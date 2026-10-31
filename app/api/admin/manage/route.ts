@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     const resource = request.nextUrl.searchParams.get('resource');
 
     if (resource === 'departments') {
-      if (!(await canAny(staff, ['departments.manage', 'members.view']))) return staffPermissionErrorResponse(403);
+      if (!(await canAny(staff, ['departments.manage', 'members.view', 'opportunities.view', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
       let query = supabase.from('departments')
         .select('id, name, slug, description, sort_order, status, created_at, updated_at, archived_at')
         .order('sort_order', { ascending: true })
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (resource === 'roles') {
-      if (!(await canAny(staff, ['roles.manage', 'members.view']))) return staffPermissionErrorResponse(403);
+      if (!(await canAny(staff, ['roles.manage', 'members.view', 'members.manage', 'applications.review', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
       let query = supabase.from('team_roles')
         .select('id, department_id, name, description, badge_title, badge_description, status, created_at, updated_at')
         .order('name', { ascending: true });
@@ -129,6 +129,31 @@ export async function GET(request: NextRequest) {
           profile: (profilesResult.data || []).find((profile) => profile.user_id === row.user_id) || null,
           role: (rolesResult.data || []).find((role) => role.id === row.role_id) || null,
           department: (departmentsResult.data || []).find((department) => department.id === row.department_id) || null,
+        })),
+      }, { headers: noStore });
+    }
+
+    if (resource === 'opportunities') {
+      if (!(await canAny(staff, ['opportunities.view', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
+      let query = supabase.from('opportunities')
+        .select('id, department_id, title, description, requirements, openings, questions, opens_at, closes_at, status, created_at, updated_at')
+        .order('created_at', { ascending: false });
+      if (!staff.isPlatformAdmin) {
+        const ids = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
+        if (!ids.length) return NextResponse.json({ opportunities: [] }, { headers: noStore });
+        query = query.in('department_id', ids);
+      }
+      const { data: opportunities, error } = await query;
+      if (error) return dbError(error, 'GET admin opportunities');
+      const ids = Array.from(new Set((opportunities || []).map((item) => item.department_id)));
+      const { data: departments, error: departmentError } = ids.length
+        ? await supabase.from('departments').select('id, name').in('id', ids)
+        : { data: [], error: null };
+      if (departmentError) return dbError(departmentError, 'GET admin opportunity departments');
+      return NextResponse.json({
+        opportunities: (opportunities || []).map((item) => ({
+          ...item,
+          department: (departments || []).find((department) => department.id === item.department_id) || null,
         })),
       }, { headers: noStore });
     }
@@ -201,6 +226,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ id: data }, { status: 201, headers: noStore });
     }
 
+    if (body.resource === 'opportunity') {
+      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
+      const id = cleanText(body.id, 80, true);
+      const title = cleanText(body.title, 120, true);
+      const description = cleanText(body.description, 12000) || '';
+      const requirements = cleanText(body.requirements, 8000) || '';
+      const openings = Number.isInteger(body.openings) ? body.openings : 0;
+      const status = ['draft', 'open', 'closed', 'archived'].includes(body.status) ? body.status : null;
+      const opensAt = new Date(body.opens_at);
+      const closesAt = new Date(body.closes_at);
+      if (!id || !title || typeof body.department_id !== 'string' || !status || !Array.isArray(body.questions) ||
+          !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
+        return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
+      }
+      const { data, error } = await supabase.rpc('admin_update_opportunity', {
+        p_session_token_hash: staff.sessionTokenHash,
+        p_opportunity_id: id,
+        p_department_id: body.department_id,
+        p_title: title,
+        p_description: description,
+        p_requirements: requirements,
+        p_openings: openings,
+        p_questions: body.questions,
+        p_opens_at: opensAt.toISOString(),
+        p_closes_at: closesAt.toISOString(),
+        p_status: status,
+      });
+      if (error) return dbError(error, 'PATCH admin opportunity');
+      return NextResponse.json({ updated: Boolean(data) }, { headers: noStore });
+    }
+
     if (body.resource === 'role') {
       if (!(await hasStaffPermission(staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
@@ -221,6 +277,35 @@ export async function POST(request: NextRequest) {
         p_permission_codes: permissionCodes,
       });
       if (error) return dbError(error, 'POST admin role');
+      return NextResponse.json({ id: data }, { status: 201, headers: noStore });
+    }
+
+    if (body.resource === 'opportunity') {
+      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
+      const title = cleanText(body.title, 120, true);
+      const description = cleanText(body.description, 12000) || '';
+      const requirements = cleanText(body.requirements, 8000) || '';
+      const openings = Number.isInteger(body.openings) ? body.openings : 0;
+      const status = ['draft', 'open', 'closed', 'archived'].includes(body.status) ? body.status : 'draft';
+      const opensAt = new Date(body.opens_at);
+      const closesAt = new Date(body.closes_at);
+      if (!title || typeof body.department_id !== 'string' || !Array.isArray(body.questions) ||
+          !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
+        return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
+      }
+      const { data, error } = await supabase.rpc('admin_create_opportunity', {
+        p_session_token_hash: staff.sessionTokenHash,
+        p_department_id: body.department_id,
+        p_title: title,
+        p_description: description,
+        p_requirements: requirements,
+        p_openings: openings,
+        p_questions: body.questions,
+        p_opens_at: opensAt.toISOString(),
+        p_closes_at: closesAt.toISOString(),
+        p_status: status,
+      });
+      if (error) return dbError(error, 'POST admin opportunity');
       return NextResponse.json({ id: data }, { status: 201, headers: noStore });
     }
 
