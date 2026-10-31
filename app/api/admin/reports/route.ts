@@ -29,7 +29,7 @@ export async function GET() {
     const departmentIds = await moderationDepartments(staff);
     if (!staff.isPlatformAdmin && !departmentIds.length) return NextResponse.json({ reports: [] }, { headers: noStore });
     let query = supabase.from('moderation_reports')
-      .select('id, reporter_id, target_user_id, department_id, content_type, content_id, reason, details, status, internal_notes, reviewer_id, reviewed_at, created_at')
+      .select('id, reporter_id, target_user_id, department_id, content_type, content_id, reason, details, evidence_urls, status, internal_notes, reviewer_id, reviewed_at, created_at')
       .order('created_at', { ascending: false })
       .limit(300);
     if (!staff.isPlatformAdmin) query = query.in('department_id', departmentIds);

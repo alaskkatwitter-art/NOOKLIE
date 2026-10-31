@@ -482,6 +482,29 @@ test('content-warning correction requests stay private to authors and authorized
   assert.equal(moderationCreate.status, 401);
 });
 
+test('moderation reports reject unsafe or excessive evidence links', async () => {
+  const login = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-vercel-forwarded-for': '198.51.100.55' },
+    body: JSON.stringify({ username: 'owner', password: 'correct-password' }),
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const cases = [
+    ['javascript:alert(1)'],
+    ['https://user:password@example.com/evidence'],
+    ['https://example.com/1', 'https://example.com/2', 'https://example.com/3', 'https://example.com/4'],
+  ];
+  for (const evidence_urls of cases) {
+    const response = await fetch(`${baseUrl}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ content_type: 'story', content_id: 'story-1', reason: 'safety', details: '', evidence_urls }),
+    });
+    assert.equal(response.status, 400);
+  }
+});
+
 test('login rate-limits repeated attempts', async () => {
   let response;
   for (let attempt = 0; attempt < 11; attempt += 1) {

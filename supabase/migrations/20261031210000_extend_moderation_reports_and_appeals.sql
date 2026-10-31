@@ -10,6 +10,16 @@ grant update (appeal_status, ends_at) on public.moderation_actions to service_ro
 alter table public.moderation_reports drop constraint if exists moderation_reports_content_type_check;
 alter table public.moderation_reports add constraint moderation_reports_content_type_check
   check (content_type in ('profile', 'post', 'story', 'chapter', 'comment', 'review', 'review_comment'));
+alter table public.moderation_reports
+  add column if not exists evidence_urls text[] not null default '{}'::text[];
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'moderation_reports_evidence_urls_check') then
+    alter table public.moderation_reports add constraint moderation_reports_evidence_urls_check
+      check (cardinality(evidence_urls) <= 3 and array_position(evidence_urls, null) is null);
+  end if;
+end;
+$$;
 
 create index if not exists chapters_public_story_idx
   on public.chapters (story_id, chapter_number) where moderation_hidden_at is null;
@@ -54,7 +64,8 @@ create function public.submit_moderation_report(
   p_content_type text,
   p_content_id uuid,
   p_reason text,
-  p_details text default ''
+  p_details text default '',
+  p_evidence_urls text[] default '{}'::text[]
 )
 returns uuid
 language plpgsql
@@ -65,6 +76,7 @@ declare
   v_target uuid;
   v_department uuid;
   v_report_id uuid;
+  v_evidence_url text;
 begin
   v_actor := public.admin_current_actor(p_session_token_hash);
   if p_content_type = 'profile' then
@@ -91,20 +103,30 @@ begin
      or char_length(btrim(coalesce(p_details, ''))) > 3000 then
     raise exception using errcode = '22023', message = 'Report details are invalid';
   end if;
+  if p_evidence_urls is null or cardinality(p_evidence_urls) > 3 then
+    raise exception using errcode = '22023', message = 'Report evidence is invalid';
+  end if;
+  foreach v_evidence_url in array p_evidence_urls loop
+    if char_length(v_evidence_url) > 2000
+       or v_evidence_url !~* '^https?://[^[:space:]]+$'
+       or v_evidence_url ~* '^https?://[^/@]+@' then
+      raise exception using errcode = '22023', message = 'Report evidence is invalid';
+    end if;
+  end loop;
   if (select count(*) from public.moderation_reports where reporter_id = v_actor and status in ('pending', 'in_review')) >= 10 then
     raise exception using errcode = '22023', message = 'Too many open reports';
   end if;
   select department.id into v_department from public.departments as department where department.slug = 'moderacao' and department.status = 'active';
   if v_department is null then raise exception using errcode = 'P0002', message = 'Moderation department is unavailable'; end if;
 
-  insert into public.moderation_reports (reporter_id, target_user_id, department_id, content_type, content_id, reason, details)
-  values (v_actor, v_target, v_department, p_content_type, p_content_id, p_reason, btrim(coalesce(p_details, '')))
+  insert into public.moderation_reports (reporter_id, target_user_id, department_id, content_type, content_id, reason, details, evidence_urls)
+  values (v_actor, v_target, v_department, p_content_type, p_content_id, p_reason, btrim(coalesce(p_details, '')), p_evidence_urls)
   returning id into v_report_id;
   return v_report_id;
 end;
 $$;
-revoke all on function public.submit_moderation_report(text, text, uuid, text, text) from public, anon, authenticated;
-grant execute on function public.submit_moderation_report(text, text, uuid, text, text) to service_role;
+revoke all on function public.submit_moderation_report(text, text, uuid, text, text, text[]) from public, anon, authenticated;
+grant execute on function public.submit_moderation_report(text, text, uuid, text, text, text[]) to service_role;
 
 -- Replace the current action handler so hide/restore applies to every supported target.
 drop function if exists public.admin_review_moderation_report(text, uuid, text, text, text);
