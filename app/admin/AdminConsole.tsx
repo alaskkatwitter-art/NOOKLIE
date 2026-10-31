@@ -178,6 +178,7 @@ export default function AdminConsole({
       : tab === 'opportunities' ? Promise.all([loadDepartments(), loadOpportunities()]).then(() => undefined)
       : tab === 'applications' ? Promise.all([loadDepartments(), loadRoles(), loadApplications()]).then(() => undefined)
       : tab === 'users' ? loadUsers()
+      : tab === 'moderation' ? Promise.resolve()
       : loadAudit();
     work.catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : 'Falha ao carregar o painel.'); })
       .finally(() => { if (active) setLoading(false); });
