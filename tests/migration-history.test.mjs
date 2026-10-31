@@ -41,4 +41,5 @@ test('active migration files retain the exact applied Supabase history', async (
   }
   assert.ok(activeSqlFiles.includes('20261031194437_add_literary_collaboration_review_privacy_features.sql'));
   assert.ok(activeSqlFiles.includes('20261031210000_extend_moderation_reports_and_appeals.sql'));
+  assert.ok(activeSqlFiles.includes('20261031220000_collaborator_exit_and_credit_withdrawal.sql'));
 });

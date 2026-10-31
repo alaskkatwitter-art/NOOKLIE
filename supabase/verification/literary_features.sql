@@ -46,6 +46,16 @@ begin
     raise exception 'service_role needs column-only update access for suspension end times';
   end if;
 
+  if to_regprocedure('public.leave_story_collaboration(text,uuid,text)') is null then
+    raise exception 'Self-service collaboration exit function is missing';
+  end if;
+  if has_function_privilege('authenticated', 'public.leave_story_collaboration(text,uuid,text)', 'EXECUTE') then
+    raise exception 'Browser roles must not execute the collaboration exit function directly';
+  end if;
+  if not has_function_privilege('service_role', 'public.leave_story_collaboration(text,uuid,text)', 'EXECUTE') then
+    raise exception 'Backend service role must be able to execute the collaboration exit function';
+  end if;
+
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.story_reviews'::regclass

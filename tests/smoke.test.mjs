@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], collaborators: [], storyCredits: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -154,6 +154,22 @@ before(async () => {
       state.account.recovery_key_hash = input.p_consumed_recovery_key_hash;
       state.sessions = [];
       return sendJson(response, true);
+    }
+
+    if (path === 'rpc/leave_story_collaboration' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const input = JSON.parse(body);
+      const session = state.sessions.find((item) => item.token_hash === input.p_session_token_hash && new Date(item.expires_at).getTime() > Date.now());
+      if (!session) return sendJson(response, { code: '42501' }, 403);
+      const membership = state.collaborators.find((item) => item.story_id === input.p_story_id && item.profile_id === session.user_id && item.role === input.p_role && item.status === 'active');
+      if (!membership) return sendJson(response, { code: 'P0002' }, 400);
+      membership.status = 'left'; membership.removed_at = new Date().toISOString();
+      if (input.p_role !== 'coauthor') {
+        const credit = state.storyCredits.find((item) => item.story_id === input.p_story_id && item.contributor_id === session.user_id && item.role === input.p_role && ['pending', 'accepted'].includes(item.status));
+        if (credit) { credit.status = 'withdrawn'; credit.decided_at = new Date().toISOString(); }
+      }
+      return sendJson(response, { left: true, role: input.p_role });
     }
 
     if (path === 'tag_categories' && request.method === 'GET') {
@@ -326,7 +342,12 @@ before(async () => {
       const profileFilter = (url.searchParams.get('profile_id') || '').replace(/^eq\./, '');
       const roleFilter = (url.searchParams.get('role') || '').replace(/^eq\./, '');
       const statusFilter = (url.searchParams.get('status') || '').replace(/^eq\./, '');
-      const rows = state.collaborators.filter((item) => item.story_id === storyFilter && item.profile_id === profileFilter && item.role === roleFilter && item.status === statusFilter);
+      let rows = state.collaborators;
+      if (storyFilter) rows = rows.filter((item) => item.story_id === storyFilter);
+      if (profileFilter) rows = rows.filter((item) => item.profile_id === profileFilter);
+      if (roleFilter) rows = rows.filter((item) => item.role === roleFilter);
+      if (statusFilter) rows = rows.filter((item) => item.status === statusFilter);
+      if ((url.searchParams.get('select') || '').includes('story:stories')) rows = rows.map((item) => ({ ...item, story: { title: item.story_title || 'História de teste' } }));
       return respondRows(request, response, rows);
     }
 
@@ -528,6 +549,40 @@ test('chapter creation requires authentication and confirms story ownership', as
   const result = await created.json();
   assert.equal(result.chapter.chapter_number, 4);
   assert.equal(result.chapter.title, 'Novo capítulo');
+});
+
+test('collaborators can leave only their own role and withdraw a confirmed credit', async () => {
+  const otherToken = 'designer-collaboration-session';
+  const ownerToken = 'owner-session-token';
+  const collaborationStoryId = '00000000-0000-4000-8000-000000000001';
+  state.sessions.push({ user_id: otherUserId, token_hash: hash(otherToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  if (!state.sessions.some((session) => session.token_hash === hash(ownerToken))) {
+    state.sessions.push({ user_id: userId, token_hash: hash(ownerToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  }
+  state.collaborators.push({ id: 'designer-membership', story_id: collaborationStoryId, profile_id: otherUserId, role: 'designer', status: 'active', story_title: 'História colaborativa' });
+  state.storyCredits.push({ story_id: collaborationStoryId, contributor_id: otherUserId, role: 'designer', status: 'accepted' });
+
+  const list = await fetch(`${baseUrl}/api/account/collaborations`, { headers: { Cookie: `toriland_session=${otherToken}` } });
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).collaborations[0].story_title, 'História colaborativa');
+
+  const unauthorized = await fetch(`${baseUrl}/api/account/collaborations`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${ownerToken}` },
+    body: JSON.stringify({ story_id: collaborationStoryId, role: 'designer' }),
+  });
+  assert.equal(unauthorized.status, 404);
+  assert.equal(state.collaborators[0].status, 'active');
+
+  const withdrawn = await fetch(`${baseUrl}/api/account/collaborations`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${otherToken}` },
+    body: JSON.stringify({ story_id: collaborationStoryId, role: 'designer' }),
+  });
+  assert.equal(withdrawn.status, 200);
+  assert.deepEqual(await withdrawn.json(), { left: true, role: 'designer' });
+  assert.equal(state.collaborators[0].status, 'left');
+  assert.equal(state.storyCredits[0].status, 'withdrawn');
+  state.collaborators = [];
+  state.storyCredits = [];
 });
 
 test('readers can like and discuss a review while spoiler comments stay labeled and manageable', async () => {

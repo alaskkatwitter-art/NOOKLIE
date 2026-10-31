@@ -42,8 +42,9 @@ Migrações locais pendentes no branch da implementação (ainda não aplicadas 
 
 - `20261031194437_add_literary_collaboration_review_privacy_features`
 - `20261031210000_extend_moderation_reports_and_appeals`
+- `20261031220000_collaborator_exit_and_credit_withdrawal`
 
-Elas criam estruturas usadas por avaliações, colaboração, políticas, denúncias de conteúdo literário e recursos. Esses fluxos só devem ser ativados depois da validação e aplicação ordenada em um ambiente de desenvolvimento.
+Elas criam estruturas usadas por avaliações, colaboração, políticas, denúncias de conteúdo literário e recursos; a última adiciona a saída voluntária de colaboradores com retirada atômica do crédito. Esses fluxos só devem ser ativados depois da validação e aplicação ordenada em um ambiente de desenvolvimento.
 
 ## Segurança observada
 
@@ -63,7 +64,7 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 ## Próxima validação segura
 
 1. Obter um banco de desenvolvimento; o plano atual bloqueia branches e não foi feita alteração ao plano nem criada outra cobrança.
-2. Aplicar nele, em ordem, as duas migrações pendentes e executar todos os arquivos em `supabase/verification/`.
+2. Aplicar nele, em ordem, as três migrações pendentes e executar todos os arquivos em `supabase/verification/`.
 3. Comparar o schema e as permissões resultantes aos fluxos da aplicação e corrigir os erros encontrados.
 4. Só depois de validar e revisar, aplicar as migrações à produção com autorização explícita. Os dados da produção permanecem intocados até lá.
 
