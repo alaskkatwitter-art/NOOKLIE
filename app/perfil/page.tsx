@@ -159,6 +159,9 @@ const SPOTIFY_URL_REGEX =
 const PRIVATE_THEME_STORAGE_PREFIX =
   'nooklie-profile-theme:';
 
+const PRIVATE_THEME_MIGRATED_PREFIX =
+  'nooklie-profile-theme-migrated:';
+
 const DEFAULT_PROFILE_THEME =
   '#ff78b9';
 
@@ -369,6 +372,9 @@ export default function PerfilPage() {
   const [profileTheme, setProfileTheme] =
     useState(DEFAULT_PROFILE_THEME);
 
+  const [savingTheme, setSavingTheme] =
+    useState(false);
+
   const [showThemePicker, setShowThemePicker] =
     useState(false);
 
@@ -501,15 +507,52 @@ export default function PerfilPage() {
           ''
       );
 
+      const themeStorageKey =
+        `${PRIVATE_THEME_STORAGE_PREFIX}${data.user.id}`;
+      const themeMigratedKey =
+        `${PRIVATE_THEME_MIGRATED_PREFIX}${data.user.id}`;
       const privateTheme =
-        localStorage.getItem(
-          `${PRIVATE_THEME_STORAGE_PREFIX}${data.user.id}`
-        );
+        localStorage.getItem(themeStorageKey);
+      const themeWasMigrated =
+        localStorage.getItem(themeMigratedKey) === 'true';
+      const savedTheme =
+        typeof data.user.theme_color === 'string' &&
+        PROFILE_THEME_OPTIONS.includes(data.user.theme_color)
+          ? data.user.theme_color
+          : DEFAULT_PROFILE_THEME;
 
-      setProfileTheme(
-        privateTheme ||
-          DEFAULT_PROFILE_THEME
-      );
+      if (
+        !themeWasMigrated &&
+        privateTheme &&
+        PROFILE_THEME_OPTIONS.includes(privateTheme)
+      ) {
+        setProfileTheme(privateTheme);
+
+        try {
+          const themeResponse = await fetch(
+            '/api/profile/update',
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                theme_color: privateTheme,
+              }),
+            }
+          );
+
+          if (themeResponse.ok) {
+            localStorage.setItem(themeMigratedKey, 'true');
+          }
+        } catch {
+          // Keep the saved local color visible and retry the sync next time.
+        }
+      } else {
+        setProfileTheme(savedTheme);
+        localStorage.setItem(themeStorageKey, savedTheme);
+        localStorage.setItem(themeMigratedKey, 'true');
+      }
     } catch {
       router.push('/login');
     } finally {
@@ -829,19 +872,69 @@ export default function PerfilPage() {
     }
   }
 
-  function handleThemeChange(
+  async function handleThemeChange(
     color: string
   ) {
-    if (!user) return;
+    if (
+      !user ||
+      savingTheme ||
+      !PROFILE_THEME_OPTIONS.includes(color)
+    ) return;
 
+    const previousTheme = profileTheme;
+    setSavingTheme(true);
     setProfileTheme(color);
-
-    localStorage.setItem(
-      `${PRIVATE_THEME_STORAGE_PREFIX}${user.id}`,
-      color
-    );
-
     setShowThemePicker(false);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        '/api/profile/update',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            theme_color: color,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.user) {
+        setProfileTheme(previousTheme);
+        setError(
+          data.error ||
+            'Não foi possível salvar a cor do perfil. Tente novamente.'
+        );
+        return;
+      }
+
+      setUser(data.user);
+      localStorage.setItem(
+        `${PRIVATE_THEME_STORAGE_PREFIX}${user.id}`,
+        color
+      );
+      localStorage.setItem(
+        `${PRIVATE_THEME_MIGRATED_PREFIX}${user.id}`,
+        'true'
+      );
+      setSuccess('A cor do perfil foi salva.');
+
+      setTimeout(() => {
+        setSuccess('');
+      }, 2500);
+    } catch {
+      setProfileTheme(previousTheme);
+      setError(
+        'Não foi possível salvar a cor do perfil. Tente novamente.'
+      );
+    } finally {
+      setSavingTheme(false);
+    }
   }
 
   function openAvatarPicker() {
@@ -2605,6 +2698,7 @@ export default function PerfilPage() {
                           <button
                             key={color}
                             type="button"
+                            disabled={savingTheme}
                             onClick={() =>
                               handleThemeChange(
                                 color
@@ -4025,6 +4119,7 @@ export default function PerfilPage() {
                       <button
                         key={color}
                         type="button"
+                        disabled={savingTheme}
                         onClick={() =>
                           handleThemeChange(
                             color

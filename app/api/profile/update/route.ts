@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
+const PROFILE_THEME_COLORS = new Set([
+  '#ff78b9',
+  '#ff9aca',
+  '#b77cff',
+  '#7c8cff',
+  '#62c8ff',
+  '#61d6a4',
+  '#9be15d',
+  '#ffd166',
+  '#ff8a65',
+  '#ffffff',
+]);
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
@@ -61,32 +74,88 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
 
-    const displayName =
-      typeof body.display_name === 'string'
-        ? body.display_name.trim()
-        : '';
-
-    const bio =
-      typeof body.bio === 'string'
-        ? body.bio.trim()
-        : '';
-
-    if (displayName.length > 50) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json(
-        {
-          error:
-            'O nome de exibição pode ter no máximo 50 caracteres.',
-        },
+        { error: 'Dados do perfil inválidos.' },
         { status: 400 }
       );
     }
 
-    if (bio.length > 500) {
+    const updates: {
+      display_name?: string | null;
+      bio?: string | null;
+      theme_color?: string;
+    } = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, 'display_name')) {
+      if (body.display_name !== null && typeof body.display_name !== 'string') {
+        return NextResponse.json(
+          { error: 'Nome de exibição inválido.' },
+          { status: 400 }
+        );
+      }
+
+      const displayName =
+        typeof body.display_name === 'string'
+          ? body.display_name.trim()
+          : '';
+
+      if (displayName.length > 50) {
+        return NextResponse.json(
+          {
+            error:
+              'O nome de exibição pode ter no máximo 50 caracteres.',
+          },
+          { status: 400 }
+        );
+      }
+
+      updates.display_name = displayName || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'bio')) {
+      if (body.bio !== null && typeof body.bio !== 'string') {
+        return NextResponse.json(
+          { error: 'Bio inválida.' },
+          { status: 400 }
+        );
+      }
+
+      const bio =
+        typeof body.bio === 'string'
+          ? body.bio.trim()
+          : '';
+
+      if (bio.length > 500) {
+        return NextResponse.json(
+          {
+            error:
+              'A bio pode ter no máximo 500 caracteres.',
+          },
+          { status: 400 }
+        );
+      }
+
+      updates.bio = bio || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'theme_color')) {
+      if (
+        typeof body.theme_color !== 'string' ||
+        !PROFILE_THEME_COLORS.has(body.theme_color)
+      ) {
+        return NextResponse.json(
+          { error: 'Cor do perfil inválida.' },
+          { status: 400 }
+        );
+      }
+
+      updates.theme_color = body.theme_color;
+    }
+
+    if (Object.keys(updates).length === 0) {
       return NextResponse.json(
-        {
-          error:
-            'A bio pode ter no máximo 500 caracteres.',
-        },
+        { error: 'Nenhuma alteração válida foi informada.' },
         { status: 400 }
       );
     }
@@ -94,10 +163,7 @@ export async function PATCH(request: Request) {
     const { data: profile, error: profileError } =
       await supabase
         .from('profiles')
-        .update({
-          display_name: displayName || null,
-          bio: bio || null,
-        })
+        .update(updates)
         .eq('user_id', session.user_id)
         .select(
           'id, username, display_name, bio, avatar_url, cover_url, theme_color'
