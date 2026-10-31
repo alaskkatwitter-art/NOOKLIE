@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { isStoryRating } from '@/lib/stories/rating';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabase = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY!);
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Página inválida.' }, { status: 400 });
     }
 
-    if (rating && !['Livre', '10', '12', '14', '16', '18'].includes(rating)) {
+    if (rating && !isStoryRating(rating)) {
       return NextResponse.json({ error: 'Classificação inválida.' }, { status: 400 });
     }
     if (storyStatus && !['Em andamento', 'Concluída'].includes(storyStatus)) {

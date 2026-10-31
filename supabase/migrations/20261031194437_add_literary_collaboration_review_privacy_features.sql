@@ -7,6 +7,10 @@ alter table public.stories
   add column if not exists anonymity_changed_at timestamptz,
   add column if not exists hidden_by_deactivation boolean not null default false;
 
+alter table public.stories
+  add constraint stories_rating_allowed_check
+  check (rating is null or rating in ('Livre', '12', '14', '16', '18'));
+
 alter table public.profiles
   add column if not exists designer_portfolio_enabled boolean not null default true,
   add column if not exists available_for_design_requests boolean not null default false,

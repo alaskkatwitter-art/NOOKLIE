@@ -749,3 +749,28 @@ test('story discovery can continue to the next page', async () => {
   assert.equal(secondPage.has_more, false);
   assert.equal(new Set([...firstPage.stories, ...secondPage.stories].map((story) => story.id)).size, 27);
 });
+
+
+test('story age ratings reject unsupported values', async () => {
+  const invalidFilter = await fetch(`${baseUrl}/api/explore?rating=10`);
+  assert.equal(invalidFilter.status, 400);
+
+  const login = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-vercel-forwarded-for': '198.51.100.56' },
+    body: JSON.stringify({ username: 'owner', password: 'correct-password' }),
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const form = new FormData();
+  form.set('title', 'História de teste');
+  form.set('description', '');
+  form.set('status', 'Em andamento');
+  form.set('genre', 'Fantasia');
+  form.set('rating', '10');
+  form.set('tags', '');
+  const response = await fetch(`${baseUrl}/api/stories/create`, {
+    method: 'POST', headers: { Cookie: cookie }, body: form,
+  });
+  assert.equal(response.status, 400);
+});

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { isStoryRating } from '@/lib/stories/rating';
 import { getStoryEditAccess } from '@/lib/stories/access';
 
 const supabaseUrl =
@@ -932,22 +933,7 @@ export async function PUT(
       );
     }
 
-    const allowedRatings =
-      [
-        '',
-        'Livre',
-        '10',
-        '12',
-        '14',
-        '16',
-        '18',
-      ];
-
-    if (
-      !allowedRatings.includes(
-        rating
-      )
-    ) {
+    if (rating && !isStoryRating(rating)) {
       return NextResponse.json(
         {
           error:

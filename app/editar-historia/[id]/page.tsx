@@ -1,5 +1,7 @@
 'use client';
 
+import { storyRatings } from '@/lib/stories/rating';
+
 import React, {
   ChangeEvent,
   FormEvent,
@@ -2438,29 +2440,11 @@ export default function EditarHistoriaPage() {
                         Selecione
                       </option>
 
-                      <option value="Livre">
-                        Livre
-                      </option>
-
-                      <option value="10">
-                        10 anos
-                      </option>
-
-                      <option value="12">
-                        12 anos
-                      </option>
-
-                      <option value="14">
-                        14 anos
-                      </option>
-
-                      <option value="16">
-                        16 anos
-                      </option>
-
-                      <option value="18">
-                        18 anos
-                      </option>
+                      {storyRatings.map((value) => (
+                        <option key={value} value={value}>
+                          {value === 'Livre' ? 'Livre' : `${value} anos`}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

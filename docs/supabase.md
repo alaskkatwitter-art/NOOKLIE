@@ -6,7 +6,7 @@ Projeto conectado: `fwwgoyburkdybbqmvljk` (TORILAND). Esta documentação foi at
 
 O histórico remoto contém **25 migrações aplicadas**. O SQL de cada uma foi lido da tabela `supabase_migrations.schema_migrations` e comparado aos arquivos locais. A comparação encontrou seis versões remotas sem arquivo local e alterações posteriores que haviam sido incorporadas a duas migrações antigas. Os 25 arquivos canônicos agora estão em `supabase/migrations/`, com as versões e o SQL armazenados no banco. As 19 cópias locais anteriores foram preservadas em `supabase/migration_archive/pre-reconciliation/`; **não execute os arquivos do arquivo morto**.
 
-O diretório ativo contém exatamente as 25 versões já aplicadas, seguidas pelas duas novas migrações listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching. Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem validar as migrações num banco de desenvolvimento e obter autorização explícita.
+O diretório ativo contém as 25 versões já aplicadas, seguidas pelas três migrações pendentes listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching. Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem validar as migrações num banco de desenvolvimento e obter autorização explícita.
 
 ### Histórico remoto observado
 
@@ -44,7 +44,7 @@ Migrações locais pendentes no branch da implementação (ainda não aplicadas 
 - `20261031210000_extend_moderation_reports_and_appeals`
 - `20261031220000_collaborator_exit_and_credit_withdrawal`
 
-Elas criam estruturas usadas por avaliações, colaboração, políticas, denúncias de conteúdo literário e recursos; a última adiciona a saída voluntária de colaboradores com retirada atômica do crédito. Esses fluxos só devem ser ativados depois da validação e aplicação ordenada em um ambiente de desenvolvimento.
+Elas criam estruturas usadas por avaliações, colaboração, políticas, denúncias de conteúdo literário e recursos; a última adiciona a saída voluntária de colaboradores com retirada atômica do crédito. A primeira também limita a classificação de histórias a Livre, 12, 14, 16 ou 18 anos. Esses fluxos só devem ser ativados depois da validação e aplicação ordenada em um ambiente de desenvolvimento.
 
 ## Segurança observada
 
@@ -70,5 +70,5 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 
 ## Descoberta e recursos em implementação
 
-As categorias e filtros de tags já vivem no catálogo do Supabase. Sugestões de tag podem ser publicadas imediatamente, com normalização de slug e limite de criação. Avaliações, favoritos, bloqueios, privacidade, coautoria, créditos, histórico, recursos e denúncias de conteúdo literário estão em migrações aditivas pendentes. As verificações estão em `supabase/verification/literary_features.sql` e `supabase/verification/moderation_appeal_workflow.sql`.
+As categorias e filtros de tags já vivem no catálogo do Supabase. O assessor de segurança consultado em 31/10/2026 retornou zero avisos; o assessor de desempenho listou 64 índices sem uso observado, que não devem ser removidos sem medir consultas reais. Sugestões de tag podem ser publicadas imediatamente, com normalização de slug e limite de criação. Avaliações, favoritos, bloqueios, privacidade, coautoria, créditos, histórico, recursos e denúncias de conteúdo literário estão em migrações aditivas pendentes. As verificações estão em `supabase/verification/literary_features.sql` e `supabase/verification/moderation_appeal_workflow.sql`.
 

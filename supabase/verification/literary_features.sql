@@ -72,5 +72,14 @@ begin
   ) then
     raise exception 'Chapter favorite uniqueness constraint is missing';
   end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.stories'::regclass
+      and conname = 'stories_rating_allowed_check'
+      and contype = 'c'
+  ) then
+    raise exception 'Story age-rating constraint is missing';
+  end if;
 end;
-$$;
+$;
