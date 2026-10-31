@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [recoveryKey, setRecoveryKey] = useState("");
+  const [recoveryKeyWasRotated, setRecoveryKeyWasRotated] = useState(false);
 
   async function handleSignup(event: React.FormEvent) {
     event.preventDefault();
@@ -136,10 +137,8 @@ export default function LoginPage() {
 
       setPassword("");
       setConfirmPassword("");
-      setError(
-        "Senha alterada com sucesso. Agora você pode entrar."
-      );
-      setMode("login");
+      setRecoveryKey(data.recoveryKey);
+      setRecoveryKeyWasRotated(true);
     } catch {
       setError("Não foi possível conectar ao Nooklie.");
     } finally {
@@ -156,11 +155,11 @@ export default function LoginPage() {
               <CloudLogo />
 
               <h1 className="mt-4 text-2xl font-black">
-                Sua conta foi criada
+                {recoveryKeyWasRotated ? "Sua chave foi renovada" : "Sua conta foi criada"}
               </h1>
 
               <p className="mt-2 text-sm leading-6 text-white/45">
-                Antes de continuar, guarde sua chave de recuperação.
+                {recoveryKeyWasRotated ? "Guarde esta nova chave; a anterior não funciona mais." : "Antes de continuar, guarde sua chave de recuperação."}
               </p>
             </div>
 
@@ -180,10 +179,18 @@ export default function LoginPage() {
             </p>
 
             <button
-              onClick={() => router.push("/")}
+              onClick={() => {
+                if (recoveryKeyWasRotated) {
+                  setRecoveryKey("");
+                  setRecoveryKeyWasRotated(false);
+                  setMode("login");
+                } else {
+                  router.push("/");
+                }
+              }}
               className="mt-7 w-full rounded-full bg-[#ff78b9] px-6 py-3.5 font-bold text-[#180d15] transition hover:brightness-110"
             >
-              Continuar para o Nooklie
+              {recoveryKeyWasRotated ? "Ir para o login" : "Continuar para o Nooklie"}
             </button>
           </section>
         </div>

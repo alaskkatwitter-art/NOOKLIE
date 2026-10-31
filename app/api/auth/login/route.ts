@@ -10,156 +10,88 @@ const supabase = createClient(
 
 const SESSION_DAYS = 30;
 const SESSION_SECONDS = SESSION_DAYS * 24 * 60 * 60;
+const RATE_WINDOW_SECONDS = 15 * 60;
+
+function noStoreHeaders() {
+  return { 'Cache-Control': 'no-store, no-cache, must-revalidate', Pragma: 'no-cache' };
+}
+
+function hashRateLimitKey(value: string) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const payload = await request.json();
+    const username = typeof payload.username === 'string' ? payload.username.trim().toLowerCase() : '';
+    const password = typeof payload.password === 'string' ? payload.password : '';
 
-    const cleanUsername = username?.trim().toLowerCase();
-
-    if (!cleanUsername || !password) {
-      return NextResponse.json(
-        {
-          error: 'Username e senha são obrigatórios.',
-        },
-        { status: 400 }
-      );
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Username e senha são obrigatórios.' }, { status: 400, headers: noStoreHeaders() });
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+      return NextResponse.json({ error: 'Username ou senha incorretos.' }, { status: 401, headers: noStoreHeaders() });
     }
 
-    if (!/^[a-z0-9_]{3,30}$/.test(cleanUsername)) {
-      return NextResponse.json(
-        {
-          error:
-            'O username deve ter entre 3 e 30 caracteres e usar apenas letras, números e _.',
-        },
-        { status: 400 }
-      );
+    // Vercel sets this header from the connecting client. Hash it before persisting the limiter key.
+    const clientIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const limiterKeys = [
+      { value: `login:user:${username}:ip:${clientIp}`, limit: 10 },
+      { value: `login:ip:${clientIp}`, limit: 60 },
+    ];
+    for (const entry of limiterKeys) {
+      const { data: allowed, error } = await supabase.rpc('consume_auth_rate_limit', {
+        p_key_hash: hashRateLimitKey(entry.value),
+        p_limit: entry.limit,
+        p_window_seconds: RATE_WINDOW_SECONDS,
+      });
+      if (error || typeof allowed !== 'boolean') {
+        console.error('Não foi possível aplicar limite de tentativas de login:', error);
+        return NextResponse.json({ error: 'Não foi possível realizar o login agora.' }, { status: 503, headers: noStoreHeaders() });
+      }
+      if (!allowed) {
+        return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' }, { status: 429, headers: { ...noStoreHeaders(), 'Retry-After': String(RATE_WINDOW_SECONDS) } });
+      }
     }
 
-    /*
-     * Procura a conta pelo username.
-     */
-    const { data: account, error: accountError } =
-      await supabase
-        .from('auth_accounts')
-        .select('id, username, password_hash')
-        .eq('username', cleanUsername)
-        .maybeSingle();
+    const { data: account, error: accountError } = await supabase
+      .from('auth_accounts')
+      .select('id, username, password_hash')
+      .eq('username', username)
+      .maybeSingle();
 
     if (accountError) {
-      console.error(
-        'ERRO AO PROCURAR CONTA:',
-        accountError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível verificar sua conta.',
-        },
-        { status: 500 }
-      );
+      console.error('Erro ao verificar conta:', accountError);
+      return NextResponse.json({ error: 'Não foi possível realizar o login agora.' }, { status: 503, headers: noStoreHeaders() });
     }
 
-    /*
-     * Username inexistente.
-     */
-    if (!account) {
-      return NextResponse.json(
-        {
-          error: 'Username ou senha incorretos.',
-        },
-        { status: 401 }
-      );
+    const passwordIsValid = account
+      ? await bcrypt.compare(password, account.password_hash)
+      : false;
+    if (!account || !passwordIsValid) {
+      return NextResponse.json({ error: 'Username ou senha incorretos.' }, { status: 401, headers: noStoreHeaders() });
     }
 
-    /*
-     * Confere a senha salva no cadastro.
-     */
-    const passwordIsValid = await bcrypt.compare(
-      password,
-      account.password_hash
-    );
-
-    if (!passwordIsValid) {
-      return NextResponse.json(
-        {
-          error: 'Username ou senha incorretos.',
-        },
-        { status: 401 }
-      );
-    }
-
-    /*
-     * Cria um token de sessão completamente aleatório.
-     */
-    const sessionToken = crypto
-      .randomBytes(32)
-      .toString('hex');
-
-    /*
-     * No banco guardamos somente o hash do token.
-     */
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(sessionToken)
-      .digest('hex');
-
-    /*
-     * Sessão válida por 30 dias.
-     */
-    const expiresAt = new Date(
-      Date.now() + SESSION_SECONDS * 1000
-    ).toISOString();
-
-    /*
-     * Salva a sessão no banco.
-     *
-     * A tabela auth_sessions possui uma coluna id
-     * obrigatória, então geramos um UUID para ela.
-     */
-    const { error: sessionError } = await supabase
-      .from('auth_sessions')
-      .insert({
-        id: crypto.randomUUID(),
-        user_id: account.id,
-        token_hash: tokenHash,
-        expires_at: expiresAt,
-      });
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+    const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
+    const { error: sessionError } = await supabase.from('auth_sessions').insert({
+      id: crypto.randomUUID(),
+      user_id: account.id,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
 
     if (sessionError) {
-      console.error(
-        'ERRO AO CRIAR SESSÃO NO SUPABASE:',
-        sessionError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível criar sua sessão.',
-        },
-        { status: 500 }
-      );
+      console.error('Erro ao criar sessão:', sessionError);
+      return NextResponse.json({ error: 'Não foi possível criar sua sessão.' }, { status: 503, headers: noStoreHeaders() });
     }
 
-    /*
-     * Cria a resposta.
-     */
-    const response = NextResponse.json(
-      {
-        message: 'Login realizado com sucesso.',
-        authenticated: true,
-        user: {
-          id: account.id,
-          username: account.username,
-        },
-      },
-      { status: 200 }
-    );
-
-    /*
-     * Cria o cookie que o /api/auth/me procura.
-     */
+    const response = NextResponse.json({
+      message: 'Login realizado com sucesso.',
+      authenticated: true,
+      user: { id: account.id, username: account.username },
+    }, { status: 200, headers: noStoreHeaders() });
     response.cookies.set({
       name: 'toriland_session',
       value: sessionToken,
@@ -169,20 +101,9 @@ export async function POST(request: Request) {
       path: '/',
       maxAge: SESSION_SECONDS,
     });
-
     return response;
   } catch (error) {
-    console.error(
-      'ERRO INESPERADO NO LOGIN:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          'Não foi possível realizar o login.',
-      },
-      { status: 500 }
-    );
+    console.error('Erro inesperado no login:', error);
+    return NextResponse.json({ error: 'Não foi possível realizar o login.' }, { status: 400, headers: noStoreHeaders() });
   }
 }

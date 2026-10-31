@@ -6,6 +6,7 @@ Este documento registra o estado observado no projeto Supabase **TORILAND** (ref
 
 | Versão | Nome |
 | --- | --- |
+| `20261031012246` | `secure_public_access_and_optimize_rls` |
 | `20261030021627` | `harden_public_schema_access_and_function_security` |
 | `20261030024020` | `auth_attempt_rate_limits` |
 | `20261030025623` | `complete_auth_recovery_atomically` |
@@ -32,3 +33,13 @@ Com o Supabase CLI instalado e autenticado:
 5. Salve o arquivo gerado no GitHub antes de propor qualquer mudança de esquema.
 
 Para alterações futuras, crie arquivos com `supabase migration new <nome>`, revise o SQL, aplique primeiro em um ambiente de desenvolvimento e só então use `supabase db push` no projeto pretendido. Mantenha RLS e políticas explícitas em todas as tabelas expostas.
+
+## Segurança de acesso e desempenho
+
+A migração `20261031012246_secure_public_access_and_optimize_rls` mantém as tabelas do aplicativo acessíveis somente pelas rotas de servidor que usam a chave secreta. As 21 tabelas que não tinham política receberam uma política restritiva de bloqueio para `anon` e `authenticated`, além da revogação explícita de privilégios. As políticas existentes que usam `auth.uid()` foram ajustadas para avaliar a identidade uma vez por instrução; 13 índices foram criados nas colunas de chaves estrangeiras que ainda não tinham índice pelo primeiro campo.
+
+A recuperação de conta usa a função atômica `complete_auth_recovery`: ela troca a senha e a chave de recuperação somente se a chave apresentada continuar válida e revoga as sessões antigas na mesma transação. Login e recuperação aplicam limites de tentativas com chaves armazenadas como hash.
+
+## Verificação do banco
+
+O arquivo `supabase/verification/rls_access.sql` verifica as políticas restritivas, a ausência de permissões para os papéis de cliente, as expressões RLS otimizadas e os índices de chaves estrangeiras. Após aplicar as migrações, cole o conteúdo no SQL Editor do Supabase; a consulta termina sem erro quando todas as verificações passam. A suíte de integração do app cobre login, recuperação de conta e criação de capítulos no CI do GitHub.
