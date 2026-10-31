@@ -69,6 +69,18 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  database-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: Start an isolated local Supabase stack
+        run: supabase start
+      - name: Replay the complete migration history
+        run: supabase db reset --local
+
   save-initial-lockfile:
     needs: [prepare-dependencies, verify]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare-dependencies.outputs.generated == 'true'
