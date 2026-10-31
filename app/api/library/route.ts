@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import { isPublicProfileVisible, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
+import { getPublicProfileIds, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -178,9 +178,13 @@ export async function GET() {
       );
     }
 
-    const visibleStories = (await Promise.all((stories || []).map(async (story) =>
-      await isPublicProfileVisible(supabase, story.author_id) ? story : null
-    ))).filter((story): story is NonNullable<typeof story> => story !== null);
+    const visibleProfileIds = await getPublicProfileIds(
+      supabase,
+      (stories || []).map((story) => story.author_id)
+    );
+    const visibleStories = (stories || []).filter((story) =>
+      visibleProfileIds.has(story.author_id)
+    );
 
     const authorIds = Array.from(
       new Set(

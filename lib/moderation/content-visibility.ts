@@ -32,6 +32,57 @@ export async function isPublicProfileVisible(
   return account?.account_status !== 'suspended';
 }
 
+export async function getPublicProfileIds(
+  supabase: VisibilityClient,
+  profileOrUserIds: string[]
+): Promise<Set<string>> {
+  const identifiers = Array.from(new Set(profileOrUserIds.filter(Boolean)));
+  if (identifiers.length === 0) return new Set();
+
+  const [profilesById, profilesByUserId] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, user_id, moderation_hidden_at')
+      .in('id', identifiers),
+    supabase
+      .from('profiles')
+      .select('id, user_id, moderation_hidden_at')
+      .in('user_id', identifiers),
+  ]);
+
+  if (profilesById.error) throw profilesById.error;
+  if (profilesByUserId.error) throw profilesByUserId.error;
+
+  const profiles = Array.from(
+    new Map(
+      [...(profilesById.data || []), ...(profilesByUserId.data || [])]
+        .map((profile) => [profile.user_id, profile] as const)
+    ).values()
+  ).filter((profile) => !profile.moderation_hidden_at);
+
+  if (profiles.length === 0) return new Set();
+
+  const userIds = profiles.map((profile) => profile.user_id);
+  const { data: accounts, error: accountError } = await supabase
+    .from('auth_accounts')
+    .select('id, account_status')
+    .in('id', userIds);
+
+  if (accountError) throw accountError;
+
+  const suspendedUserIds = new Set(
+    (accounts || [])
+      .filter((account) => account.account_status === 'suspended')
+      .map((account) => account.id)
+  );
+
+  return new Set(
+    profiles
+      .filter((profile) => !suspendedUserIds.has(profile.user_id))
+      .flatMap((profile) => [profile.id, profile.user_id])
+  );
+}
+
 export async function isPublicStoryVisible(
   supabase: VisibilityClient,
   storyId: string

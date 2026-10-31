@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,6 +125,19 @@ export async function GET() {
       });
     }
 
+    const visibleFollowingIds = await getPublicProfileIds(
+      supabase,
+      followingIds
+    );
+
+    const publicFollowingIds = followingIds.filter((id) =>
+      visibleFollowingIds.has(id)
+    );
+
+    if (publicFollowingIds.length === 0) {
+      return NextResponse.json({ updates: [] });
+    }
+
     // ======================================================
     // HISTÓRIAS DESSES AUTORES
     // ======================================================
@@ -141,7 +155,7 @@ export async function GET() {
       `)
       .in(
         'author_id',
-        followingIds
+        publicFollowingIds
       )
       .is('moderation_hidden_at', null);
 
@@ -288,7 +302,7 @@ export async function GET() {
       `)
       .in(
         'id',
-        followingIds
+        publicFollowingIds
       );
 
     if (profilesError) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
-import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -99,9 +99,15 @@ export async function GET(request: Request) {
       );
     }
 
-    const posts = (await Promise.all((rawPosts || []).filter((post) => !post.moderation_hidden_at).map(async (post) =>
-      await isPublicProfileVisible(supabase, post.user_id) ? post : null
-    ))).filter((post): post is NonNullable<typeof post> => post !== null);
+    const visibleProfileIds = await getPublicProfileIds(
+      supabase,
+      (rawPosts || []).map((post) => post.user_id)
+    );
+    const posts = (rawPosts || []).filter(
+      (post) =>
+        !post.moderation_hidden_at &&
+        visibleProfileIds.has(post.user_id)
+    );
 
     if (!posts || posts.length === 0) {
       return NextResponse.json({

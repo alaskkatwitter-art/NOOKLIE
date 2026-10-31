@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getPublicStaffBadges } from "@/lib/admin/public-badges";
-import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { getPublicProfileIds, isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
@@ -325,6 +325,7 @@ export async function GET(
         .select(
           `
           id,
+          author_id,
           title,
           description,
           cover_url,
@@ -343,7 +344,13 @@ export async function GET(
           listStoriesError
         );
       } else {
-        listStories = storiesData || [];
+        const visibleAuthorIds = await getPublicProfileIds(
+          supabase,
+          (storiesData || []).map((story) => story.author_id)
+        );
+        listStories = (storiesData || [])
+          .filter((story) => visibleAuthorIds.has(story.author_id))
+          .map(({ author_id, ...story }) => story);
       }
     }
 
@@ -474,6 +481,7 @@ export async function GET(
         .select(
           `
           id,
+          author_id,
           title,
           description,
           cover_url,
@@ -487,8 +495,13 @@ export async function GET(
         .is("moderation_hidden_at", null);
 
       if (!clubStoriesError) {
-        clubStories =
-          clubStoriesData || [];
+        const visibleAuthorIds = await getPublicProfileIds(
+          supabase,
+          (clubStoriesData || []).map((story) => story.author_id)
+        );
+        clubStories = (clubStoriesData || [])
+          .filter((story) => visibleAuthorIds.has(story.author_id))
+          .map(({ author_id, ...story }) => story);
       }
     }
 
