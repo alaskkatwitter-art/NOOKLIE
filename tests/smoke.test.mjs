@@ -461,6 +461,27 @@ test('login rejects invalid credentials and creates a hashed session on success'
   assert.ok(state.sessions.every((session) => session.token_hash !== cookieToken));
 });
 
+test('content-warning correction requests stay private to authors and authorized moderation staff', async () => {
+  const authorRead = await fetch(`${baseUrl}/api/account/content-warning-corrections`);
+  assert.equal(authorRead.status, 401);
+
+  const authorSubmit = await fetch(`${baseUrl}/api/account/content-warning-corrections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'correction-1', author_response: 'Adicionei os avisos solicitados.' }),
+  });
+  assert.equal(authorSubmit.status, 401);
+
+  const moderationRead = await fetch(`${baseUrl}/api/admin/content-warning-corrections`);
+  assert.equal(moderationRead.status, 401);
+  const moderationCreate = await fetch(`${baseUrl}/api/admin/content-warning-corrections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ story_id: 'story-1', missing_warnings: ['violence'], notice: 'Add a warning.', due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }),
+  });
+  assert.equal(moderationCreate.status, 401);
+});
+
 test('login rate-limits repeated attempts', async () => {
   let response;
   for (let attempt = 0; attempt < 11; attempt += 1) {

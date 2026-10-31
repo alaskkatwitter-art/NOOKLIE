@@ -497,10 +497,13 @@ export default function ConfiguracoesPage() {
               </div>
 
               <div className="px-6 pt-5">
-                <Link href="/bloqueios" className="text-sm font-semibold text-[#ff9aca] hover:underline">Gerenciar perfis bloqueados →</Link>
-                <a href="/api/account/export" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Baixar meus dados</a>
-                <Link href="/conta/privacidade" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Privacidade da conta →</Link>
-                <Link href="/convites" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Convites de colaboração →</Link>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  <Link href="/bloqueios" className="text-sm font-semibold text-[#ff9aca] hover:underline">Gerenciar perfis bloqueados →</Link>
+                  <a href="/api/account/export" className="text-sm font-semibold text-[#ff9aca] hover:underline">Baixar meus dados</a>
+                  <Link href="/conta/privacidade" className="text-sm font-semibold text-[#ff9aca] hover:underline">Privacidade da conta →</Link>
+                  <Link href="/convites" className="text-sm font-semibold text-[#ff9aca] hover:underline">Convites de colaboração →</Link>
+                  <Link href="/conta/avisos-de-conteudo" className="text-sm font-semibold text-[#ff9aca] hover:underline">Pedidos de correção de avisos →</Link>
+                </div>
               </div>
 
               <div className="divide-y divide-white/6">

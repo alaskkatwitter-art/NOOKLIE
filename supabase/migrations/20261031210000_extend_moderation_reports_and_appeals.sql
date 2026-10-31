@@ -475,6 +475,209 @@ $$;
 revoke all on function public.decide_story_deletion(text, uuid, boolean) from public, anon, authenticated;
 grant execute on function public.decide_story_deletion(text, uuid, boolean) to service_role;
 
+-- Formal requests to correct missing content warnings. The author may report a
+-- correction, but a moderator must review and close the request; no story is
+-- removed automatically when a deadline passes.
+create table if not exists public.content_warning_corrections (
+  id uuid primary key default gen_random_uuid(),
+  -- Keep a historical story UUID after a story is deleted; do not block the
+  -- existing account/story deletion workflows with moderation history.
+  story_id uuid not null,
+  author_user_id uuid references public.auth_accounts(id) on delete set null,
+  department_id uuid not null references public.departments(id) on delete restrict,
+  source_report_id uuid references public.moderation_reports(id) on delete set null,
+  moderator_user_id uuid references public.auth_accounts(id) on delete set null,
+  missing_warnings text[] not null check (cardinality(missing_warnings) between 1 and 12),
+  notice text not null check (char_length(btrim(notice)) between 1 and 2000),
+  due_at timestamptz not null,
+  author_response text not null default '' check (char_length(author_response) <= 2000),
+  internal_notes text not null default '' check (char_length(internal_notes) <= 4000),
+  status text not null default 'requested' check (status in ('requested', 'submitted', 'resolved', 'cancelled')),
+  created_at timestamptz not null default now(),
+  submitted_at timestamptz,
+  decided_at timestamptz,
+  decision text check (decision in ('corrected', 'not_corrected', 'cancelled'))
+);
+
+create index if not exists content_warning_corrections_author_status_idx
+  on public.content_warning_corrections(author_user_id, status, due_at);
+create index if not exists content_warning_corrections_department_status_idx
+  on public.content_warning_corrections(department_id, status, due_at);
+create unique index if not exists content_warning_corrections_one_open_story_idx
+  on public.content_warning_corrections(story_id)
+  where status in ('requested', 'submitted');
+
+alter table public.content_warning_corrections enable row level security;
+revoke all on table public.content_warning_corrections from public, anon, authenticated;
+grant select, insert, update on table public.content_warning_corrections to service_role;
+
+create or replace function public.admin_create_content_warning_correction(
+  p_session_token_hash text,
+  p_story_id uuid,
+  p_source_report_id uuid,
+  p_missing_warnings text[],
+  p_notice text,
+  p_due_at timestamptz
+)
+returns uuid
+language plpgsql
+set search_path = pg_catalog
+as $$
+declare
+  v_actor uuid;
+  v_author uuid;
+  v_department uuid;
+  v_id uuid;
+  v_warning text;
+begin
+  v_actor := public.admin_current_actor(p_session_token_hash);
+  select story.author_id into v_author
+  from public.stories as story
+  where story.id = p_story_id
+  for update;
+  if v_author is null then
+    raise exception using errcode = 'P0002', message = 'Story not found';
+  end if;
+  select department.id into v_department
+  from public.departments as department
+  where department.slug = 'moderacao' and department.status = 'active';
+  if v_department is null then
+    raise exception using errcode = 'P0002', message = 'Moderation department is unavailable';
+  end if;
+  perform public.admin_assert_permission(v_actor, 'moderation.manage', v_department);
+  if p_source_report_id is not null and not exists (
+    select 1 from public.moderation_reports as report
+    where report.id = p_source_report_id
+      and report.content_type = 'story'
+      and report.content_id = p_story_id
+  ) then
+    raise exception using errcode = '22023', message = 'Source report does not match the story';
+  end if;
+  if p_missing_warnings is null or cardinality(p_missing_warnings) not between 1 and 12
+     or p_notice is null or char_length(btrim(p_notice)) not between 1 and 2000
+     or p_due_at <= now() + interval '1 hour'
+     or p_due_at > now() + interval '30 days' then
+    raise exception using errcode = '22023', message = 'Correction request details are invalid';
+  end if;
+  foreach v_warning in array p_missing_warnings loop
+    if char_length(btrim(v_warning)) not between 1 and 100 then
+      raise exception using errcode = '22023', message = 'A warning label is invalid';
+    end if;
+  end loop;
+  insert into public.content_warning_corrections (
+    story_id, author_user_id, department_id, source_report_id, moderator_user_id,
+    missing_warnings, notice, due_at
+  ) values (
+    p_story_id, v_author, v_department, p_source_report_id, v_actor,
+    (select array_agg(distinct btrim(label)) from unnest(p_missing_warnings) as warnings(label)),
+    btrim(p_notice), p_due_at
+  ) returning id into v_id;
+
+  insert into public.admin_audit_log(actor_user_id, action, subject_type, subject_id, details)
+  values (v_actor, 'moderation.content_warning_correction.requested', 'content_warning_correction', v_id,
+    jsonb_build_object('story_id', p_story_id, 'author_user_id', v_author,
+      'source_report_id', p_source_report_id, 'missing_warnings', p_missing_warnings, 'due_at', p_due_at));
+  insert into public.user_notifications(user_id, notification_type, title, body, href)
+  values (v_author, 'content_warning_correction_requested', 'Ajuste de avisos de conteúdo solicitado',
+    'A moderação solicitou que você revise os avisos da sua história até ' || to_char(p_due_at at time zone 'UTC', 'DD/MM/YYYY "às" HH24:MI') || ' UTC.',
+    '/conta/avisos-de-conteudo');
+  return v_id;
+end;
+$$;
+
+create or replace function public.submit_content_warning_correction(
+  p_session_token_hash text,
+  p_correction_id uuid,
+  p_author_response text
+)
+returns boolean
+language plpgsql
+set search_path = pg_catalog
+as $$
+declare
+  v_actor uuid;
+  v_author uuid;
+begin
+  v_actor := public.admin_current_actor(p_session_token_hash);
+  if char_length(btrim(coalesce(p_author_response, ''))) not between 1 and 2000 then
+    raise exception using errcode = '22023', message = 'A correction response is required';
+  end if;
+  update public.content_warning_corrections
+  set status = 'submitted', author_response = btrim(p_author_response), submitted_at = now()
+  where id = p_correction_id and author_user_id = v_actor and status = 'requested'
+  returning author_user_id into v_author;
+  if v_author is null then
+    raise exception using errcode = 'P0002', message = 'Open correction request not found';
+  end if;
+  insert into public.admin_audit_log(actor_user_id, action, subject_type, subject_id, details)
+  values (v_actor, 'moderation.content_warning_correction.submitted', 'content_warning_correction', p_correction_id,
+    jsonb_build_object('author_user_id', v_author));
+  insert into public.user_notifications(user_id, notification_type, title, body, href)
+  select distinct membership.user_id, 'content_warning_correction_submitted', 'Correção enviada para análise',
+    'O autor informou que atualizou os avisos de conteúdo de uma história.', '/admin'
+  from public.team_memberships as membership
+  join public.team_role_permissions as grant_row on grant_row.role_id = membership.role_id
+  where membership.department_id = (select request.department_id from public.content_warning_corrections as request where request.id = p_correction_id)
+    and membership.status = 'active' and grant_row.permission_code = 'moderation.manage';
+  return true;
+end;
+$$;
+
+create or replace function public.admin_decide_content_warning_correction(
+  p_session_token_hash text,
+  p_correction_id uuid,
+  p_decision text,
+  p_internal_notes text default ''
+)
+returns boolean
+language plpgsql
+set search_path = pg_catalog
+as $$
+declare
+  v_actor uuid;
+  v_author uuid;
+  v_department uuid;
+  v_story_id uuid;
+begin
+  v_actor := public.admin_current_actor(p_session_token_hash);
+  if p_decision not in ('corrected', 'not_corrected', 'cancelled')
+     or char_length(coalesce(p_internal_notes, '')) > 4000 then
+    raise exception using errcode = '22023', message = 'Correction decision is invalid';
+  end if;
+  select request.author_user_id, request.department_id, request.story_id
+    into v_author, v_department, v_story_id
+  from public.content_warning_corrections as request
+  where request.id = p_correction_id and request.status in ('requested', 'submitted')
+  for update;
+  if v_author is null then
+    raise exception using errcode = 'P0002', message = 'Open correction request not found';
+  end if;
+  perform public.admin_assert_permission(v_actor, 'moderation.manage', v_department);
+  update public.content_warning_corrections
+  set status = case when p_decision = 'cancelled' then 'cancelled' else 'resolved' end,
+      decision = p_decision, internal_notes = btrim(coalesce(p_internal_notes, '')), decided_at = now()
+  where id = p_correction_id;
+  insert into public.admin_audit_log(actor_user_id, action, subject_type, subject_id, details)
+  values (v_actor, 'moderation.content_warning_correction.' || p_decision, 'content_warning_correction', p_correction_id,
+    jsonb_build_object('story_id', v_story_id, 'author_user_id', v_author, 'internal_notes', p_internal_notes));
+  insert into public.user_notifications(user_id, notification_type, title, body, href)
+  values (v_author, 'content_warning_correction_decided',
+    case when p_decision = 'corrected' then 'Avisos de conteúdo revisados' else 'Solicitação de ajuste revisada' end,
+    case when p_decision = 'corrected' then 'A moderação confirmou a correção dos avisos de conteúdo.'
+      when p_decision = 'not_corrected' then 'A moderação concluiu que os avisos ainda precisam de ajuste. Consulte a solicitação e as orientações.'
+      else 'A solicitação de ajuste foi cancelada pela moderação.' end,
+    '/conta/avisos-de-conteudo');
+  return true;
+end;
+$$;
+
+revoke all on function public.admin_create_content_warning_correction(text, uuid, uuid, text[], text, timestamptz) from public, anon, authenticated;
+grant execute on function public.admin_create_content_warning_correction(text, uuid, uuid, text[], text, timestamptz) to service_role;
+revoke all on function public.submit_content_warning_correction(text, uuid, text) from public, anon, authenticated;
+grant execute on function public.submit_content_warning_correction(text, uuid, text) to service_role;
+revoke all on function public.admin_decide_content_warning_correction(text, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.admin_decide_content_warning_correction(text, uuid, text, text) to service_role;
+
 alter table public.profiles
   add column if not exists reviewer_portfolio_enabled boolean not null default true,
   add column if not exists beta_reader_portfolio_enabled boolean not null default true,

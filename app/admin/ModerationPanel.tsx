@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import ModerationAppealsPanel from './ModerationAppealsPanel';
+import ContentWarningCorrectionsPanel from './ContentWarningCorrectionsPanel';
 
 type Report = {
   id: string;
   content_type: 'profile' | 'post' | 'story' | 'chapter' | 'comment' | 'review' | 'review_comment';
+  content_id: string;
   reason: string;
   details: string;
   content_hidden: boolean;
@@ -105,6 +107,7 @@ export default function ModerationPanel({ canViewReports, canManage, canManageAp
           )}
         </article>
       ))}
+      {canViewReports && <ContentWarningCorrectionsPanel reports={reports} canManage={canManage} />}
       <ModerationAppealsPanel canManage={canManageAppeals} />
     </section>
   );
