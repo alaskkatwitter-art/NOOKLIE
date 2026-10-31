@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
     if (!user) return errorResponse('Entre na sua conta para enviar uma denúncia.', 401);
 
     const isMultipart = request.headers.get('content-type')?.toLowerCase().includes('multipart/form-data') || false;
+    const contentLength = Number(request.headers.get('content-length'));
+    if (isMultipart && Number.isFinite(contentLength) && contentLength > 4 * 1024 * 1024) {
+      return errorResponse('O envio de evidências excede o limite permitido.', 413);
+    }
     const formData = isMultipart ? await request.formData() : null;
     const body = formData ? {
       content_type: formData.get('content_type'),
