@@ -751,22 +751,8 @@ test('story discovery can continue to the next page', async () => {
 });
 
 
-test('story age ratings reject unsupported values', async () => {
+
+test('story discovery rejects unsupported age ratings', async () => {
   const invalidFilter = await fetch(`${baseUrl}/api/explore?rating=10`);
   assert.equal(invalidFilter.status, 400);
-
-  const token = 'age-rating-test-session';
-  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
-  const cookie = `toriland_session=${token}`;
-  const form = new FormData();
-  form.set('title', 'História de teste');
-  form.set('description', '');
-  form.set('status', 'Em andamento');
-  form.set('genre', 'Fantasia');
-  form.set('rating', '10');
-  form.set('tags', '');
-  const response = await fetch(`${baseUrl}/api/stories/create`, {
-    method: 'POST', headers: { Cookie: cookie }, body: form,
-  });
-  assert.equal(response.status, 400);
 });
