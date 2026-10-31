@@ -31,18 +31,18 @@ jobs:
               @supabase/ssr@latest @supabase/supabase-js@latest bcryptjs@latest \
               next@latest react@latest react-dom@latest lucide-react@latest
             npm install --save-dev --save-exact --no-audit --no-fund --ignore-scripts \
-              eslint@latest eslint-config-next@latest @types/node@latest \
-              @types/react@latest @types/react-dom@latest typescript@latest \
+              eslint@9.39.5 eslint-config-next@latest @types/node@latest \
+              @types/react@latest @types/react-dom@latest typescript@6.0.3 \
               tailwindcss@latest @tailwindcss/postcss@latest postcss@latest
             npm install --package-lock-only --no-audit --no-fund --ignore-scripts
           fi
           echo "generated=$generated" >> "$GITHUB_OUTPUT"
-          mkdir -p .ci-dependencies
-          cp package.json package-lock.json .ci-dependencies/
+          mkdir -p ci-dependencies
+          cp package.json package-lock.json ci-dependencies/
       - uses: actions/upload-artifact@v4
         with:
           name: resolved-dependencies
-          path: .ci-dependencies/
+          path: ci-dependencies/
           if-no-files-found: error
           retention-days: 1
 
@@ -62,8 +62,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: resolved-dependencies
-          path: .ci-dependencies
-      - run: cp .ci-dependencies/package.json .ci-dependencies/package-lock.json .
+          path: ci-dependencies
+      - run: cp ci-dependencies/package.json ci-dependencies/package-lock.json .
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
@@ -82,12 +82,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: resolved-dependencies
-          path: .ci-dependencies
+          path: ci-dependencies
       - name: Save the verified dependency versions
         shell: bash
         run: |
-          cp .ci-dependencies/package.json package.json
-          cp .ci-dependencies/package-lock.json package-lock.json
+          cp ci-dependencies/package.json package.json
+          cp ci-dependencies/package-lock.json package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json
