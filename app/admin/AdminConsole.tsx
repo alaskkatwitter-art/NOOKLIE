@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 
 type Department = {
@@ -78,7 +79,7 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
   const [badgeDescription, setBadgeDescription] = useState('');
   const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -107,7 +108,6 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     setError('');
     const work = tab === 'overview' ? loadOverview()
       : tab === 'departments' ? loadDepartments()
@@ -265,7 +265,7 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
       <div className="mx-auto max-w-6xl">
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <a href="/perfil" className="text-xs font-semibold text-[#ff9aca] hover:text-white">← Voltar ao perfil</a>
+            <Link href="/perfil" className="text-xs font-semibold text-[#ff9aca] hover:text-white">← Voltar ao perfil</Link>
             <p className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-[#ff78b9]/70">NOOKLIE • ADMINISTRAÇÃO</p>
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">Painel da equipe</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/45">
@@ -277,7 +277,7 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
 
         <nav aria-label="Seções administrativas" className="mb-6 flex gap-2 overflow-x-auto pb-2">
           {tabs.map(([key, label]) => (
-            <button key={key} type="button" onClick={() => { setTab(key); setError(''); setMessage(''); }}
+            <button key={key} type="button" onClick={() => { if (tab !== key) { setLoading(true); setTab(key); } setError(''); setMessage(''); }}
               className={tab === key ? 'shrink-0 rounded-full bg-[#ff78b9] px-4 py-2.5 text-xs font-bold text-[#1b1018]' : 'shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/60 hover:text-white'}>
               {label}
             </button>
@@ -397,7 +397,7 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
               {selectedCandidate && <div className="mt-4 flex flex-col gap-2 sm:flex-row"><select required className={inputClass} value={selectedRoleId} onChange={(event) => setSelectedRoleId(event.target.value)}><option value="">Selecione o cargo</option>{roles.filter((role) => role.status === 'active' && (isPlatformAdmin || manageableDepartmentIds.includes(role.department_id))).map((role) => <option key={role.id} value={role.id}>{role.name} · {departments.find((item) => item.id === role.department_id)?.name || ''}</option>)}</select><button type="button" disabled={busy || !selectedRoleId} className={primaryButton} onClick={() => { if (selectedCandidate && selectedRoleId) void appointMember(); }}>Confirmar nomeação</button></div>}
             </form>}
             <div className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Integrantes e histórico</h2><p className="mt-1 text-sm text-white/45">Remoções preservam o registro da participação.</p></div><div className="flex gap-2"><button type="button" onClick={() => setMemberStatus('active')} className={memberStatus === 'active' ? primaryButton : secondaryButton}>Ativos</button><button type="button" onClick={() => setMemberStatus('removed')} className={memberStatus === 'removed' ? primaryButton : secondaryButton}>Histórico</button></div></div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Integrantes e histórico</h2><p className="mt-1 text-sm text-white/45">Remoções preservam o registro da participação.</p></div><div className="flex gap-2"><button type="button" onClick={() => { if (memberStatus !== 'active') setLoading(true); setMemberStatus('active'); }} className={memberStatus === 'active' ? primaryButton : secondaryButton}>Ativos</button><button type="button" onClick={() => { if (memberStatus !== 'removed') setLoading(true); setMemberStatus('removed'); }} className={memberStatus === 'removed' ? primaryButton : secondaryButton}>Histórico</button></div></div>
               <div className="space-y-3">
                 {members.map((member) => <article key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#100b12] p-4">
                   <div className="flex min-w-0 items-center gap-3">
