@@ -1,10 +1,16 @@
 DO $$
 DECLARE
-  root_id uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  root_id uuid;
   target_profile uuid;
   target_user uuid;
   report_id uuid;
 BEGIN
+  SELECT account.id INTO root_id
+  FROM public.platform_admins admin
+  JOIN public.auth_accounts account ON account.id=admin.user_id
+  WHERE account.username='astriddy';
+  IF root_id IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
+
   SELECT profile.id, profile.user_id INTO target_profile, target_user
   FROM public.profiles AS profile
   WHERE NOT EXISTS (SELECT 1 FROM public.platform_admins AS root WHERE root.user_id=profile.user_id)

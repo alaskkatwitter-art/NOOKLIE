@@ -2,13 +2,19 @@
 -- Creates temporary stories and a coauthor, then rolls the entire exercise back.
 do $$
 declare
-  root_id uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  root_id uuid;
   coauthor_id uuid;
   approved_story uuid;
   rejected_story uuid;
   approved_request uuid;
   rejected_request uuid;
-begin
+BEGIN
+  SELECT account.id INTO root_id
+  FROM public.platform_admins admin
+  JOIN public.auth_accounts account ON account.id=admin.user_id
+  WHERE account.username='astriddy';
+  IF root_id IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
+
   select id into coauthor_id from public.profiles
   where not exists (select 1 from public.platform_admins where user_id = profiles.user_id)
   order by created_at limit 1;

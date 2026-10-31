@@ -1,6 +1,6 @@
 DO $$
 DECLARE
-  v_root uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  v_root uuid;
   v_target uuid;
   v_second_target uuid;
   v_second_application uuid;
@@ -13,12 +13,22 @@ DECLARE
   v_self_application uuid;
   v_membership uuid;
 BEGIN
+  SELECT account.id INTO v_root
+  FROM public.platform_admins admin
+  JOIN public.auth_accounts account ON account.id=admin.user_id
+  WHERE account.username='astriddy';
+  IF v_root IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
+
   SELECT account.id INTO v_target
   FROM public.auth_accounts account JOIN public.profiles profile ON profile.user_id=account.id
-  WHERE account.id<>v_root LIMIT 1;
+  WHERE account.id<>v_root
+    AND NOT EXISTS (SELECT 1 FROM public.platform_admins admin WHERE admin.user_id=account.id)
+  LIMIT 1;
   SELECT account.id INTO v_second_target
   FROM public.auth_accounts account JOIN public.profiles profile ON profile.user_id=account.id
-  WHERE account.id NOT IN (v_root,v_target) LIMIT 1;
+  WHERE account.id NOT IN (v_root,v_target)
+    AND NOT EXISTS (SELECT 1 FROM public.platform_admins admin WHERE admin.user_id=account.id)
+  LIMIT 1;
   SELECT id INTO v_department FROM public.departments WHERE status='active' ORDER BY sort_order LIMIT 1;
   IF v_target IS NULL OR v_second_target IS NULL OR v_department IS NULL THEN RAISE EXCEPTION 'Required test fixtures are unavailable'; END IF;
 
