@@ -43,6 +43,6 @@ VALUES
   ('users.view', 'View users', '', 'platform');
 
 INSERT INTO public.departments (id, name, slug, description, sort_order, status, created_by)
-VALUES ('90000000-0000-4000-8000-000000000010', 'Departamento de teste', 'ci-department', 'Fixture de CI sem dados reais', 0, 'active', '90000000-0000-4000-8000-000000000001');
+VALUES ('90000000-0000-4000-8000-000000000010', 'Departamento de teste', 'moderacao', 'Fixture de CI sem dados reais', 0, 'active', '90000000-0000-4000-8000-000000000001');
 
 COMMIT;
