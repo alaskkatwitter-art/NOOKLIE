@@ -268,13 +268,13 @@ before(async () => {
       return respondRows(request, response, rows);
     }
 
-    if (path === 'review_likes' && request.method === 'GET') {
+    if (path === 'review_likes' && ['GET', 'HEAD'].includes(request.method)) {
       const reviewFilter = url.searchParams.get('review_id') || '';
       const userFilter = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
       const ids = reviewFilter.startsWith('in.(') ? reviewFilter.slice(4, -1).split(',') : reviewFilter.startsWith('eq.') ? [reviewFilter.slice(3)] : [];
       let rows = state.reviewLikes.filter((item) => ids.includes(item.review_id));
       if (userFilter) rows = rows.filter((item) => item.user_id === userFilter);
-      if ((request.headers.prefer || '').includes('count=exact') && request.method === 'GET') {
+      if ((request.headers.prefer || '').includes('count=exact')) {
         response.writeHead(200, { 'content-range': `0-0/${rows.length}` });
         return response.end();
       }
