@@ -755,13 +755,9 @@ test('story age ratings reject unsupported values', async () => {
   const invalidFilter = await fetch(`${baseUrl}/api/explore?rating=10`);
   assert.equal(invalidFilter.status, 400);
 
-  const login = await fetch(`${baseUrl}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-vercel-forwarded-for': '198.51.100.56' },
-    body: JSON.stringify({ username: 'owner', password: 'correct-password' }),
-  });
-  assert.equal(login.status, 200);
-  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const token = 'age-rating-test-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  const cookie = `toriland_session=${token}`;
   const form = new FormData();
   form.set('title', 'História de teste');
   form.set('description', '');
