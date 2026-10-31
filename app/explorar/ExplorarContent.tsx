@@ -3,26 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-const fandoms = [
-  'House of the Dragon',
-  'Game of Thrones',
-  'Harry Potter',
-  'Marvel',
-  'DC',
-  'K-pop',
-];
-
-const genres = [
-  'Romance',
-  'Fantasia',
-  'Drama',
-  'Aventura',
-  'Mistério',
-  'Terror',
-  'Comédia',
-  'Ficção',
-];
+import TagFilters from './TagFilters';
 
 type ExploreUser = {
   id: string;
@@ -44,11 +25,13 @@ type ExploreStory = {
   author: ExploreUser | null;
   is_saved?: boolean;
   is_own_story?: boolean;
+  tags?: Array<{ name: string; slug: string; category: string | null }>;
 };
 
 type ExploreResults = {
   users: ExploreUser[];
   stories: ExploreStory[];
+  has_more: boolean;
 };
 
 type CurrentUser = {
@@ -65,14 +48,14 @@ export default function ExplorarContent() {
   const router = useRouter();
 
   const urlQuery = searchParams.get('q') || '';
-  const selectedFandom = searchParams.get('fandom') || '';
-  const selectedGenre = searchParams.get('genre') || '';
+  const filterQuery = searchParams.toString();
 
   const [searchValue, setSearchValue] = useState(urlQuery);
 
   const [results, setResults] = useState<ExploreResults>({
     users: [],
     stories: [],
+    has_more: false,
   });
 
   const [currentUser, setCurrentUser] =
@@ -160,20 +143,6 @@ export default function ExplorarContent() {
    */
 
   useEffect(() => {
-    const value = urlQuery.trim();
-
-    if (!value) {
-      setResults({
-        users: [],
-        stories: [],
-      });
-
-      setLoadingResults(false);
-      setSearchError('');
-
-      return;
-    }
-
     let cancelled = false;
 
     async function search() {
@@ -181,63 +150,33 @@ export default function ExplorarContent() {
         setLoadingResults(true);
         setSearchError('');
 
-        const response = await fetch(
-          `/api/explore?q=${encodeURIComponent(value)}`,
-          {
-            cache: 'no-store',
-          }
-        );
-
+        const queryString = filterQuery ? `?${filterQuery}` : '';
+        const response = await fetch(`/api/explore${queryString}`, { cache: 'no-store' });
         const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(
-            data?.error ||
-              'Não foi possível realizar a busca.'
-          );
-        }
+        if (!response.ok) throw new Error(data?.error || 'Não foi possível realizar a busca.');
 
         if (!cancelled) {
           setResults({
-            users: Array.isArray(data?.users)
-              ? data.users
-              : [],
-            stories: Array.isArray(data?.stories)
-              ? data.stories
-              : [],
+            users: Array.isArray(data?.users) ? data.users : [],
+            stories: Array.isArray(data?.stories) ? data.stories : [],
+            has_more: data?.has_more === true,
           });
         }
       } catch (error) {
-        console.error(
-          'ERRO NA BUSCA DO EXPLORAR:',
-          error
-        );
-
+        console.error('ERRO NA BUSCA DO EXPLORAR:', error);
         if (!cancelled) {
-          setResults({
-            users: [],
-            stories: [],
-          });
-
-          setSearchError(
-            error instanceof Error
-              ? error.message
-              : 'Não foi possível realizar a busca.'
-          );
+          setResults({ users: [], stories: [], has_more: false });
+          setSearchError(error instanceof Error ? error.message : 'Não foi possível realizar a busca.');
         }
       } finally {
-        if (!cancelled) {
-          setLoadingResults(false);
-        }
+        if (!cancelled) setLoadingResults(false);
       }
     }
 
     void search();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [urlQuery]);
+    return () => { cancelled = true; };
+  }, [filterQuery]);
 
   function updateSearch(value: string) {
     setSearchValue(value);
@@ -246,8 +185,7 @@ export default function ExplorarContent() {
       searchParams.toString()
     );
 
-    params.delete('fandom');
-    params.delete('genre');
+    params.delete('page');
 
     if (value.trim()) {
       params.set('q', value);
@@ -258,52 +196,6 @@ export default function ExplorarContent() {
     const queryString = params.toString();
 
     router.replace(
-      queryString
-        ? `${pathname}?${queryString}`
-        : pathname
-    );
-  }
-
-  function selectFandom(fandom: string) {
-    const params = new URLSearchParams(
-      searchParams.toString()
-    );
-
-    params.delete('q');
-    params.delete('genre');
-
-    if (selectedFandom === fandom) {
-      params.delete('fandom');
-    } else {
-      params.set('fandom', fandom);
-    }
-
-    const queryString = params.toString();
-
-    router.push(
-      queryString
-        ? `${pathname}?${queryString}`
-        : pathname
-    );
-  }
-
-  function selectGenre(genre: string) {
-    const params = new URLSearchParams(
-      searchParams.toString()
-    );
-
-    params.delete('q');
-    params.delete('fandom');
-
-    if (selectedGenre === genre) {
-      params.delete('genre');
-    } else {
-      params.set('genre', genre);
-    }
-
-    const queryString = params.toString();
-
-    router.push(
       queryString
         ? `${pathname}?${queryString}`
         : pathname
@@ -470,13 +362,26 @@ export default function ExplorarContent() {
 
   const hasFilters = Boolean(
     urlQuery ||
-      selectedFandom ||
-      selectedGenre
+      searchParams.getAll('includeTag').length ||
+      searchParams.getAll('excludeTag').length ||
+      searchParams.get('rating') ||
+      searchParams.get('status') ||
+      searchParams.get('sort')
   );
 
   const hasSearchResults =
     results.users.length > 0 ||
     results.stories.length > 0;
+
+  const currentPage = Math.max(1, Number(searchParams.get('page') || '1'));
+
+  function changePage(page: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page > 1) params.set('page', String(page));
+    else params.delete('page');
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#100b12] text-white">
@@ -629,15 +534,16 @@ export default function ExplorarContent() {
           </div>
         </section>
 
-        {urlQuery && (
-          <section className="relative pb-14">
+        <TagFilters currentUser={currentUser} />
+
+        <section className="relative pb-14">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
                 Resultados
               </p>
 
               <h2 className="mt-2 text-3xl font-black">
-                Busca por “{urlQuery}”
+                {urlQuery ? `Busca por “${urlQuery}”` : 'Histórias para descobrir'}
               </h2>
             </div>
 
@@ -845,6 +751,16 @@ export default function ExplorarContent() {
                                   </p>
                                 )}
 
+                                {story.tags && story.tags.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    {story.tags.slice(0, 5).map((tag) => (
+                                      <Link key={tag.slug} href={`/tag/${encodeURIComponent(tag.slug)}`} className="rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-2.5 py-1 text-[10px] font-medium text-[#ff9bca]/80 transition hover:border-[#ff78b9]/40 hover:text-[#ffb7d5]">
+                                        {tag.name}
+                                      </Link>
+                                    ))}
+                                  </div>
+                                )}
+
                                 <div className="mt-4 flex flex-wrap items-center gap-2">
                                   {story.rating && (
                                     <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/40">
@@ -906,72 +822,19 @@ export default function ExplorarContent() {
                 )}
               </div>
             )}
+
+            {(currentPage > 1 || results.has_more) && (
+              <nav aria-label="Paginação das histórias" className="mt-7 flex items-center justify-center gap-3">
+                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage <= 1} className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white/65 transition hover:border-[#ff78b9]/40 disabled:cursor-not-allowed disabled:opacity-30">
+                  Anterior
+                </button>
+                <span className="text-xs text-white/40">Página {currentPage}</span>
+                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={!results.has_more} className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white/65 transition hover:border-[#ff78b9]/40 disabled:cursor-not-allowed disabled:opacity-30">
+                  Próxima
+                </button>
+              </nav>
+            )}
           </section>
-        )}
-
-        <section className="relative pb-14">
-          <div className="mb-6 flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
-              Filtre por universo
-            </p>
-
-            <h2 className="text-3xl font-black">
-              Fandoms
-            </h2>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {fandoms.map(
-              (fandom, index) => (
-                <CategoryCard
-                  key={fandom}
-                  title={fandom}
-                  type="Fandom"
-                  index={index}
-                  active={
-                    selectedFandom ===
-                    fandom
-                  }
-                  onClick={() =>
-                    selectFandom(fandom)
-                  }
-                />
-              )
-            )}
-          </div>
-        </section>
-
-        <section className="relative pb-16">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
-              Filtre por estilo
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black">
-              Gêneros
-            </h2>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {genres.map(
-              (genre, index) => (
-                <CategoryCard
-                  key={genre}
-                  title={genre}
-                  type="Gênero"
-                  index={index}
-                  active={
-                    selectedGenre ===
-                    genre
-                  }
-                  onClick={() =>
-                    selectGenre(genre)
-                  }
-                />
-              )
-            )}
-          </div>
-        </section>
 
         <section className="relative mb-20 overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-r from-[#291522] via-[#21131e] to-[#171018]">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#ff78b9]/10 blur-3xl" />

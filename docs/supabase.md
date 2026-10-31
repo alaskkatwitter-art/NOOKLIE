@@ -6,6 +6,8 @@ Este documento registra o estado observado no projeto Supabase **TORILAND** (ref
 
 | Versão | Nome |
 | --- | --- |
+| `20261031013628` | `add_tag_aware_story_discovery` |
+| `20261031014115` | `exclude_unpublished_stories_before_paging` |
 | `20261031012246` | `secure_public_access_and_optimize_rls` |
 | `20261030021627` | `harden_public_schema_access_and_function_security` |
 | `20261030024020` | `auth_attempt_rate_limits` |
@@ -43,3 +45,12 @@ A recuperação de conta usa a função atômica `complete_auth_recovery`: ela t
 ## Verificação do banco
 
 O arquivo `supabase/verification/rls_access.sql` verifica as políticas restritivas, a ausência de permissões para os papéis de cliente, as expressões RLS otimizadas e os índices de chaves estrangeiras. Após aplicar as migrações, cole o conteúdo no SQL Editor do Supabase; a consulta termina sem erro quando todas as verificações passam. A suíte de integração do app cobre login, recuperação de conta e criação de capítulos no CI do GitHub.
+
+
+## Descoberta e catálogo de tags
+
+A tabela `tag_categories` já contém categorias de fandom, gênero, personagens, relacionamentos, avisos, tropes e tags livres. A página `/explorar` agora lê esse catálogo do banco. A pessoa pode incluir várias tags (todas devem combinar), excluir tags (qualquer uma remove a história), e combinar isso com classificação, status e ordenação. Só aparecem histórias com pelo menos um capítulo publicado.
+
+Quem está conectado pode adicionar uma tag com categoria pelo painel de exploração. Ela é normalizada em um slug, publicada imediatamente e fica disponível no catálogo; slugs duplicados reutilizam a tag existente. O endpoint aplica limite de criação e grava com a identidade da sessão. A tabela continua fechada para acesso direto do navegador; a gravação ocorre pela rota de servidor usando a chave secreta.
+
+A função `search_public_stories` executa os filtros no banco antes de paginar e só pode ser chamada pelo papel de servidor `service_role`. Para evitar que rascunhos escondam histórias publicadas, a função exige capítulos publicados antes do limite de resultados. O arquivo de verificação SQL também confirma essas permissões.

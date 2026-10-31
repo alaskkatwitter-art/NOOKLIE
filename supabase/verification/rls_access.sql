@@ -59,3 +59,22 @@ DO $test$ BEGIN
  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND ((coalesce(qual,'') ILIKE '%auth.uid()%' AND coalesce(qual,'') NOT ILIKE '%select auth.uid()%') OR (coalesce(with_check,'') ILIKE '%auth.uid()%' AND coalesce(with_check,'') NOT ILIKE '%select auth.uid()%'))) THEN RAISE EXCEPTION 'unwrapped auth.uid RLS expression remains'; END IF;
  RAISE NOTICE 'All 56 security and performance checks passed';
 END $test$;
+
+DO $test$
+BEGIN
+  IF to_regprocedure('public.search_public_stories(text,text[],text[],text,text,text,integer,integer)') IS NULL THEN
+    RAISE EXCEPTION 'missing public story discovery function';
+  END IF;
+  IF NOT has_function_privilege('service_role', 'public.search_public_stories(text,text[],text[],text,text,text,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role cannot execute public story discovery';
+  END IF;
+  IF has_function_privilege('anon', 'public.search_public_stories(text,text[],text[],text,text,text,integer,integer)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.search_public_stories(text,text[],text[],text,text,text,integer,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'client role can execute server-only public story discovery';
+  END IF;
+  IF (SELECT count(*) FROM public.search_public_stories(NULL, '{}'::text[], '{}'::text[], NULL, NULL, 'updated', 48, 0)) > 48 THEN
+    RAISE EXCEPTION 'story discovery pagination limit is not enforced';
+  END IF;
+  RAISE NOTICE 'Tag-aware discovery function checks passed';
+END
+$test$;

@@ -16,7 +16,21 @@ const userId = 'user-owner';
 const otherUserId = 'user-other';
 const storyId = 'story-owned';
 const recoveryKey = 'known-recovery-key';
-const state = { account: null, sessions: [], chapters: [], rateLimits: new Map() };
+const categoryIds = {
+  genre: 'category-genre',
+  freeform: 'category-freeform',
+  fandom: 'category-fandom',
+  characters: 'category-characters',
+  relationships: 'category-relationships',
+  'content-warning': 'category-warning',
+  tropes: 'category-tropes',
+};
+const categories = Object.entries(categoryIds).map(([slug, id]) => ({
+  id,
+  slug,
+  name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
+}));
+const state = { account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -51,6 +65,41 @@ before(async () => {
     password_hash: await bcrypt.hash('correct-password', 4),
     recovery_key_hash: await bcrypt.hash(recoveryKey, 4),
   };
+  state.tags = [
+    { id: 'tag-fantasia', name: 'Fantasia', slug: 'fantasia', category_id: categoryIds.genre, created_at: new Date().toISOString() },
+    { id: 'tag-romance', name: 'Romance', slug: 'romance', category_id: categoryIds.genre, created_at: new Date().toISOString() },
+    { id: 'tag-terror', name: 'Terror', slug: 'terror', category_id: categoryIds['content-warning'], created_at: new Date().toISOString() },
+  ];
+  state.discoveryStories = [
+    { id: 'story-filter-one', author_id: userId, title: 'Dragões e Romance', description: 'Uma aventura', cover_url: null, status: 'Concluída', rating: '12', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
+    { id: 'story-filter-two', author_id: userId, title: 'Fantasia sombria', description: 'Um mistério', cover_url: null, status: 'Em andamento', rating: '18', created_at: '2026-10-03T00:00:00.000Z', updated_at: '2026-10-04T00:00:00.000Z' },
+    { id: 'story-filter-draft', author_id: userId, title: 'Rascunho de fantasia', description: 'Ainda não publicada', cover_url: null, status: 'Concluída', rating: '12', created_at: '2026-10-05T00:00:00.000Z', updated_at: '2026-10-06T00:00:00.000Z' },
+  ];
+  state.storyTags = [
+    { story_id: 'story-filter-one', tag_id: 'tag-fantasia' },
+    { story_id: 'story-filter-one', tag_id: 'tag-romance' },
+    { story_id: 'story-filter-two', tag_id: 'tag-fantasia' },
+    { story_id: 'story-filter-two', tag_id: 'tag-terror' },
+  ];
+  state.chapters.push(
+    { id: 'published-one', story_id: 'story-filter-one', chapter_number: 1, published: true },
+    { id: 'published-two', story_id: 'story-filter-two', chapter_number: 1, published: true },
+  );
+  for (let index = 1; index <= 25; index += 1) {
+    const id = `story-page-${index}`;
+    state.discoveryStories.push({
+      id,
+      author_id: userId,
+      title: `Livro ${index}`,
+      description: 'História de paginação',
+      cover_url: null,
+      status: 'Em andamento',
+      rating: 'Livre',
+      created_at: `2026-10-${String(index).padStart(2, '0')}T00:00:00.000Z`,
+      updated_at: `2026-10-${String(index).padStart(2, '0')}T00:00:00.000Z`,
+    });
+    state.chapters.push({ id: `chapter-page-${index}`, story_id: id, chapter_number: 1, published: true });
+  }
 
   supabaseMock = createHttpServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
@@ -65,6 +114,34 @@ before(async () => {
       return sendJson(response, count <= p_limit);
     }
 
+    if (path === 'rpc/search_public_stories' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const input = JSON.parse(body);
+      const tagSlugs = new Map(state.tags.map((tag) => [tag.id, tag.slug]));
+      const storySlugs = new Map();
+      for (const relation of state.storyTags) {
+        const slugs = storySlugs.get(relation.story_id) || [];
+        slugs.push(tagSlugs.get(relation.tag_id));
+        storySlugs.set(relation.story_id, slugs);
+      }
+      let rows = state.discoveryStories.filter((story) => {
+        const slugs = storySlugs.get(story.id) || [];
+        const query = (input.p_query || '').toLowerCase();
+        return (!query || `${story.title} ${story.description || ''}`.toLowerCase().includes(query)) &&
+          (input.p_include_slugs || []).every((slug) => slugs.includes(slug)) &&
+          !(input.p_exclude_slugs || []).some((slug) => slugs.includes(slug)) &&
+          (!input.p_rating || story.rating === input.p_rating) &&
+          (!input.p_status || story.status === input.p_status) &&
+          state.chapters.some((chapter) => chapter.story_id === story.id && chapter.published);
+      });
+      if (input.p_sort === 'newest') rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      else if (input.p_sort === 'title_asc') rows.sort((a, b) => a.title.localeCompare(b.title));
+      else if (input.p_sort === 'title_desc') rows.sort((a, b) => b.title.localeCompare(a.title));
+      else rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      return sendJson(response, rows.slice(input.p_offset || 0, (input.p_offset || 0) + (input.p_limit || 24)));
+    }
+
     if (path === 'rpc/complete_auth_recovery' && request.method === 'POST') {
       let body = '';
       for await (const chunk of request) body += chunk;
@@ -76,6 +153,46 @@ before(async () => {
       state.account.recovery_key_hash = input.p_consumed_recovery_key_hash;
       state.sessions = [];
       return sendJson(response, true);
+    }
+
+    if (path === 'tag_categories' && request.method === 'GET') {
+      let rows = state.categories;
+      const slug = (url.searchParams.get('slug') || '').replace(/^eq\./, '');
+      if (slug) rows = rows.filter((category) => category.slug === slug);
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'tags' && request.method === 'GET') {
+      let rows = state.tags;
+      const slug = (url.searchParams.get('slug') || '').replace(/^eq\./, '');
+      const categoryId = (url.searchParams.get('category_id') || '').replace(/^eq\./, '');
+      const name = (url.searchParams.get('name') || '').replace(/^ilike\./, '').replace(/%/g, '').toLowerCase();
+      if (slug) rows = rows.filter((tag) => tag.slug === slug);
+      if (categoryId) rows = rows.filter((tag) => tag.category_id === categoryId);
+      if (name) rows = rows.filter((tag) => tag.name.toLowerCase().includes(name));
+      const limit = Number(url.searchParams.get('limit') || 120);
+      return respondRows(request, response, rows.slice(0, limit));
+    }
+
+    if (path === 'tags' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const tag = { id: `tag-${state.tags.length + 1}`, created_at: new Date().toISOString(), ...JSON.parse(body) };
+      state.tags.push(tag);
+      return respondRows(request, response, [tag], 201);
+    }
+
+    if (path === 'story_tags' && request.method === 'GET') {
+      const rows = state.storyTags.map((relation) => {
+        const tag = state.tags.find((item) => item.id === relation.tag_id);
+        const category = state.categories.find((item) => item.id === tag?.category_id);
+        return { ...relation, tags: tag ? { ...tag, tag_categories: category ? { name: category.name } : null } : null };
+      });
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'profiles' && request.method === 'GET') {
+      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false }]);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
@@ -116,6 +233,9 @@ before(async () => {
     }
 
     if (path === 'chapters' && request.method === 'GET') {
+      if ((url.searchParams.get('select') || '').includes('story_id')) {
+        return sendJson(response, state.chapters.filter((chapter) => chapter.published).map((chapter) => ({ story_id: chapter.story_id })));
+      }
       const rows = state.chapters
         .filter((chapter) => chapter.story_id === (url.searchParams.get('story_id') || '').replace(/^eq\./, ''))
         .sort((a, b) => b.chapter_number - a.chapter_number)
@@ -281,4 +401,64 @@ test('chapter creation requires authentication and confirms story ownership', as
   const result = await created.json();
   assert.equal(result.chapter.chapter_number, 3);
   assert.equal(result.chapter.title, 'Novo capítulo');
+});
+
+
+test('discovery applies included and excluded tags, rating, status, and sort', async () => {
+  const response = await fetch(
+    `${baseUrl}/api/explore?includeTag=fantasia&includeTag=romance&excludeTag=terror&rating=12&status=${encodeURIComponent('Concluída')}&sort=newest`,
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(result.stories.map((story) => story.id), ['story-filter-one']);
+  assert.deepEqual(result.stories[0].tags.map((tag) => tag.slug).sort(), ['fantasia', 'romance']);
+});
+
+test('signed-in readers can publish a categorized tag immediately and duplicates are reused', async () => {
+  const endpoint = `${baseUrl}/api/tags`;
+  const body = { name: 'Coffee Shop AU', category: 'tropes' };
+  const anonymous = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  assert.equal(anonymous.status, 401);
+
+  const token = 'tag-creator-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  const headers = { 'Content-Type': 'application/json', Cookie: `toriland_session=${token}` };
+  const createdResponse = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json();
+  assert.equal(created.created, true);
+  assert.equal(created.tag.slug, 'coffee-shop-au');
+
+  const catalogResponse = await fetch(`${endpoint}?q=Coffee`);
+  assert.equal(catalogResponse.status, 200);
+  const catalog = await catalogResponse.json();
+  assert.ok(catalog.tags.some((tag) => tag.slug === 'coffee-shop-au' && tag.category.slug === 'tropes'));
+
+  const duplicate = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'coffee shop au', category: 'freeform' }),
+  });
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).created, false);
+});
+
+
+test('story discovery can continue to the next page', async () => {
+  const firstResponse = await fetch(`${baseUrl}/api/explore`);
+  assert.equal(firstResponse.status, 200);
+  const firstPage = await firstResponse.json();
+  assert.equal(firstPage.stories.length, 24);
+  assert.equal(firstPage.has_more, true);
+
+  const secondResponse = await fetch(`${baseUrl}/api/explore?page=2`);
+  assert.equal(secondResponse.status, 200);
+  const secondPage = await secondResponse.json();
+  assert.equal(secondPage.stories.length, 3);
+  assert.equal(secondPage.has_more, false);
+  assert.equal(new Set([...firstPage.stories, ...secondPage.stories].map((story) => story.id)).size, 27);
 });

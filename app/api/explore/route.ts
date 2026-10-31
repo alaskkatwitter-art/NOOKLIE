@@ -3,10 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabase = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY!);
+
+function slugify(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
 
 async function getCurrentProfileId() {
   try {
@@ -59,24 +61,34 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get('q') || '').trim();
-
-    if (!query) {
-      return NextResponse.json({
-        users: [],
-        stories: [],
-      });
+    if (query.length > 100) {
+      return NextResponse.json({ error: 'A busca é muito longa.' }, { status: 400 });
     }
 
-    if (query.length > 100) {
-      return NextResponse.json(
-        { error: 'A busca é muito longa.' },
-        { status: 400 }
-      );
+    const includedTagSlugs = Array.from(new Set([
+      ...searchParams.getAll('includeTag').map(slugify),
+      ...[searchParams.get('fandom'), searchParams.get('genre')].filter((value): value is string => Boolean(value)).map(slugify),
+    ].filter(Boolean))).slice(0, 12);
+    const excludedTagSlugs = Array.from(new Set(searchParams.getAll('excludeTag').map(slugify).filter(Boolean))).slice(0, 12);
+    const rating = searchParams.get('rating') || null;
+    const storyStatus = searchParams.get('status') || null;
+    const sort = searchParams.get('sort') || 'updated';
+    const requestedPage = Number(searchParams.get('page') || '1');
+    if (!Number.isInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000) {
+      return NextResponse.json({ error: 'Página inválida.' }, { status: 400 });
+    }
+
+    if (rating && !['Livre', '10', '12', '14', '16', '18'].includes(rating)) {
+      return NextResponse.json({ error: 'Classificação inválida.' }, { status: 400 });
+    }
+    if (storyStatus && !['Em andamento', 'Concluída'].includes(storyStatus)) {
+      return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
+    }
+    if (!['updated', 'newest', 'title_asc', 'title_desc'].includes(sort)) {
+      return NextResponse.json({ error: 'Ordenação inválida.' }, { status: 400 });
     }
 
     const currentProfileId = await getCurrentProfileId();
-
-    const search = `%${query}%`;
 
     /*
      * =========================================================
@@ -84,14 +96,25 @@ export async function GET(request: Request) {
      * =========================================================
      */
 
-    const { data: users, error: usersError } = await supabase
-      .from('profiles')
-      .select(
-        'id, username, display_name, avatar_url, verified'
-      )
-      .or(`username.ilike.${search},display_name.ilike.${search}`)
-      .order('username', { ascending: true })
-      .limit(20);
+    let users: Array<{
+      id: string;
+      username: string;
+      display_name: string | null;
+      avatar_url: string | null;
+      verified: boolean;
+    }> = [];
+    let usersError: { message?: string } | null = null;
+    const safeUserQuery = query.replace(/[^\p{L}\p{N}_ -]/gu, '').trim();
+    if (safeUserQuery) {
+      const result = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, verified')
+        .or(`username.ilike.%${safeUserQuery}%,display_name.ilike.%${safeUserQuery}%`)
+        .order('username', { ascending: true })
+        .limit(20);
+      users = result.data || [];
+      usersError = result.error;
+    }
 
     if (usersError) {
       console.error(
@@ -151,14 +174,16 @@ export async function GET(request: Request) {
      * =========================================================
      */
 
-    const { data: stories, error: storiesError } = await supabase
-      .from('stories')
-      .select(
-        'id, author_id, title, description, cover_url, status, rating, created_at, updated_at'
-      )
-      .ilike('title', search)
-      .order('updated_at', { ascending: false })
-      .limit(30);
+    const { data: stories, error: storiesError } = await supabase.rpc('search_public_stories', {
+      p_query: query || null,
+      p_include_slugs: includedTagSlugs,
+      p_exclude_slugs: excludedTagSlugs,
+      p_rating: rating,
+      p_status: storyStatus,
+      p_sort: sort,
+      p_limit: 24,
+      p_offset: (requestedPage - 1) * 24,
+    });
 
     if (storiesError) {
       console.error(
@@ -272,6 +297,28 @@ export async function GET(request: Request) {
       (story) => publishedStoryIds.has(story.id)
     );
 
+    const tagsByStory = new Map<string, Array<{ name: string; slug: string; category: string | null }>>();
+    if (publicStoryRows.length > 0) {
+      const { data: tagRows, error: tagError } = await supabase
+        .from('story_tags')
+        .select('story_id, tags(name, slug, tag_categories(name))')
+        .in('story_id', publicStoryRows.map((story) => story.id))
+        .limit(1000);
+
+      if (tagError) {
+        console.error('ERRO AO BUSCAR TAGS DAS HISTÓRIAS:', tagError);
+      } else {
+        for (const row of tagRows || []) {
+          const tag = Array.isArray(row.tags) ? row.tags[0] : row.tags;
+          if (!tag) continue;
+          const category = Array.isArray(tag.tag_categories) ? tag.tag_categories[0] : tag.tag_categories;
+          const current = tagsByStory.get(row.story_id) || [];
+          current.push({ name: tag.name, slug: tag.slug, category: category?.name || null });
+          tagsByStory.set(row.story_id, current);
+        }
+      }
+    }
+
     /*
      * =========================================================
      * HISTÓRIAS JÁ SALVAS NA BIBLIOTECA
@@ -330,6 +377,7 @@ export async function GET(request: Request) {
         cover_url: story.cover_url,
         status: story.status,
         rating: story.rating,
+        tags: tagsByStory.get(story.id) || [],
         author: story.author_id
           ? authorMap.get(story.author_id) || null
           : null,
@@ -343,6 +391,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       users: publicUsers,
       stories: publicStories,
+      page: requestedPage,
+      has_more: storyRows.length === 24,
       authenticated: !!currentProfileId,
     });
   } catch (error) {
