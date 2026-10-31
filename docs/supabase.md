@@ -2,11 +2,11 @@
 
 Projeto conectado: `fwwgoyburkdybbqmvljk` (TORILAND). Esta documentação foi atualizada após uma nova leitura do histórico remoto em 31/10/2026.
 
-## Situação que exige reconciliação
+## Histórico e reconciliação
 
-O histórico remoto contém **25 migrações aplicadas**. O repositório contém **21 arquivos de migração**; somente três têm a mesma versão e o mesmo nome do histórico remoto. Os outros nomes e versões podem representar alterações equivalentes com timestamps diferentes, mas isso ainda não foi comparado por SQL.
+O histórico remoto contém **25 migrações aplicadas**. O SQL de cada uma foi lido da tabela `supabase_migrations.schema_migrations` e comparado aos arquivos locais. A comparação encontrou seis versões remotas sem arquivo local e alterações posteriores que haviam sido incorporadas a duas migrações antigas. Os 25 arquivos canônicos agora estão em `supabase/migrations/`, com as versões e o SQL armazenados no banco. As 19 cópias locais anteriores foram preservadas em `supabase/migration_archive/pre-reconciliation/`; **não execute os arquivos do arquivo morto**.
 
-**Não rode `supabase db push`, `migration repair`, reset ou qualquer reaplicação em produção até concluir essa comparação.** Uma cópia de desenvolvimento do banco não pôde ser criada porque o plano conectado não permite branching. As migrações literárias e de recursos de moderação abaixo seguem pendentes; nenhuma foi aplicada ao banco ativo.
+O diretório ativo contém exatamente as 25 versões já aplicadas, seguidas pelas duas novas migrações listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching. Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem validar as migrações num banco de desenvolvimento e obter autorização explícita.
 
 ### Histórico remoto observado
 
@@ -38,7 +38,7 @@ O histórico remoto contém **25 migrações aplicadas**. O repositório contém
 | `20261031190107` | `serialize_application_reviews` |
 | `20261031190603` | `profile_theme_persistence` |
 
-Migrações pendentes no branch da implementação:
+Migrações locais pendentes no branch da implementação (ainda não aplicadas ao Supabase):
 
 - `20261031194437_add_literary_collaboration_review_privacy_features`
 - `20261031210000_extend_moderation_reports_and_appeals`
@@ -60,12 +60,12 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 - **Descoberta:** `tags`, `tag_categories`, `story_tags`, `user_stickers`, `fic_clubs`, `fic_club_members`.
 - **Administração/moderação:** `platform_admins`, `permissions`, `departments`, `team_roles`, `team_role_permissions`, `team_memberships`, `admin_audit_log`, `user_notifications`, `opportunities`, `applications`, `moderation_reports`.
 
-## Sincronização segura futura
+## Próxima validação segura
 
-1. Obter uma cópia/exportação do schema remoto ou sincronizar com Supabase CLI autenticado.
-2. Comparar cada versão aplicada com o conteúdo dos arquivos locais; documentar equivalências e diferenças sem alterar a tabela de histórico.
-3. Gerar uma linha de base revisada para controle de versão e validar que o próximo `migration list` não mostra migrações antigas como pendentes.
-4. Aplicar novas migrações em desenvolvimento primeiro. Produção permanece sem alterações até revisão e autorização explícita.
+1. Obter um banco de desenvolvimento; o plano atual bloqueia branches e não foi feita alteração ao plano nem criada outra cobrança.
+2. Aplicar nele, em ordem, as duas migrações pendentes e executar todos os arquivos em `supabase/verification/`.
+3. Comparar o schema e as permissões resultantes aos fluxos da aplicação e corrigir os erros encontrados.
+4. Só depois de validar e revisar, aplicar as migrações à produção com autorização explícita. Os dados da produção permanecem intocados até lá.
 
 ## Descoberta e recursos em implementação
 
