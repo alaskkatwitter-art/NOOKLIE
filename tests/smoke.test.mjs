@@ -503,6 +503,19 @@ test('moderation reports reject unsafe or excessive evidence links', async () =>
     });
     assert.equal(response.status, 400);
   }
+  const invalidImage = new FormData();
+  invalidImage.set('content_type', 'story');
+  invalidImage.set('content_id', 'story-1');
+  invalidImage.set('reason', 'safety');
+  invalidImage.set('details', '');
+  invalidImage.set('evidence_urls', JSON.stringify(['https://example.com/evidence']));
+  invalidImage.append('evidence_files', new Blob(['not an image'], { type: 'image/png' }), 'evidence.png');
+  const invalidImageResponse = await fetch(`${baseUrl}/api/reports`, {
+    method: 'POST', headers: { Cookie: cookie }, body: invalidImage,
+  });
+  assert.equal(invalidImageResponse.status, 400);
+  const unauthorizedEvidence = await fetch(`${baseUrl}/api/admin/reports/00000000-0000-4000-8000-000000000001/evidence/0`);
+  assert.equal(unauthorizedEvidence.status, 401);
 });
 
 test('login rate-limits repeated attempts', async () => {

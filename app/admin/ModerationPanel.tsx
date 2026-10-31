@@ -11,6 +11,7 @@ type Report = {
   reason: string;
   details: string;
   evidence_urls: string[];
+  evidence_paths: string[];
   content_hidden: boolean;
   status: 'pending' | 'in_review' | 'resolved' | 'dismissed';
   internal_notes: string;
@@ -88,6 +89,7 @@ export default function ModerationPanel({ canViewReports, canManage, canManageAp
               {report.content?.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/70">{report.content.body}</p>}
               {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-white/55">{report.details}</p>}
               {report.evidence_urls?.length > 0 && <div className="mt-3"><p className="text-xs font-semibold text-white/50">Links de evidência</p><ul className="mt-1 space-y-1">{report.evidence_urls.map((url) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer" className="break-all text-xs text-[#ff9aca] underline">{url}</a></li>)}</ul><p className="mt-1 text-[10px] text-white/35">Os links são abertos no navegador e não são buscados pelo servidor do Nooklie.</p></div>}
+              {report.evidence_paths?.length > 0 && <div className="mt-3"><p className="text-xs font-semibold text-white/50">Imagens privadas anexadas</p><div className="mt-2 flex flex-wrap gap-2">{report.evidence_paths.map((_, index) => <a key={`${report.id}-${index}`} href={`/api/admin/reports/${report.id}/evidence/${index}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#ff9aca] underline">Abrir imagem {index + 1}</a>)}</div></div>}
             </div>
             <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">{report.status}</span>
           </div>

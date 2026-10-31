@@ -12,12 +12,35 @@ alter table public.moderation_reports add constraint moderation_reports_content_
   check (content_type in ('profile', 'post', 'story', 'chapter', 'comment', 'review', 'review_comment'));
 alter table public.moderation_reports
   add column if not exists evidence_urls text[] not null default '{}'::text[];
+alter table public.moderation_reports
+  add column if not exists evidence_paths text[] not null default '{}'::text[];
 do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'moderation_reports_evidence_urls_check') then
     alter table public.moderation_reports add constraint moderation_reports_evidence_urls_check
       check (cardinality(evidence_urls) <= 3 and array_position(evidence_urls, null) is null);
   end if;
+  if not exists (select 1 from pg_constraint where conname = 'moderation_reports_evidence_paths_check') then
+    alter table public.moderation_reports add constraint moderation_reports_evidence_paths_check
+      check (cardinality(evidence_paths) <= 3 and array_position(evidence_paths, null) is null);
+  end if;
+end;
+$$;
+
+-- Evidence files are private. Only the server's service_role reads and writes
+-- them; moderators access them through an authenticated, no-store app route.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('moderation-evidence', 'moderation-evidence', false, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+do $$
+begin
+  if exists (select 1 from storage.buckets where id = 'moderation-evidence' and public) then
+    raise exception 'moderation-evidence bucket must remain private';
+  end if;
+  update storage.buckets
+  set file_size_limit = 1048576,
+      allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+  where id = 'moderation-evidence';
 end;
 $$;
 
@@ -59,13 +82,15 @@ revoke all on function public.get_story_review_summary(uuid) from public, anon, 
 grant execute on function public.get_story_review_summary(uuid) to service_role;
 
 drop function if exists public.submit_moderation_report(text, text, uuid, text, text);
+drop function if exists public.submit_moderation_report(text, text, uuid, text, text, text[]);
 create function public.submit_moderation_report(
   p_session_token_hash text,
   p_content_type text,
   p_content_id uuid,
   p_reason text,
   p_details text default '',
-  p_evidence_urls text[] default '{}'::text[]
+  p_evidence_urls text[] default '{}'::text[],
+  p_evidence_paths text[] default '{}'::text[]
 )
 returns uuid
 language plpgsql
@@ -77,6 +102,7 @@ declare
   v_department uuid;
   v_report_id uuid;
   v_evidence_url text;
+  v_evidence_path text;
 begin
   v_actor := public.admin_current_actor(p_session_token_hash);
   if p_content_type = 'profile' then
@@ -113,20 +139,31 @@ begin
       raise exception using errcode = '22023', message = 'Report evidence is invalid';
     end if;
   end loop;
+  if p_evidence_paths is null or cardinality(p_evidence_paths) > 3 then
+    raise exception using errcode = '22023', message = 'Report evidence files are invalid';
+  end if;
+  foreach v_evidence_path in array p_evidence_paths loop
+    if v_evidence_path !~ ('^' || v_actor::text || '/[0-9a-f-]{36}[.](jpg|png|webp)$') then
+      raise exception using errcode = '22023', message = 'Report evidence files are invalid';
+    end if;
+  end loop;
   if (select count(*) from public.moderation_reports where reporter_id = v_actor and status in ('pending', 'in_review')) >= 10 then
     raise exception using errcode = '22023', message = 'Too many open reports';
   end if;
   select department.id into v_department from public.departments as department where department.slug = 'moderacao' and department.status = 'active';
   if v_department is null then raise exception using errcode = 'P0002', message = 'Moderation department is unavailable'; end if;
+  if cardinality(p_evidence_urls) + cardinality(p_evidence_paths) > 3 then
+    raise exception using errcode = '22023', message = 'At most three evidence items are allowed';
+  end if;
 
-  insert into public.moderation_reports (reporter_id, target_user_id, department_id, content_type, content_id, reason, details, evidence_urls)
-  values (v_actor, v_target, v_department, p_content_type, p_content_id, p_reason, btrim(coalesce(p_details, '')), p_evidence_urls)
+  insert into public.moderation_reports (reporter_id, target_user_id, department_id, content_type, content_id, reason, details, evidence_urls, evidence_paths)
+  values (v_actor, v_target, v_department, p_content_type, p_content_id, p_reason, btrim(coalesce(p_details, '')), p_evidence_urls, p_evidence_paths)
   returning id into v_report_id;
   return v_report_id;
 end;
 $$;
-revoke all on function public.submit_moderation_report(text, text, uuid, text, text, text[]) from public, anon, authenticated;
-grant execute on function public.submit_moderation_report(text, text, uuid, text, text, text[]) to service_role;
+revoke all on function public.submit_moderation_report(text, text, uuid, text, text, text[], text[]) from public, anon, authenticated;
+grant execute on function public.submit_moderation_report(text, text, uuid, text, text, text[], text[]) to service_role;
 
 -- Replace the current action handler so hide/restore applies to every supported target.
 drop function if exists public.admin_review_moderation_report(text, uuid, text, text, text);
