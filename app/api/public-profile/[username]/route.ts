@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getPublicStaffBadges } from "@/lib/admin/public-badges";
+import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
@@ -55,7 +56,8 @@ export async function GET(
           avatar_url,
           cover_url,
           verified,
-          is_official
+          is_official,
+          moderation_hidden_at
           `
         )
         .eq("username", decodedUsername)
@@ -80,6 +82,10 @@ export async function GET(
       );
     }
 
+    if (!(await isPublicProfileVisible(supabase, profile.id))) {
+      return NextResponse.json({ error: "Perfil não encontrado." }, { status: 404 });
+    }
+
     const { data: accountIdentity, error: identityError } = await supabase
       .from("profiles")
       .select("user_id")
@@ -102,6 +108,7 @@ export async function GET(
         .from("stories")
         .select("*")
         .eq("author_id", profile.id)
+        .is("moderation_hidden_at", null)
         .order("updated_at", {
           ascending: false,
         });
@@ -138,6 +145,7 @@ export async function GET(
           `
         )
         .eq("user_id", profile.id)
+        .is("moderation_hidden_at", null)
         .order("pinned", {
           ascending: false,
         })
@@ -326,7 +334,8 @@ export async function GET(
           updated_at
           `
         )
-        .in("id", listStoryIds);
+        .in("id", listStoryIds)
+        .is("moderation_hidden_at", null);
 
       if (listStoriesError) {
         console.error(
@@ -474,7 +483,8 @@ export async function GET(
           updated_at
           `
         )
-        .in("id", clubStoryIds);
+        .in("id", clubStoryIds)
+        .is("moderation_hidden_at", null);
 
       if (!clubStoriesError) {
         clubStories =

@@ -44,9 +44,11 @@ A seção Usuários do painel exige `users.view` e retorna apenas nome, avatar e
 
 Denúncias de perfis, publicações e histórias ficam em `moderation_reports`. O envio usa a sessão de autenticação própria, bloqueia auto denúncia e duplicatas em aberto, e limita denúncias pendentes por conta. RLS é habilitado e acesso direto de clientes é revogado; apenas rotas de servidor com permissão validada podem consultar ou alterar os registros.
 
-A fila de moderação é filtrada por departamento e pelas permissões `moderation.view`/`moderation.manage`. Decisões finais pedem confirmação, atualizam a denúncia e gravam uma entrada append-only no histórico administrativo. O painel registra a análise; a ocultação ou remoção do conteúdo deve ser tratada como uma ação separada com regras próprias.
+A fila de moderação é filtrada por departamento e pelas permissões `moderation.view`/`moderation.manage`. Decisões finais pedem confirmação, atualizam a denúncia e gravam uma entrada append-only no histórico administrativo. A ação **Resolver e ocultar/restaurar** muda a visibilidade do perfil, história ou publicação na mesma transação da decisão e da auditoria. A restauração só remove a ocultação aplicada pela moderação; não altera o status editorial da história.
 
-`supabase/verification/moderation_workflows.sql` testa envio, duplicata, auto denúncia, revisão, auditoria, rollback e privilégios/RLS.
+Perfis suspensos ou ocultos, histórias ocultas e publicações ocultas são excluídos dos endpoints públicos de perfil, exploração, feed, histórias, capítulos, comentários e interações. A busca pública de histórias também exige capítulo publicado e filtra autores suspensos/ocultos. Os campos `moderation_hidden_at` são de controle interno e não podem ser atualizados pelo cliente.
+
+`supabase/verification/moderation_workflows.sql` testa envio, duplicata, auto denúncia, revisão, auditoria, rollback e privilégios/RLS. `supabase/verification/moderation_content_visibility.sql` testa ocultação/restauração transacional e auditoria.
 
 ## Gerenciamento de contas
 

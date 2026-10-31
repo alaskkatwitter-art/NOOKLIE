@@ -37,14 +37,14 @@ export async function GET() {
     if (error) throw error;
     const userIds = Array.from(new Set((reports || []).flatMap((item) => [item.reporter_id, item.target_user_id])));
     const { data: profiles, error: profilesError } = userIds.length
-      ? await supabase.from('profiles').select('user_id, username, display_name, avatar_url').in('user_id', userIds)
+      ? await supabase.from('profiles').select('user_id, username, display_name, avatar_url, moderation_hidden_at').in('user_id', userIds)
       : { data: [], error: null };
     if (profilesError) throw profilesError;
     const storyIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'story').map((item) => item.content_id)));
     const postIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'post').map((item) => item.content_id)));
     const [storiesResult, postsResult] = await Promise.all([
-      storyIds.length ? supabase.from('stories').select('id, title').in('id', storyIds) : Promise.resolve({ data: [], error: null }),
-      postIds.length ? supabase.from('nook_posts').select('id, body').in('id', postIds) : Promise.resolve({ data: [], error: null }),
+      storyIds.length ? supabase.from('stories').select('id, title, moderation_hidden_at').in('id', storyIds) : Promise.resolve({ data: [], error: null }),
+      postIds.length ? supabase.from('nook_posts').select('id, body, moderation_hidden_at').in('id', postIds) : Promise.resolve({ data: [], error: null }),
     ]);
     if (storiesResult.error) throw storiesResult.error;
     if (postsResult.error) throw postsResult.error;
@@ -53,6 +53,11 @@ export async function GET() {
         ...report,
         reporter: (profiles || []).find((profile) => profile.user_id === report.reporter_id) || null,
         target: (profiles || []).find((profile) => profile.user_id === report.target_user_id) || null,
+        content_hidden: report.content_type === 'profile'
+          ? Boolean((profiles || []).find((profile) => profile.user_id === report.target_user_id)?.moderation_hidden_at)
+          : report.content_type === 'story'
+            ? Boolean((storiesResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
+            : Boolean((postsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at),
         content: report.content_type === 'story'
           ? (storiesResult.data || []).find((item) => item.id === report.content_id) || null
           : report.content_type === 'post'
@@ -72,7 +77,9 @@ export async function PATCH(request: NextRequest) {
     if (!staff) return staffPermissionErrorResponse(401);
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        typeof body.id !== 'string' || !['in_review', 'resolved', 'dismissed'].includes(body.status)) {
+        typeof body.id !== 'string' || !['in_review', 'resolved', 'dismissed'].includes(body.status) ||
+        !['none', 'hide', 'restore'].includes(body.content_action ?? 'none') ||
+        (body.content_action && body.status !== 'resolved')) {
       return NextResponse.json({ error: 'Ação de moderação inválida.' }, { status: 400, headers: noStore });
     }
     if (body.status !== 'in_review' && body.confirm !== true) {
@@ -90,6 +97,7 @@ export async function PATCH(request: NextRequest) {
       p_report_id: body.id,
       p_status: body.status,
       p_internal_notes: notes,
+      p_content_action: body.content_action || 'none',
     });
     if (error) {
       if (error.code === '42501') return staffPermissionErrorResponse(403);

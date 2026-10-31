@@ -142,7 +142,8 @@ export async function GET() {
       .in(
         'author_id',
         followingIds
-      );
+      )
+      .is('moderation_hidden_at', null);
 
     if (storiesError) {
       console.error(

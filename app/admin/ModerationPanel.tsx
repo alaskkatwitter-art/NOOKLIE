@@ -7,6 +7,7 @@ type Report = {
   content_type: 'profile' | 'post' | 'story';
   reason: string;
   details: string;
+  content_hidden: boolean;
   status: 'pending' | 'in_review' | 'resolved' | 'dismissed';
   internal_notes: string;
   created_at: string;
@@ -48,13 +49,13 @@ export default function ModerationPanel({ canManage }: { canManage: boolean }) {
     void load().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Falha ao carregar denúncias.'));
   }, [load]);
 
-  async function update(report: Report, status: 'in_review' | 'resolved' | 'dismissed') {
+  async function update(report: Report, status: 'in_review' | 'resolved' | 'dismissed', content_action: 'none' | 'hide' | 'restore' = 'none') {
     if (!canManage) return;
-    if (status !== 'in_review' && !window.confirm(status === 'resolved' ? 'Marcar esta denúncia como resolvida?' : 'Dispensar esta denúncia?')) return;
+    if (status !== 'in_review' && !window.confirm(content_action === 'hide' ? 'Resolver e ocultar este conteúdo para a comunidade?' : content_action === 'restore' ? 'Resolver e restaurar este conteúdo?' : status === 'resolved' ? 'Marcar esta denúncia como resolvida?' : 'Dispensar esta denúncia?')) return;
     setBusy(true); setError(''); setMessage('');
     try {
       await api('/api/admin/reports', { method: 'PATCH', body: JSON.stringify({
-        id: report.id, status, internal_notes: notes[report.id] || '', confirm: status !== 'in_review',
+        id: report.id, status, content_action, internal_notes: notes[report.id] || '', confirm: status !== 'in_review',
       }) });
       setMessage('Denúncia atualizada e ação registrada no histórico.');
       await load();
@@ -77,18 +78,25 @@ export default function ModerationPanel({ canManage }: { canManage: boolean }) {
             <div>
               <p className="font-bold">{report.target?.display_name || report.target?.username || 'Conta indisponível'} <span className="text-xs font-normal text-white/40">· {report.content_type} · {reasons[report.reason] || report.reason}</span></p>
               <p className="mt-1 text-xs text-white/45">Denunciado por @{report.reporter?.username || 'conta indisponível'} em {new Date(report.created_at).toLocaleString('pt-BR')}</p>
+              <p className="mt-2 text-xs text-white/45">Conteúdo: {report.content_hidden ? 'oculto' : 'visível'}</p>
               {report.content?.title && <p className="mt-2 text-sm font-semibold">{report.content.title}</p>}
               {report.content?.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/70">{report.content.body}</p>}
               {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-white/55">{report.details}</p>}
             </div>
             <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">{report.status}</span>
           </div>
+          {canManage && report.status === 'resolved' && report.content_hidden && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'resolved', 'restore')}>Restaurar conteúdo</button>
+            </div>
+          )}
           {canManage && report.status !== 'resolved' && report.status !== 'dismissed' && (
             <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
               <label className="block text-xs font-semibold text-white/55">Observações internas<textarea value={notes[report.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [report.id]: event.target.value }))} maxLength={8000} rows={3} className="mt-2 w-full rounded-xl border border-white/10 bg-[#100b12] p-3 text-sm text-white" /></label>
               <div className="flex flex-wrap gap-2">
                 <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'in_review')}>Em análise</button>
                 <button disabled={busy} className="rounded-xl bg-[#ff78b9] px-4 py-2 text-sm font-bold text-[#1b1018] disabled:opacity-50" onClick={() => void update(report, 'resolved')}>Resolver</button>
+                <button disabled={busy} className="rounded-xl border border-amber-300/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50" onClick={() => void update(report, 'resolved', report.content_hidden ? 'restore' : 'hide')}>Resolver e {report.content_hidden ? 'restaurar' : 'ocultar'}</button>
                 <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'dismissed')}>Dispensar</button>
               </div>
             </div>

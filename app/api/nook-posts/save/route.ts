@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!post) {
+    if (!post || !(await isPublicPostVisible(supabase, postId))) {
       return NextResponse.json(
         {
           error: 'Post não encontrado.',

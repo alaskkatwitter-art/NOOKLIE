@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -263,12 +264,14 @@ export async function GET(
         status,
         rating,
         created_at,
-        updated_at
+        updated_at,
+        moderation_hidden_at
       `)
       .eq(
         'id',
         id
       )
+      .is('moderation_hidden_at', null)
       .maybeSingle();
 
     if (storyError) {
@@ -288,7 +291,7 @@ export async function GET(
       );
     }
 
-    if (!story) {
+    if (!story || !(await isPublicProfileVisible(supabase, story.author_id))) {
       return NextResponse.json(
         {
           error:

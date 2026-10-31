@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,6 +70,7 @@ export async function GET(
           `
         )
         .eq('author_id', id)
+        .is('moderation_hidden_at', null)
         .order('updated_at', {
           ascending: false,
         });
@@ -83,6 +85,10 @@ export async function GET(
         { error: 'Não foi possível carregar as histórias.' },
         { status: 500 }
       );
+    }
+
+    if (!(await isPublicProfileVisible(supabase, id))) {
+      return NextResponse.json({ stories: [] });
     }
 
     return NextResponse.json({

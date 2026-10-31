@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,6 +80,10 @@ export async function GET(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    if (!(await isPublicPostVisible(supabase, postId))) {
+      return NextResponse.json({ comments: [] });
     }
 
     const {
@@ -314,7 +319,7 @@ export async function POST(
       );
     }
 
-    if (!post) {
+    if (!post || !(await isPublicPostVisible(supabase, postId))) {
       return NextResponse.json(
         {
           error:

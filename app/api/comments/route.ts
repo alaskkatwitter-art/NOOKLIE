@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
 process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,6 +55,15 @@ if (!chapterId) {
     },
     { status: 400 }
   );
+}
+
+const { data: chapterVisibility } = await supabase
+  .from('chapters')
+  .select('story_id')
+  .eq('id', chapterId)
+  .maybeSingle();
+if (!chapterVisibility || !(await isPublicStoryVisible(supabase, chapterVisibility.story_id))) {
+  return NextResponse.json({ comments: [] });
 }
 
 const { data: comments, error } = await supabase
@@ -171,6 +181,11 @@ if (!chapter) {
     },
     { status: 404 }
   );
+}
+
+const { data: chapterStory } = await supabase.from('chapters').select('story_id').eq('id', chapterId).maybeSingle();
+if (!chapterStory || !(await isPublicStoryVisible(supabase, chapterStory.story_id))) {
+  return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404 });
 }
 
 let sticker = null;

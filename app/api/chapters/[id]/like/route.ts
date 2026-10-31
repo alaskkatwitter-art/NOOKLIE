@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -157,12 +158,12 @@ export async function POST(
     const { data: chapter } =
       await supabase
         .from('chapters')
-        .select('id, published')
+        .select('id, story_id, published')
         .eq('id', id)
         .eq('published', true)
         .maybeSingle();
 
-    if (!chapter) {
+    if (!chapter || !(await isPublicStoryVisible(supabase, chapter.story_id))) {
       return NextResponse.json(
         {
           error: 'Capítulo não encontrado.',

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isPublicProfileVisible, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,7 +160,8 @@ export async function GET() {
         .select(
           'id, author_id, title, description, cover_url, status, rating, created_at, updated_at'
         )
-        .in('id', storyIds);
+        .in('id', storyIds)
+        .is('moderation_hidden_at', null);
 
     if (storiesError) {
       console.error(
@@ -176,9 +178,13 @@ export async function GET() {
       );
     }
 
+    const visibleStories = (await Promise.all((stories || []).map(async (story) =>
+      await isPublicProfileVisible(supabase, story.author_id) ? story : null
+    ))).filter((story): story is NonNullable<typeof story> => story !== null);
+
     const authorIds = Array.from(
       new Set(
-        (stories || [])
+        visibleStories
           .map((story) => story.author_id)
           .filter(Boolean)
       )
@@ -206,7 +212,7 @@ export async function GET() {
     );
 
     const storyMap = new Map(
-      (stories || []).map((story) => [
+      visibleStories.map((story) => [
         story.id,
         story,
       ])
@@ -365,7 +371,7 @@ export async function POST(
       );
     }
 
-    if (!story) {
+    if (!story || !(await isPublicStoryVisible(supabase, storyId))) {
       return NextResponse.json(
         {
           error: 'História não encontrada.',

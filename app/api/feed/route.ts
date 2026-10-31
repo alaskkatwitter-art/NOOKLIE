@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
      * pelo usuário atual.
      */
     const {
-      data: posts,
+      data: rawPosts,
       error: postsError,
     } = await supabase
       .from('nook_posts')
@@ -76,8 +77,10 @@ export async function GET(request: Request) {
         story_id,
         pinned,
         created_at,
-        updated_at
+        updated_at,
+        moderation_hidden_at
       `)
+      .is('moderation_hidden_at', null)
       .order('created_at', {
         ascending: false,
       });
@@ -95,6 +98,10 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+
+    const posts = (await Promise.all((rawPosts || []).filter((post) => !post.moderation_hidden_at).map(async (post) =>
+      await isPublicProfileVisible(supabase, post.user_id) ? post : null
+    ))).filter((post): post is NonNullable<typeof post> => post !== null);
 
     if (!posts || posts.length === 0) {
       return NextResponse.json({

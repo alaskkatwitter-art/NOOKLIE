@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -249,6 +250,10 @@ export async function GET(
           headers: noCacheHeaders(),
         }
       );
+    }
+
+    if (!(await isPublicStoryVisible(supabase, chapter.story_id))) {
+      return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
     }
 
     const { data: media, error: mediaError } =

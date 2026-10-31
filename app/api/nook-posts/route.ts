@@ -77,9 +77,11 @@ export async function GET(request: Request) {
           story_id,
           pinned,
           created_at,
-          updated_at
+          updated_at,
+          moderation_hidden_at
         `)
         .eq('user_id', userId)
+        .is('moderation_hidden_at', null)
         .order('pinned', {
           ascending: false,
         })

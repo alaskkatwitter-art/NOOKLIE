@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -214,7 +215,8 @@ export async function POST(
 
     if (
       postError ||
-      !post
+      !post ||
+      !(await isPublicPostVisible(supabase, postId))
     ) {
       return NextResponse.json(
         {
