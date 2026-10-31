@@ -64,6 +64,7 @@ before(async () => {
     username: 'owner',
     password_hash: await bcrypt.hash('correct-password', 4),
     recovery_key_hash: await bcrypt.hash(recoveryKey, 4),
+    account_status: 'active',
   };
   state.tags = [
     { id: 'tag-fantasia', name: 'Fantasia', slug: 'fantasia', category_id: categoryIds.genre, created_at: new Date().toISOString() },
@@ -318,6 +319,16 @@ test('login rejects invalid credentials and creates a hashed session on success'
     body: JSON.stringify({ username: 'owner', password: 'wrong-password' }),
   });
   assert.equal(invalid.status, 401);
+
+  state.account.account_status = 'suspended';
+  const suspended = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-vercel-forwarded-for': '198.51.100.13' },
+    body: JSON.stringify({ username: 'owner', password: 'correct-password' }),
+  });
+  assert.equal(suspended.status, 403);
+  assert.equal(state.sessions.length, 0);
+  state.account.account_status = 'active';
 
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
