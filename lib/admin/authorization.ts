@@ -104,11 +104,32 @@ export async function hasStaffPermission(
 
   if (roleIds.length === 0) return false;
 
+  const { data: activeRoles, error: rolesError } = await supabase
+    .from('team_roles')
+    .select('id, department_id')
+    .in('id', roleIds)
+    .eq('status', 'active');
+  if (rolesError) throw rolesError;
+  const activeDepartmentIds = Array.from(new Set((activeRoles || []).map((role) => role.department_id)));
+  if (activeDepartmentIds.length === 0) return false;
+
+  const { data: activeDepartments, error: departmentsError } = await supabase
+    .from('departments')
+    .select('id')
+    .in('id', activeDepartmentIds)
+    .eq('status', 'active');
+  if (departmentsError) throw departmentsError;
+  const activeDepartmentSet = new Set((activeDepartments || []).map((department) => department.id));
+  const activeRoleIds = (activeRoles || [])
+    .filter((role) => activeDepartmentSet.has(role.department_id))
+    .map((role) => role.id);
+  if (activeRoleIds.length === 0) return false;
+
   const { data: grant, error: grantError } = await supabase
     .from('team_role_permissions')
     .select('role_id')
     .eq('permission_code', permissionCode)
-    .in('role_id', roleIds)
+    .in('role_id', activeRoleIds)
     .limit(1)
     .maybeSingle();
 
