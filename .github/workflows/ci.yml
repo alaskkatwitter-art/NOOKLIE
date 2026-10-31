@@ -79,7 +79,7 @@ jobs:
         with:
           version: 2.122.0
       - name: Start an isolated local PostgreSQL database without replaying migrations
-        run: supabase db start --password postgres
+        run: supabase db start
       - name: Install the PostgreSQL client
         run: |
           sudo apt-get update
