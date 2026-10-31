@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, anonymousStoryIds: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -228,6 +228,10 @@ before(async () => {
     }
 
     if (path === 'stories' && request.method === 'GET') {
+      if ((url.searchParams.get('select') || '').includes('is_anonymous')) {
+        const ids = (url.searchParams.get('id') || '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+        return sendJson(response, state.discoveryStories.filter((story) => ids.includes(story.id)).map((story) => ({ id: story.id, is_anonymous: state.anonymousStoryIds.includes(story.id) })));
+      }
       const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
       const rows = id === storyId ? [{ id: storyId, author_id: userId }] : [];
       return respondRows(request, response, rows);
@@ -444,6 +448,7 @@ test('chapter creation requires authentication and confirms story ownership', as
 
 
 test('discovery applies included and excluded tags, rating, status, and sort', async () => {
+  state.anonymousStoryIds.push('story-filter-one');
   const response = await fetch(
     `${baseUrl}/api/explore?includeTag=fantasia&includeTag=romance&excludeTag=terror&rating=12&status=${encodeURIComponent('Concluída')}&sort=newest`,
   );
@@ -451,6 +456,9 @@ test('discovery applies included and excluded tags, rating, status, and sort', a
   const result = await response.json();
   assert.deepEqual(result.stories.map((story) => story.id), ['story-filter-one']);
   assert.deepEqual(result.stories[0].tags.map((tag) => tag.slug).sort(), ['fantasia', 'romance']);
+  assert.equal(result.stories[0].author, null);
+  assert.equal(result.stories[0].author_label, 'Autor anônimo');
+  state.anonymousStoryIds = [];
 });
 
 test('signed-in readers can publish a categorized tag immediately and duplicates are reused', async () => {

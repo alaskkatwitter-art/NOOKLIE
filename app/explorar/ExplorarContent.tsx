@@ -23,6 +23,7 @@ type ExploreStory = {
   status: string | null;
   rating: string | null;
   author: ExploreUser | null;
+  author_label?: string | null;
   is_saved?: boolean;
   is_own_story?: boolean;
   tags?: Array<{ name: string; slug: string; category: string | null }>;
@@ -722,7 +723,9 @@ export default function ExplorarContent() {
                                   </h4>
                                 </Link>
 
-                                {story.author && (
+                                {story.author_label ? (
+                                  <div className="mt-2 text-sm text-white/40">por <span className="text-white/60">{story.author_label}</span></div>
+                                ) : story.author && (
                                   <div className="mt-2 flex items-center gap-1.5 text-sm text-white/40">
                                     <span>
                                       por

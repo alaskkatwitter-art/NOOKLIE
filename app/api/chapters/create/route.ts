@@ -73,6 +73,14 @@ async function getAuthenticatedUser(request: Request) {
     return null;
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('deactivated_at')
+    .eq('user_id', session.user_id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile || profile.deactivated_at) return null;
+
   return session.user_id;
 }
 

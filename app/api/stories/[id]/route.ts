@@ -266,7 +266,8 @@ export async function GET(
         rating,
         created_at,
         updated_at,
-        moderation_hidden_at
+        moderation_hidden_at,
+        is_anonymous
       `)
       .eq(
         'id',
@@ -651,9 +652,10 @@ export async function GET(
         story: {
           ...story,
           can_edit: editAccess.canEdit,
-
-          author:
-            author || null,
+          can_manage_anonymity: currentUserId === story.author_id,
+          author_id: story.is_anonymous && currentUserId !== story.author_id ? null : story.author_id,
+          author_label: story.is_anonymous ? 'Autor anônimo' : null,
+          author: story.is_anonymous && currentUserId !== story.author_id ? null : author || null,
 
           tags,
 

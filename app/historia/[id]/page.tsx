@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import StoryCollaboratorsPanel from '@/app/components/StoryCollaboratorsPanel';
+import AnonymousStoryControl from '@/components/AnonymousStoryControl';
 
 type Author = {
   id: string;
@@ -44,6 +45,9 @@ type Story = {
   likes: number;
   liked: boolean;
   can_edit?: boolean;
+  can_manage_anonymity?: boolean;
+  is_anonymous?: boolean;
+  author_label?: string | null;
 };
 
 export default function HistoriaPage() {
@@ -299,7 +303,15 @@ export default function HistoriaPage() {
               {story.title}
             </h1>
 
-            {story.author && (
+            {story.is_anonymous ? (
+              <div className="mb-6 flex w-fit items-center gap-3 text-left">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg text-white/60">✦</div>
+                <div>
+                  <p className="text-xs text-white/40">Escrito por</p>
+                  <p className="font-medium text-white/80">{story.author_label || 'Autor anônimo'}</p>
+                </div>
+              </div>
+            ) : story.author && (
               <button
                 type="button"
                 onClick={() =>
@@ -412,6 +424,8 @@ export default function HistoriaPage() {
                   Editar obra
                 </button>
               )}
+
+              {story.can_manage_anonymity && <AnonymousStoryControl storyId={story.id} isAnonymous={Boolean(story.is_anonymous)} onChanged={() => window.location.reload()} />}
 
               {isOwner && (
                 <button

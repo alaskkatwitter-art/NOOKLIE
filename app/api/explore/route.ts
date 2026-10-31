@@ -210,6 +210,12 @@ export async function GET(request: Request) {
     }
 
     const storyRows = (stories || []) as StoryRow[];
+    const storyIds = storyRows.map((story) => story.id);
+    const { data: privacyRows, error: privacyError } = storyIds.length
+      ? await supabase.from('stories').select('id, is_anonymous').in('id', storyIds)
+      : { data: [], error: null };
+    if (privacyError) throw privacyError;
+    const anonymousStoryIds = new Set((privacyRows || []).filter((story) => story.is_anonymous).map((story) => story.id));
 
     /*
      * =========================================================
@@ -220,6 +226,7 @@ export async function GET(request: Request) {
     const authorIds = Array.from(
       new Set(
         storyRows
+          .filter((story) => !anonymousStoryIds.has(story.id))
           .map((story) => story.author_id)
           .filter(Boolean)
       )
@@ -266,10 +273,6 @@ export async function GET(request: Request) {
      * CAPÍTULOS PUBLICADOS
      * =========================================================
      */
-
-    const storyIds = storyRows.map(
-      (story) => story.id
-    );
 
     let publishedStoryIds = new Set<string>();
 
@@ -390,7 +393,8 @@ export async function GET(request: Request) {
         status: story.status,
         rating: story.rating,
         tags: tagsByStory.get(story.id) || [],
-        author: story.author_id
+        author_label: anonymousStoryIds.has(story.id) ? 'Autor anônimo' : null,
+        author: !anonymousStoryIds.has(story.id) && story.author_id
           ? authorMap.get(story.author_id) || null
           : null,
         is_saved: savedStoryIds.has(story.id),
