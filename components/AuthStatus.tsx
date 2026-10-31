@@ -18,6 +18,7 @@ export default function AuthStatus() {
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -36,11 +37,16 @@ export default function AuthStatus() {
 
         if (data.authenticated && data.user) {
           setUser(data.user);
+          const accessResponse = await fetch('/api/admin/access', { cache: 'no-store' });
+          const access = accessResponse.ok ? await accessResponse.json() : { allowed: false };
+          setIsAdmin(access.allowed === true);
         } else {
           setUser(null);
+          setIsAdmin(false);
         }
       } catch {
         setUser(null);
+        setIsAdmin(false);
       } finally {
         setLoading(false);
       }
@@ -58,6 +64,7 @@ export default function AuthStatus() {
       });
 
       setUser(null);
+      setIsAdmin(false);
       router.push('/');
       router.refresh();
     } catch {
@@ -94,6 +101,11 @@ export default function AuthStatus() {
           @{user.username}
         </span>
       </button>
+
+      {isAdmin && <button
+        onClick={() => router.push('/admin')}
+        className="rounded-full border border-[#ff78b9]/30 px-4 py-2 text-sm font-semibold text-[#ff9aca] transition hover:bg-[#ff78b9]/10"
+      >Painel</button>}
 
       <button
         onClick={handleLogout}

@@ -29,6 +29,7 @@ const menu = [
   { label: "Escrever", href: "/escrever" },
   { label: "Fandoms", href: "/fandoms" },
   { label: "Notícias", href: "/noticias" },
+  { label: "Oportunidades", href: "/oportunidades" },
 ];
 
 export default function Home() {

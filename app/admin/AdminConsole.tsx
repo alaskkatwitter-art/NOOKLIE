@@ -22,6 +22,19 @@ type Member = {
   department: { name: string } | null;
 };
 type Candidate = { user_id: string; username: string; display_name: string | null; avatar_url: string | null };
+type OpportunityQuestion = { id: string; prompt: string; required: boolean };
+type Opportunity = {
+  id: string; department_id: string; title: string; description: string; requirements: string;
+  openings: number; questions: OpportunityQuestion[]; opens_at: string; closes_at: string;
+  status: 'draft' | 'open' | 'closed' | 'archived'; department: { name: string } | null;
+};
+type AdminApplication = {
+  id: string; opportunity_id: string; user_id: string; answers: Record<string, string>;
+  status: 'submitted' | 'in_review' | 'approved' | 'rejected' | 'cancelled';
+  internal_notes: string; created_at: string;
+  applicant: { username: string; display_name: string | null; avatar_url: string | null } | null;
+  opportunity: { id: string; department_id: string; title: string; questions: OpportunityQuestion[] } | null;
+};
 type AuditEntry = {
   id: string; action: string; subject_type: string; subject_id: string | null;
   details: Record<string, unknown>; created_at: string;
@@ -33,6 +46,8 @@ const tabs = [
   ['departments', 'Departamentos'],
   ['roles', 'Cargos e permissões'],
   ['members', 'Equipe'],
+  ['opportunities', 'Vagas'],
+  ['applications', 'Candidaturas'],
   ['audit', 'Histórico'],
 ] as const;
 type Tab = (typeof tabs)[number][0];
@@ -53,7 +68,17 @@ function dateLabel(value: string | null) {
   return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-export default function AdminConsole({ isPlatformAdmin, canManageMembers, manageableDepartmentIds }: { isPlatformAdmin: boolean; canManageMembers: boolean; manageableDepartmentIds: string[] }) {
+export default function AdminConsole({
+  isPlatformAdmin, canManageMembers, manageableDepartmentIds,
+  canManageOpportunities, manageableOpportunityDepartmentIds,
+  canViewOpportunities, canViewApplications, canReviewApplications,
+  reviewableDepartmentIds,
+}: {
+  isPlatformAdmin: boolean; canManageMembers: boolean; manageableDepartmentIds: string[];
+  canManageOpportunities: boolean; manageableOpportunityDepartmentIds: string[];
+  canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
+  reviewableDepartmentIds: string[];
+}) {
   const [tab, setTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<{ users: number | null; departments: number; roles: number; members: number } | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -62,6 +87,23 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
   const [members, setMembers] = useState<Member[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
+  const [opportunityDepartment, setOpportunityDepartment] = useState('');
+  const [opportunityTitle, setOpportunityTitle] = useState('');
+  const [opportunityDescription, setOpportunityDescription] = useState('');
+  const [opportunityRequirements, setOpportunityRequirements] = useState('');
+  const [opportunityOpenings, setOpportunityOpenings] = useState('1');
+  const [opportunityOpensAt, setOpportunityOpensAt] = useState('');
+  const [opportunityClosesAt, setOpportunityClosesAt] = useState('');
+  const [opportunityStatus, setOpportunityStatus] = useState<'draft' | 'open' | 'closed' | 'archived'>('draft');
+  const [opportunityQuestions, setOpportunityQuestions] = useState<OpportunityQuestion[]>([]);
+  const [questionDraft, setQuestionDraft] = useState('');
+  const [questionRequired, setQuestionRequired] = useState(true);
+  const [selectedApplication, setSelectedApplication] = useState<AdminApplication | null>(null);
+  const [internalNotes, setInternalNotes] = useState('');
+  const [applicationRoleId, setApplicationRoleId] = useState('');
   const [memberStatus, setMemberStatus] = useState<'active' | 'removed'>('active');
   const [search, setSearch] = useState('');
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -97,6 +139,14 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
     const data = await request<{ members: Member[] }>('/api/admin/manage?resource=members&status=' + memberStatus);
     setMembers(data.members);
   }, [memberStatus]);
+  const loadOpportunities = useCallback(async () => {
+    const data = await request<{ opportunities: Opportunity[] }>('/api/admin/manage?resource=opportunities');
+    setOpportunities(data.opportunities);
+  }, []);
+  const loadApplications = useCallback(async () => {
+    const data = await request<{ applications: AdminApplication[] }>('/api/admin/applications');
+    setApplications(data.applications);
+  }, []);
   const loadAudit = useCallback(async () => {
     const data = await request<{ entries: AuditEntry[] }>('/api/admin/manage?resource=audit');
     setAudit(data.entries);
@@ -113,11 +163,13 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
       : tab === 'departments' ? loadDepartments()
       : tab === 'roles' ? Promise.all([loadDepartments(), loadRoles()]).then(() => undefined)
       : tab === 'members' ? Promise.all([loadDepartments(), loadRoles(), loadMembers()]).then(() => undefined)
+      : tab === 'opportunities' ? Promise.all([loadDepartments(), loadOpportunities()]).then(() => undefined)
+      : tab === 'applications' ? Promise.all([loadDepartments(), loadRoles(), loadApplications()]).then(() => undefined)
       : loadAudit();
     work.catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : 'Falha ao carregar o painel.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [tab, memberStatus, loadOverview, loadDepartments, loadRoles, loadMembers, loadAudit]);
+  }, [tab, memberStatus, loadOverview, loadDepartments, loadRoles, loadMembers, loadOpportunities, loadApplications, loadAudit]);
 
 
   function resetDepartmentForm() {
@@ -220,6 +272,116 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
     finally { setBusy(false); }
   }
 
+  function canManageInDepartment(departmentId: string) {
+    return isPlatformAdmin || manageableDepartmentIds.includes(departmentId);
+  }
+
+  function canManageOpportunitiesInDepartment(departmentId: string) {
+    return isPlatformAdmin || manageableOpportunityDepartmentIds.includes(departmentId);
+  }
+
+  function canReviewInDepartment(departmentId: string) {
+    return isPlatformAdmin || reviewableDepartmentIds.includes(departmentId);
+  }
+
+  function localDateValue(daysFromNow: number) {
+    const value = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
+    value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+    return value.toISOString().slice(0, 16);
+  }
+
+  function resetOpportunityForm() {
+    setEditingOpportunity(null); setOpportunityDepartment('');
+    setOpportunityTitle(''); setOpportunityDescription(''); setOpportunityRequirements('');
+    setOpportunityOpenings('1'); setOpportunityStatus('draft'); setOpportunityQuestions([]);
+    setOpportunityOpensAt(localDateValue(0)); setOpportunityClosesAt(localDateValue(7));
+  }
+
+  function editOpportunity(item: Opportunity) {
+    setEditingOpportunity(item); setOpportunityDepartment(item.department_id);
+    setOpportunityTitle(item.title); setOpportunityDescription(item.description);
+    setOpportunityRequirements(item.requirements); setOpportunityOpenings(String(item.openings));
+    setOpportunityStatus(item.status); setOpportunityQuestions(item.questions || []);
+    const toLocal = (value: string) => {
+      const date = new Date(value); date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+      return date.toISOString().slice(0, 16);
+    };
+    setOpportunityOpensAt(toLocal(item.opens_at)); setOpportunityClosesAt(toLocal(item.closes_at));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function addQuestion() {
+    const prompt = questionDraft.trim();
+    if (!prompt || prompt.length > 300 || opportunityQuestions.length >= 10) return;
+    setOpportunityQuestions((current) => [...current, {
+      id: 'q-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      prompt, required: questionRequired,
+    }]);
+    setQuestionDraft(''); setQuestionRequired(true);
+  }
+
+  async function saveOpportunity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    try {
+      const body = {
+        resource: 'opportunity', id: editingOpportunity?.id, department_id: opportunityDepartment,
+        title: opportunityTitle, description: opportunityDescription, requirements: opportunityRequirements,
+        openings: Number(opportunityOpenings), questions: opportunityQuestions,
+        opens_at: new Date(opportunityOpensAt).toISOString(),
+        closes_at: new Date(opportunityClosesAt).toISOString(), status: opportunityStatus,
+      };
+      await request('/api/admin/manage', { method: editingOpportunity ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      setMessage(editingOpportunity ? 'Vaga atualizada.' : 'Vaga criada.');
+      resetOpportunityForm(); await loadOpportunities(); await loadOverview();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao salvar vaga.'); }
+    finally { setBusy(false); }
+  }
+
+  async function changeOpportunityStatus(item: Opportunity, status: Opportunity['status']) {
+    const action = status === 'open' ? 'publicar' : status === 'closed' ? 'encerrar' : status === 'archived' ? 'arquivar' : 'reativar';
+    if (!window.confirm('Deseja ' + action + ' a vaga “' + item.title + '”?')) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await request('/api/admin/manage', { method: 'PATCH', body: JSON.stringify({
+        resource: 'opportunity', id: item.id, department_id: item.department_id,
+        title: item.title, description: item.description, requirements: item.requirements,
+        openings: item.openings, questions: item.questions,
+        opens_at: item.opens_at, closes_at: item.closes_at, status,
+      }) });
+      setMessage('Status da vaga atualizado.'); await loadOpportunities();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao atualizar vaga.'); }
+    finally { setBusy(false); }
+  }
+
+  function openApplication(item: AdminApplication) {
+    setSelectedApplication(selectedApplication?.id === item.id ? null : item);
+    setInternalNotes(item.internal_notes || '');
+    setApplicationRoleId('');
+  }
+
+  async function reviewApplication(status: 'in_review' | 'approved' | 'rejected') {
+    if (!selectedApplication) return;
+    if ((status === 'approved' || status === 'rejected') &&
+        !window.confirm(status === 'approved' ? 'Aprovar e nomear esta pessoa para o cargo selecionado?' : 'Recusar esta candidatura?')) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await request('/api/admin/applications', { method: 'PATCH', body: JSON.stringify({
+        id: selectedApplication.id, status, internal_notes: internalNotes,
+        role_id: status === 'approved' ? applicationRoleId : null,
+        confirm: status === 'approved' || status === 'rejected',
+      }) });
+      setMessage(status === 'approved' ? 'Candidatura aprovada e nomeação registrada.' : status === 'rejected' ? 'Candidatura recusada.' : 'Candidatura movida para análise.');
+      setSelectedApplication(null); await loadApplications(); await loadOverview();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao analisar candidatura.'); }
+    finally { setBusy(false); }
+  }
+
+  const visibleTabs = tabs.filter(([key]) =>
+    (key !== 'audit' || isPlatformAdmin) &&
+    (key !== 'opportunities' || canViewOpportunities || canManageOpportunities) &&
+    (key !== 'applications' || canViewApplications || canReviewApplications)
+  );
+
   async function searchCandidates(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
     try {
@@ -276,7 +438,7 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
         </div>
 
         <nav aria-label="Seções administrativas" className="mb-6 flex gap-2 overflow-x-auto pb-2">
-          {tabs.map(([key, label]) => (
+          {visibleTabs.map(([key, label]) => (
             <button key={key} type="button" onClick={() => { if (tab !== key) { setLoading(true); setTab(key); } setError(''); setMessage(''); }}
               className={tab === key ? 'shrink-0 rounded-full bg-[#ff78b9] px-4 py-2.5 text-xs font-bold text-[#1b1018]' : 'shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/60 hover:text-white'}>
               {label}
@@ -412,6 +574,99 @@ export default function AdminConsole({ isPlatformAdmin, canManageMembers, manage
                 {!members.length && <p className="rounded-xl border border-dashed border-white/10 p-5 text-sm text-white/40">{memberStatus === 'active' ? 'Nenhum integrante ativo.' : 'Nenhuma participação anterior.'}</p>}
               </div>
             </div>
+          </section>
+        )}
+
+
+        {tab === 'opportunities' && (
+          <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.9fr)]">
+            <div className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
+              <h2 className="text-xl font-bold">Oportunidades</h2>
+              <p className="mb-4 mt-1 text-sm text-white/45">Crie e atualize as vagas da Central de Oportunidades.</p>
+              <div className="space-y-3">
+                {opportunities.map((item) => <article key={item.id} className="rounded-xl border border-white/5 bg-[#100b12] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0"><p className="font-bold">{item.title}</p>
+                      <p className="mt-1 text-xs text-[#ff9aca]">{item.department?.name || 'Departamento'} · {item.openings} vaga(s)</p>
+                      <p className="mt-1 text-xs text-white/35">{item.status === 'open' ? 'Aberta' : item.status === 'draft' ? 'Rascunho' : item.status === 'closed' ? 'Encerrada' : 'Arquivada'} · até {dateLabel(item.closes_at)}</p>
+                    </div>
+                    {canManageOpportunitiesInDepartment(item.department_id) && <div className="flex flex-wrap gap-2">
+                      <button type="button" className={secondaryButton} onClick={() => editOpportunity(item)}>Editar</button>
+                      {item.status !== 'archived' && <button type="button" disabled={busy} className={secondaryButton} onClick={() => void changeOpportunityStatus(item, item.status === 'open' ? 'closed' : item.status === 'closed' ? 'archived' : 'open')}>
+                        {item.status === 'open' ? 'Encerrar' : item.status === 'closed' ? 'Arquivar' : 'Publicar'}
+                      </button>}
+                    </div>}
+                  </div>
+                  {item.description && <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-white/45">{item.description}</p>}
+                </article>)}
+                {!opportunities.length && <p className="rounded-xl border border-dashed border-white/10 p-5 text-sm text-white/40">Nenhuma vaga cadastrada nos departamentos acessíveis.</p>}
+              </div>
+            </div>
+
+            {canManageOpportunities && <form onSubmit={saveOpportunity} className="h-fit space-y-3 rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
+              <h2 className="text-xl font-bold">{editingOpportunity ? 'Editar vaga' : 'Nova vaga'}</h2>
+              <label className="block text-xs text-white/55">Departamento<select required className={inputClass + ' mt-1'} value={opportunityDepartment} onChange={(event) => setOpportunityDepartment(event.target.value)}><option value="">Selecione</option>{departments.filter((item) => item.status === 'active' && canManageOpportunitiesInDepartment(item.id)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <label className="block text-xs text-white/55">Nome do cargo/vaga<input required maxLength={120} className={inputClass + ' mt-1'} value={opportunityTitle} onChange={(event) => setOpportunityTitle(event.target.value)} placeholder="Jornalista do Nooklie" /></label>
+              <label className="block text-xs text-white/55">Descrição<textarea rows={4} maxLength={12000} className={inputClass + ' mt-1'} value={opportunityDescription} onChange={(event) => setOpportunityDescription(event.target.value)} /></label>
+              <label className="block text-xs text-white/55">Requisitos<textarea rows={3} maxLength={8000} className={inputClass + ' mt-1'} value={opportunityRequirements} onChange={(event) => setOpportunityRequirements(event.target.value)} /></label>
+              <label className="block text-xs text-white/55">Quantidade de vagas<input type="number" min="1" max="1000" required className={inputClass + ' mt-1'} value={opportunityOpenings} onChange={(event) => setOpportunityOpenings(event.target.value)} /></label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs text-white/55">Abertura<input type="datetime-local" required className={inputClass + ' mt-1'} value={opportunityOpensAt} onChange={(event) => setOpportunityOpensAt(event.target.value)} /></label>
+                <label className="block text-xs text-white/55">Encerramento<input type="datetime-local" required className={inputClass + ' mt-1'} value={opportunityClosesAt} onChange={(event) => setOpportunityClosesAt(event.target.value)} /></label>
+              </div>
+              <label className="block text-xs text-white/55">Status<select className={inputClass + ' mt-1'} value={opportunityStatus} onChange={(event) => setOpportunityStatus(event.target.value as Opportunity['status'])}>
+                <option value="draft">Rascunho</option><option value="open">Aberta/publicada</option><option value="closed">Encerrada</option><option value="archived">Arquivada</option>
+              </select></label>
+              <fieldset className="rounded-xl border border-white/10 p-3">
+                <legend className="px-1 text-xs font-bold text-white/70">Perguntas para candidatura (até 10)</legend>
+                <div className="space-y-2">{opportunityQuestions.map((question) => <div key={question.id} className="flex items-start justify-between gap-2 rounded-lg bg-[#100b12] p-3">
+                  <p className="text-xs text-white/75">{question.prompt}{question.required ? ' · obrigatória' : ''}</p>
+                  <button type="button" onClick={() => setOpportunityQuestions((current) => current.filter((item) => item.id !== question.id))} className="text-xs text-red-200/70">Remover</button>
+                </div>)}</div>
+                {opportunityQuestions.length < 10 && <div className="mt-3 space-y-2">
+                  <textarea rows={2} maxLength={300} className={inputClass} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Escreva uma pergunta personalizada" />
+                  <div className="flex flex-wrap items-center justify-between gap-2"><label className="flex items-center gap-2 text-xs text-white/55"><input type="checkbox" checked={questionRequired} onChange={(event) => setQuestionRequired(event.target.checked)} />Obrigatória</label><button type="button" className={secondaryButton} onClick={addQuestion}>Adicionar pergunta</button></div>
+                </div>}
+              </fieldset>
+              <div className="flex flex-wrap gap-2"><button disabled={busy || !opportunityDepartment} className={primaryButton}>{busy ? 'Salvando…' : editingOpportunity ? 'Salvar vaga' : 'Criar vaga'}</button>{editingOpportunity && <button type="button" className={secondaryButton} onClick={resetOpportunityForm}>Cancelar edição</button>}</div>
+            </form>}
+          </section>
+        )}
+
+        {tab === 'applications' && (
+          <section className="space-y-4">
+            <div><h2 className="text-xl font-bold">Candidaturas</h2><p className="mt-1 text-sm text-white/45">Respostas e observações internas são visíveis somente à equipe autorizada.</p></div>
+            {applications.map((item) => {
+              const departmentId = item.opportunity?.department_id || '';
+              const canReview = canReviewInDepartment(departmentId);
+              const canAppoint = canManageInDepartment(departmentId);
+              const canDecide = canReview && ['submitted', 'in_review'].includes(item.status);
+              const opened = selectedApplication?.id === item.id;
+              return <article key={item.id} className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-5">
+                <button type="button" onClick={() => openApplication(item)} className="flex w-full flex-wrap items-center justify-between gap-3 text-left">
+                  <span className="min-w-0"><span className="block font-bold">{item.applicant?.display_name || item.applicant?.username || 'Candidata/o'}</span>
+                    <span className="mt-1 block text-xs text-white/40">@{item.applicant?.username || 'usuário'} · {item.opportunity?.title || 'Oportunidade'} · {dateLabel(item.created_at)}</span></span>
+                  <span className="rounded-full border border-[#ff78b9]/20 px-3 py-2 text-xs font-semibold text-[#ff9aca]">{item.status === 'submitted' ? 'Enviada' : item.status === 'in_review' ? 'Em análise' : item.status === 'approved' ? 'Aprovada' : item.status === 'rejected' ? 'Recusada' : 'Cancelada'}</span>
+                </button>
+                {opened && <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
+                  <div className="space-y-3">{Object.entries(item.answers || {}).map(([questionId, answer]) => {
+                    const question = item.opportunity?.questions?.find((candidate) => candidate.id === questionId);
+                    return <div key={questionId} className="rounded-xl bg-[#100b12] p-4"><p className="text-xs font-bold text-[#ff9aca]">{question?.prompt || 'Resposta'}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/75">{answer}</p></div>;
+                  })}</div>
+                  <label className="block text-xs font-semibold text-white/60">Observações internas<textarea maxLength={8000} rows={4} className={inputClass + ' mt-2'} value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} /></label>
+                  {canDecide && <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('in_review')}>Salvar análise</button>
+                    <button type="button" disabled={busy || !canAppoint || !applicationRoleId} className={primaryButton} onClick={() => void reviewApplication('approved')}>Aprovar e nomear</button>
+                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('rejected')}>Recusar</button>
+                  </div>}
+                  {canDecide && <label className="block text-xs text-white/55">Cargo para nomeação<select className={inputClass + ' mt-1'} value={applicationRoleId} onChange={(event) => setApplicationRoleId(event.target.value)}><option value="">Escolha um cargo no departamento</option>{roles.filter((role) => role.status === 'active' && role.department_id === departmentId && canAppoint).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
+                    {!canAppoint && <span className="mt-1 block text-[11px] text-white/35">Seu cargo permite analisar, mas a nomeação exige members.manage neste departamento.</span>}
+                  </label>}
+                  {!canDecide && <p className="text-xs text-white/35">Esta candidatura já recebeu uma decisão final ou foi cancelada.</p>}
+                </div>}
+              </article>;
+            })}
+            {!applications.length && <p className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40">Não há candidaturas nos departamentos disponíveis.</p>}
           </section>
         )}
 

@@ -116,6 +116,24 @@ export async function hasStaffPermission(
   return Boolean(grant);
 }
 
+
+export async function getStaffDepartmentIds(
+  context: StaffContext,
+  permissionCodes: string[]
+): Promise<string[]> {
+  if (context.isPlatformAdmin) return [];
+  const departmentIds = Array.from(
+    new Set(context.memberships.map((membership) => membership.department_id))
+  );
+  const authorized = await Promise.all(departmentIds.map(async (departmentId) => {
+    for (const permissionCode of permissionCodes) {
+      if (await hasStaffPermission(context, permissionCode, departmentId)) return departmentId;
+    }
+    return null;
+  }));
+  return authorized.filter((departmentId): departmentId is string => Boolean(departmentId));
+}
+
 export function staffPermissionErrorResponse(
   status: 401 | 403 = 403
 ) {

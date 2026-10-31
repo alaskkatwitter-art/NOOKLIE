@@ -28,6 +28,12 @@ Departamentos e cargos são dinâmicos. Vínculos encerrados permanecem em `team
 
 O catálogo `permissions` representa capacidades verificadas por rota. Associar uma capacidade a um cargo não cria automaticamente uma operação: a rota correspondente ainda precisa validar a permissão. Escopos `platform` são exclusivos das contas principais; cargos só podem receber permissões de escopo `department`.
 
+## Oportunidades e candidaturas
+
+A Central pública fica em `/oportunidades` e lista somente vagas abertas dentro do período de inscrição. O formulário exige sessão. Cada conta pode enviar uma candidatura por vaga; respostas, observações internas e decisões não são expostas publicamente.
+
+A equipe consulta candidaturas em `/admin`. O escopo de departamento é aplicado na API e novamente pelas funções SQL. Aprovar exige um cargo ativo do mesmo departamento e a permissão `members.manage`; a aprovação cria o vínculo, a notificação e o registro de auditoria na mesma transação. Não é possível nomear a própria conta por candidatura.
+
 ## Migrações e validação
 
-As migrações em `supabase/migrations` devem ser aplicadas e mantidas junto ao código. `supabase/verification/rls_access.sql` contém verificações de acesso direto. A correção de validação de permissões usa aliases explícitos ao consultar arrays PostgreSQL, evitando referências SQL ambíguas.
+As migrações em `supabase/migrations` devem ser aplicadas e mantidas junto ao código. `supabase/verification/rls_access.sql` contém verificações gerais e `supabase/verification/admin_access.sql` verifica RLS, privilégios das funções e os IDs das duas contas principais. A correção de validação de permissões usa aliases explícitos ao consultar arrays PostgreSQL, evitando referências SQL ambíguas.

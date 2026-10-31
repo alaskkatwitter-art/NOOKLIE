@@ -24,9 +24,17 @@ export async function GET() {
   try {
     const staff = await getStaffContext();
     if (!staff) return staffPermissionErrorResponse(401);
-    if (!(await hasStaffPermission(staff, 'applications.view'))) return staffPermissionErrorResponse(403);
-    const departmentIds = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
-    let opportunityQuery = supabase.from('opportunities').select('id, department_id, title');
+    const hasView = await hasStaffPermission(staff, 'applications.view');
+    const hasReview = await hasStaffPermission(staff, 'applications.review');
+    if (!hasView && !hasReview) return staffPermissionErrorResponse(403);
+    const departmentIds = staff.isPlatformAdmin ? [] : (await Promise.all(
+      staff.memberships.map(async (membership) => ({
+        id: membership.department_id,
+        allowed: await hasStaffPermission(staff, 'applications.view', membership.department_id) ||
+          await hasStaffPermission(staff, 'applications.review', membership.department_id),
+      }))
+    )).filter((item) => item.allowed).map((item) => item.id);
+    let opportunityQuery = supabase.from('opportunities').select('id, department_id, title, questions');
     if (!staff.isPlatformAdmin) {
       if (!departmentIds.length) return NextResponse.json({ applications: [] }, { headers: noStore });
       opportunityQuery = opportunityQuery.in('department_id', departmentIds);

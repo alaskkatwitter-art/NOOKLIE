@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   getStaffContext,
+  getStaffDepartmentIds,
   hasStaffPermission,
   staffPermissionErrorResponse,
 } from '@/lib/admin/authorization';
@@ -50,13 +51,13 @@ export async function GET(request: NextRequest) {
     const resource = request.nextUrl.searchParams.get('resource');
 
     if (resource === 'departments') {
-      if (!(await canAny(staff, ['departments.manage', 'members.view', 'opportunities.view', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
+      if (!(await canAny(staff, ['departments.manage', 'members.view', 'opportunities.view', 'opportunities.manage', 'applications.view', 'applications.review']))) return staffPermissionErrorResponse(403);
       let query = supabase.from('departments')
         .select('id, name, slug, description, sort_order, status, created_at, updated_at, archived_at')
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true });
       if (!staff.isPlatformAdmin) {
-        const ids = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
+        const ids = await getStaffDepartmentIds(staff, ['members.view', 'departments.manage', 'opportunities.view', 'opportunities.manage', 'applications.view', 'applications.review']);
         if (!ids.length) return NextResponse.json({ departments: [] }, { headers: noStore });
         query = query.in('id', ids);
       }
@@ -66,12 +67,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (resource === 'roles') {
-      if (!(await canAny(staff, ['roles.manage', 'members.view', 'members.manage', 'applications.review', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
+      if (!(await canAny(staff, ['roles.manage', 'members.view', 'members.manage', 'applications.view', 'applications.review', 'opportunities.manage']))) return staffPermissionErrorResponse(403);
       let query = supabase.from('team_roles')
         .select('id, department_id, name, description, badge_title, badge_description, status, created_at, updated_at')
         .order('name', { ascending: true });
       if (!staff.isPlatformAdmin) {
-        const ids = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
+        const ids = await getStaffDepartmentIds(staff, ['members.view', 'members.manage', 'applications.view', 'applications.review', 'opportunities.manage']);
         if (!ids.length) return NextResponse.json({ roles: [], permissions: [] }, { headers: noStore });
         query = query.in('department_id', ids);
       }
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
 
     if (resource === 'members') {
       if (!(await hasStaffPermission(staff, 'members.view'))) return staffPermissionErrorResponse(403);
-      const scopeIds = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
+      const scopeIds = await getStaffDepartmentIds(staff, ['members.view']);
       if (!staff.isPlatformAdmin && !scopeIds.length) return NextResponse.json({ members: [] }, { headers: noStore });
       const status = request.nextUrl.searchParams.get('status');
       let query = supabase.from('team_memberships')
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
         .select('id, department_id, title, description, requirements, openings, questions, opens_at, closes_at, status, created_at, updated_at')
         .order('created_at', { ascending: false });
       if (!staff.isPlatformAdmin) {
-        const ids = Array.from(new Set(staff.memberships.map((membership) => membership.department_id)));
+        const ids = await getStaffDepartmentIds(staff, ['opportunities.view', 'opportunities.manage']);
         if (!ids.length) return NextResponse.json({ opportunities: [] }, { headers: noStore });
         query = query.in('department_id', ids);
       }

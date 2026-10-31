@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   getStaffContext,
+  getStaffDepartmentIds,
   hasStaffPermission,
   staffPermissionErrorResponse,
 } from '@/lib/admin/authorization';
@@ -23,9 +24,7 @@ export async function GET() {
       return staffPermissionErrorResponse(403);
     }
 
-    const departmentIds = Array.from(
-      new Set(staff.memberships.map((membership) => membership.department_id))
-    );
+    const departmentIds = await getStaffDepartmentIds(staff, ['admin.view']);
 
     const departmentsQuery = supabase
       .from('departments')
