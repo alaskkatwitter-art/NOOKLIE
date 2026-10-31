@@ -12,7 +12,7 @@ export type AuthenticatedUserContext = {
   sessionTokenHash: string;
 };
 
-export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
+export async function getAuthenticatedUserContext(options: { allowDeactivated?: boolean } = {}): Promise<AuthenticatedUserContext | null> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('toriland_session')?.value;
   if (!sessionToken) return null;
@@ -26,6 +26,14 @@ export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserCo
 
   if (error) throw error;
   if (!session || new Date(session.expires_at).getTime() <= Date.now()) return null;
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('deactivated_at')
+    .eq('user_id', session.user_id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile || (profile.deactivated_at && !options.allowDeactivated)) return null;
 
   return { userId: session.user_id as string, sessionTokenHash };
 }

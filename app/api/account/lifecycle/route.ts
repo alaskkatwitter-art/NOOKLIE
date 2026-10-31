@@ -7,7 +7,7 @@ const noStore = { 'Cache-Control': 'no-store' };
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUserContext();
+    const user = await getAuthenticatedUserContext({ allowDeactivated: true });
     if (!user) return NextResponse.json({ error: 'Entre na sua conta.' }, { status: 401, headers: noStore });
     const body = await request.json();
     const action = body?.action;

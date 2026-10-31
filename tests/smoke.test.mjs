@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], collaborators: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -193,7 +193,7 @@ before(async () => {
     }
 
     if (path === 'profiles' && request.method === 'GET') {
-      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false }]);
+      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false, deactivated_at: state.deactivatedAt }]);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
@@ -422,6 +422,14 @@ test('chapter creation requires authentication and confirms story ownership', as
 
   const ownerToken = 'owner-session-token';
   state.sessions.push({ user_id: userId, token_hash: hash(ownerToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  state.deactivatedAt = new Date().toISOString();
+  const deactivatedCannotInteract = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${ownerToken}` },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(deactivatedCannotInteract.status, 401);
+  state.deactivatedAt = null;
   state.chapters.push({ id: 'chapter-existing', story_id: storyId, chapter_number: 2 });
   const created = await fetch(endpoint, {
     method: 'POST',
