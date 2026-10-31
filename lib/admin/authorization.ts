@@ -14,6 +14,7 @@ export type StaffMembership = {
 
 export type StaffContext = {
   userId: string;
+  sessionTokenHash: string;
   isPlatformAdmin: boolean;
   memberships: StaffMembership[];
 };
@@ -52,6 +53,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   if (platformAdmin) {
     return {
       userId,
+      sessionTokenHash: tokenHash,
       isPlatformAdmin: true,
       memberships: [],
     };
@@ -67,6 +69,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
 
   return {
     userId,
+    sessionTokenHash: tokenHash,
     isPlatformAdmin: false,
     memberships: (memberships || []).map((membership) => ({
       role_id: membership.role_id as string,
