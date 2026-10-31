@@ -11,7 +11,7 @@ import {
   useRouter,
 } from 'next/navigation';
 import OfficialBadge from '../../components/OfficialBadge';
-import ReportProfileButton from '../../components/ReportProfileButton';
+import ReportProfileButton from '@/components/ReportProfileButton';
 
 type User = {
   id: string;
