@@ -426,7 +426,6 @@ export async function POST(request: Request) {
         {
           error:
             'Não foi possível criar o capítulo.',
-          details: chapterError.message,
         },
         {
           status: 500,
@@ -473,8 +472,6 @@ export async function POST(request: Request) {
           {
             error:
               'Não foi possível agendar o capítulo.',
-            details:
-              scheduleError.message,
           },
           {
             status: 500,
@@ -529,10 +526,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Erro ao criar o capítulo.',
+        error: 'Não foi possível criar o capítulo.',
       },
       {
         status: 500,

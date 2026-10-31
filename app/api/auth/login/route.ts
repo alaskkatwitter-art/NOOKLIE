@@ -137,10 +137,6 @@ export async function POST(request: Request) {
         {
           error:
             'Não foi possível criar sua sessão.',
-          debug: sessionError.message,
-          code: sessionError.code,
-          details: sessionError.details,
-          hint: sessionError.hint,
         },
         { status: 500 }
       );
@@ -185,10 +181,6 @@ export async function POST(request: Request) {
       {
         error:
           'Não foi possível realizar o login.',
-        debug:
-          error instanceof Error
-            ? error.message
-            : String(error),
       },
       { status: 500 }
     );

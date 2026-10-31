@@ -410,7 +410,7 @@ export default function HistoriaPage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/editar-historia/${story.id}`
+                      `/historia/${story.id}/novo-capitulo`
                     )
                   }
                   className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
@@ -461,7 +461,7 @@ export default function HistoriaPage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/editar-historia/${story.id}`
+                      `/historia/${story.id}/novo-capitulo`
                     )
                   }
                   className="mt-5 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-pink-400"
