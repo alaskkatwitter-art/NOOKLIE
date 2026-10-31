@@ -126,7 +126,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_assert_permission(p_actor uuid, p_permission_code text, p_department_id uuid DEFAULT NULL::uuid)
@@ -173,7 +173,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'The account lacks this department permission';
   END IF;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_assign_team_member(p_session_token_hash text, p_target_user_id uuid, p_role_id uuid)
@@ -251,7 +251,7 @@ BEGIN
 
   RETURN v_membership_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_create_department(p_session_token_hash text, p_name text, p_slug text, p_description text, p_sort_order integer)
@@ -286,7 +286,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_create_opportunity(p_session_token_hash text, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text)
@@ -324,7 +324,7 @@ BEGIN
     jsonb_build_object('department_id',p_department_id,'title',btrim(p_title),'status',p_status));
   RETURN v_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_create_team_role(p_session_token_hash text, p_department_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_permission_codes text[])
@@ -392,7 +392,7 @@ BEGIN
 
   RETURN v_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_current_actor(p_session_token_hash text)
@@ -416,7 +416,7 @@ BEGIN
 
   RETURN v_actor;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_remove_team_member(p_session_token_hash text, p_membership_id uuid, p_reason text)
@@ -492,7 +492,7 @@ BEGIN
 
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_review_application(p_session_token_hash text, p_application_id uuid, p_status text, p_internal_notes text, p_role_id uuid DEFAULT NULL::uuid)
@@ -589,7 +589,7 @@ BEGIN
         'membership_id',v_membership_id,'notes_changed',v_old_notes IS DISTINCT FROM coalesce(p_internal_notes,'')));
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_review_moderation_report(p_session_token_hash text, p_report_id uuid, p_status text, p_internal_notes text DEFAULT ''::text, p_content_action text DEFAULT 'none'::text)
@@ -672,7 +672,7 @@ BEGIN
 
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_set_account_status(p_session_token_hash text, p_target_user_id uuid, p_status text, p_reason text DEFAULT ''::text)
@@ -733,7 +733,7 @@ BEGIN
 
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_update_department(p_session_token_hash text, p_department_id uuid, p_name text, p_slug text, p_description text, p_sort_order integer, p_status text)
@@ -802,7 +802,7 @@ BEGIN
 
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_update_opportunity(p_session_token_hash text, p_opportunity_id uuid, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text)
@@ -854,7 +854,7 @@ BEGIN
       'opens_at',p_opens_at,'closes_at',p_closes_at)));
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_update_team_role(p_session_token_hash text, p_role_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_status text, p_permission_codes text[])
@@ -946,7 +946,7 @@ BEGIN
 
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.admin_validate_opportunity_questions(p_questions jsonb)
@@ -978,7 +978,7 @@ BEGIN
   END IF;
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.cancel_own_application(p_session_token_hash text, p_application_id uuid)
@@ -1005,7 +1005,7 @@ BEGIN
   VALUES (v_actor,'application.cancelled','application',p_application_id,'{}'::jsonb);
   RETURN true;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.complete_auth_recovery(p_account_id uuid, p_expected_recovery_key_hash text, p_new_password_hash text, p_consumed_recovery_key_hash text)
@@ -1040,7 +1040,7 @@ begin
 
   return true;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.consume_auth_rate_limit(p_key_hash text, p_limit integer, p_window_seconds integer)
@@ -1076,7 +1076,7 @@ begin
 
   return v_attempts <= p_limit;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.generate_tag_slug(input text)
@@ -1102,7 +1102,7 @@ AS $function$
                                                                                                                                                                                                                                                                                                             )
                                                                                                                                                                                                                                                                                                               );
                                                                                                                                                                                                                                                                                                               end;
-                                                                                                                                                                                                                                                                                                              $function$
+                                                                                                                                                                                                                                                                                                              $function$;
 
 
 CREATE OR REPLACE FUNCTION public.get_story_tags(target_story_id uuid)
@@ -1126,7 +1126,7 @@ AS $function$
                                                                                                                                                                                                                                                                                                                                                                                                                       order by
                                                                                                                                                                                                                                                                                                                                                                                                                           c.name,
                                                                                                                                                                                                                                                                                                                                                                                                                               t.name;
-                                                                                                                                                                                                                                                                                                                                                                                                                              $function$
+                                                                                                                                                                                                                                                                                                                                                                                                                              $function$;
 
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -1155,7 +1155,7 @@ begin
 
                                                                   return new;
                                                                   end;
-                                                                  $function$
+                                                                  $function$;
 
 
 CREATE OR REPLACE FUNCTION public.prevent_admin_audit_mutation()
@@ -1166,7 +1166,7 @@ AS $function$
 BEGIN
   RAISE EXCEPTION 'Administrative audit records are append-only';
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.search_public_stories(p_query text DEFAULT NULL::text, p_include_slugs text[] DEFAULT '{}'::text[], p_exclude_slugs text[] DEFAULT '{}'::text[], p_rating text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_sort text DEFAULT 'updated'::text, p_limit integer DEFAULT 24, p_offset integer DEFAULT 0)
@@ -1224,7 +1224,7 @@ AS $function$
     s.id
   LIMIT least(greatest(coalesce(p_limit, 24), 1), 48)
   OFFSET greatest(coalesce(p_offset, 0), 0);
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.search_tags(search_text text)
@@ -1247,7 +1247,7 @@ AS $function$
                                                                                                                                                                                                                                                                                                                                                               order by
                                                                                                                                                                                                                                                                                                                                                                   t.name asc
                                                                                                                                                                                                                                                                                                                                                                     limit 20;
-                                                                                                                                                                                                                                                                                                                                                                    $function$
+                                                                                                                                                                                                                                                                                                                                                                    $function$;
 
 
 CREATE OR REPLACE FUNCTION public.submit_moderation_report(p_session_token_hash text, p_content_type text, p_content_id uuid, p_reason text, p_details text DEFAULT ''::text)
@@ -1303,7 +1303,7 @@ BEGIN
 
   RETURN v_report_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.submit_opportunity_application(p_session_token_hash text, p_opportunity_id uuid, p_answers jsonb)
@@ -1356,7 +1356,7 @@ BEGIN
     jsonb_build_object('opportunity_id',p_opportunity_id));
   RETURN v_id;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.sync_official_account_follows()
@@ -1386,7 +1386,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.update_nook_comment_updated_at()
@@ -1398,7 +1398,7 @@ begin
   new.updated_at = now();
   return new;
 end;
-$function$
+$function$;
 
 
 SET check_function_bodies = on;
