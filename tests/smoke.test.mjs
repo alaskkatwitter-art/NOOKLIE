@@ -153,6 +153,7 @@ before(async () => {
         ...process.env,
         NODE_ENV: 'production',
         NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
+        SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'ci-placeholder',
         SUPABASE_SECRET_KEY: 'ci-placeholder',
         NEXT_PUBLIC_SITE_URL: baseUrl,
