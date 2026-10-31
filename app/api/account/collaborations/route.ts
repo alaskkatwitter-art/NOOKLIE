@@ -16,7 +16,14 @@ export async function GET() {
       .eq('profile_id', user.userId).eq('status', 'active').order('created_at', { ascending: false }).limit(200);
     if (error) throw error;
 
-    const collaborations = (data || []).map((row) => ({
+    type CollaborationRow = {
+      id: string;
+      story_id: string;
+      role: string;
+      accepted_at: string | null;
+      story: { title: string | null } | Array<{ title: string | null }> | null;
+    };
+    const collaborations = ((data || []) as unknown as CollaborationRow[]).map((row) => ({
       id: row.id,
       story_id: row.story_id,
       role: row.role,
