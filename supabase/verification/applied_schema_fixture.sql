@@ -128,7 +128,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_assert_permission(p_actor uuid, p_permission_code text, p_department_id uuid DEFAULT NULL::uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -174,7 +173,6 @@ BEGIN
   END IF;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_assign_team_member(p_session_token_hash text, p_target_user_id uuid, p_role_id uuid)
  RETURNS uuid
@@ -253,7 +251,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_create_department(p_session_token_hash text, p_name text, p_slug text, p_description text, p_sort_order integer)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -287,7 +284,6 @@ BEGIN
   RETURN v_id;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_create_opportunity(p_session_token_hash text, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text)
  RETURNS uuid
@@ -325,7 +321,6 @@ BEGIN
   RETURN v_id;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_create_team_role(p_session_token_hash text, p_department_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_permission_codes text[])
  RETURNS uuid
@@ -394,7 +389,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_current_actor(p_session_token_hash text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -417,7 +411,6 @@ BEGIN
   RETURN v_actor;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_remove_team_member(p_session_token_hash text, p_membership_id uuid, p_reason text)
  RETURNS boolean
@@ -493,7 +486,6 @@ BEGIN
   RETURN true;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_review_application(p_session_token_hash text, p_application_id uuid, p_status text, p_internal_notes text, p_role_id uuid DEFAULT NULL::uuid)
  RETURNS boolean
@@ -591,7 +583,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_review_moderation_report(p_session_token_hash text, p_report_id uuid, p_status text, p_internal_notes text DEFAULT ''::text, p_content_action text DEFAULT 'none'::text)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -674,7 +665,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_set_account_status(p_session_token_hash text, p_target_user_id uuid, p_status text, p_reason text DEFAULT ''::text)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -734,7 +724,6 @@ BEGIN
   RETURN true;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_update_department(p_session_token_hash text, p_department_id uuid, p_name text, p_slug text, p_description text, p_sort_order integer, p_status text)
  RETURNS boolean
@@ -804,7 +793,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_update_opportunity(p_session_token_hash text, p_opportunity_id uuid, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -855,7 +843,6 @@ BEGIN
   RETURN true;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.admin_update_team_role(p_session_token_hash text, p_role_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_status text, p_permission_codes text[])
  RETURNS boolean
@@ -948,7 +935,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.admin_validate_opportunity_questions(p_questions jsonb)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -980,7 +966,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.cancel_own_application(p_session_token_hash text, p_application_id uuid)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -1006,7 +991,6 @@ BEGIN
   RETURN true;
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.complete_auth_recovery(p_account_id uuid, p_expected_recovery_key_hash text, p_new_password_hash text, p_consumed_recovery_key_hash text)
  RETURNS boolean
@@ -1041,7 +1025,6 @@ begin
   return true;
 end;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.consume_auth_rate_limit(p_key_hash text, p_limit integer, p_window_seconds integer)
  RETURNS boolean
@@ -1078,7 +1061,6 @@ begin
 end;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.generate_tag_slug(input text)
  RETURNS text
  LANGUAGE plpgsql
@@ -1104,7 +1086,6 @@ AS $function$
                                                                                                                                                                                                                                                                                                               end;
                                                                                                                                                                                                                                                                                                               $function$;
 
-
 CREATE OR REPLACE FUNCTION public.get_story_tags(target_story_id uuid)
  RETURNS TABLE(id uuid, name text, slug text, category text, category_slug text)
  LANGUAGE sql
@@ -1127,7 +1108,6 @@ AS $function$
                                                                                                                                                                                                                                                                                                                                                                                                                           c.name,
                                                                                                                                                                                                                                                                                                                                                                                                                               t.name;
                                                                                                                                                                                                                                                                                                                                                                                                                               $function$;
-
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
  RETURNS trigger
@@ -1157,7 +1137,6 @@ begin
                                                                   end;
                                                                   $function$;
 
-
 CREATE OR REPLACE FUNCTION public.prevent_admin_audit_mutation()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1167,7 +1146,6 @@ BEGIN
   RAISE EXCEPTION 'Administrative audit records are append-only';
 END;
 $function$;
-
 
 CREATE OR REPLACE FUNCTION public.search_public_stories(p_query text DEFAULT NULL::text, p_include_slugs text[] DEFAULT '{}'::text[], p_exclude_slugs text[] DEFAULT '{}'::text[], p_rating text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_sort text DEFAULT 'updated'::text, p_limit integer DEFAULT 24, p_offset integer DEFAULT 0)
  RETURNS TABLE(id uuid, author_id uuid, title text, description text, cover_url text, status text, rating text, created_at timestamp with time zone, updated_at timestamp with time zone)
@@ -1226,7 +1204,6 @@ AS $function$
   OFFSET greatest(coalesce(p_offset, 0), 0);
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.search_tags(search_text text)
  RETURNS TABLE(id uuid, name text, slug text, category text, category_slug text)
  LANGUAGE sql
@@ -1248,7 +1225,6 @@ AS $function$
                                                                                                                                                                                                                                                                                                                                                                   t.name asc
                                                                                                                                                                                                                                                                                                                                                                     limit 20;
                                                                                                                                                                                                                                                                                                                                                                     $function$;
-
 
 CREATE OR REPLACE FUNCTION public.submit_moderation_report(p_session_token_hash text, p_content_type text, p_content_id uuid, p_reason text, p_details text DEFAULT ''::text)
  RETURNS uuid
@@ -1305,7 +1281,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.submit_opportunity_application(p_session_token_hash text, p_opportunity_id uuid, p_answers jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -1358,7 +1333,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.sync_official_account_follows()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1388,7 +1362,6 @@ BEGIN
 END;
 $function$;
 
-
 CREATE OR REPLACE FUNCTION public.update_nook_comment_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1400,28 +1373,13 @@ begin
 end;
 $function$;
 
-
 SET check_function_bodies = on;
 
-ALTER TABLE public.admin_audit_log ADD CONSTRAINT admin_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
-
 ALTER TABLE public.admin_audit_log ADD CONSTRAINT admin_audit_log_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.applications ADD CONSTRAINT applications_answers_check CHECK ((jsonb_typeof(answers) = 'object'::text));
-
-ALTER TABLE public.applications ADD CONSTRAINT applications_opportunity_id_fkey FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE RESTRICT;
 
 ALTER TABLE public.applications ADD CONSTRAINT applications_opportunity_id_user_id_key UNIQUE (opportunity_id, user_id);
 
 ALTER TABLE public.applications ADD CONSTRAINT applications_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.applications ADD CONSTRAINT applications_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
-
-ALTER TABLE public.applications ADD CONSTRAINT applications_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'in_review'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])));
-
-ALTER TABLE public.applications ADD CONSTRAINT applications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.auth_accounts ADD CONSTRAINT auth_accounts_account_status_check CHECK ((account_status = ANY (ARRAY['active'::text, 'suspended'::text])));
 
 ALTER TABLE public.auth_accounts ADD CONSTRAINT auth_accounts_pkey PRIMARY KEY (id);
 
@@ -1429,247 +1387,97 @@ ALTER TABLE public.auth_accounts ADD CONSTRAINT auth_accounts_recovery_key_hash_
 
 ALTER TABLE public.auth_accounts ADD CONSTRAINT auth_accounts_username_key UNIQUE (username);
 
-ALTER TABLE public.auth_rate_limits ADD CONSTRAINT auth_rate_limits_attempts_check CHECK ((attempts >= 0));
-
 ALTER TABLE public.auth_rate_limits ADD CONSTRAINT auth_rate_limits_pkey PRIMARY KEY (key_hash);
 
 ALTER TABLE public.auth_sessions ADD CONSTRAINT auth_sessions_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.auth_sessions ADD CONSTRAINT auth_sessions_token_hash_key UNIQUE (token_hash);
 
-ALTER TABLE public.chapter_likes ADD CONSTRAINT chapter_likes_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
-
 ALTER TABLE public.chapter_likes ADD CONSTRAINT chapter_likes_pkey PRIMARY KEY (chapter_id, user_id);
-
-ALTER TABLE public.chapter_media ADD CONSTRAINT chapter_media_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
 
 ALTER TABLE public.chapter_media ADD CONSTRAINT chapter_media_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.chapter_media ADD CONSTRAINT chapter_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text])));
-
 ALTER TABLE public.chapters ADD CONSTRAINT chapters_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.chapters ADD CONSTRAINT chapters_publication_status_check CHECK ((publication_status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'published'::text, 'unpublished'::text])));
 
 ALTER TABLE public.chapters ADD CONSTRAINT chapters_story_id_chapter_number_key UNIQUE (story_id, chapter_number);
 
-ALTER TABLE public.chapters ADD CONSTRAINT chapters_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
-ALTER TABLE public.comment_likes ADD CONSTRAINT comment_likes_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE;
-
 ALTER TABLE public.comment_likes ADD CONSTRAINT comment_likes_pkey PRIMARY KEY (comment_id, user_id);
 
-ALTER TABLE public.comment_likes ADD CONSTRAINT comment_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.comments ADD CONSTRAINT comments_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
-
-ALTER TABLE public.comments ADD CONSTRAINT comments_parent_comment_id_fkey FOREIGN KEY (parent_comment_id) REFERENCES comments(id) ON DELETE CASCADE;
-
 ALTER TABLE public.comments ADD CONSTRAINT comments_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.comments ADD CONSTRAINT comments_sticker_id_fkey FOREIGN KEY (sticker_id) REFERENCES user_stickers(id) ON DELETE SET NULL;
-
-ALTER TABLE public.comments ADD CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.departments ADD CONSTRAINT departments_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
 
 ALTER TABLE public.departments ADD CONSTRAINT departments_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.departments ADD CONSTRAINT departments_slug_key UNIQUE (slug);
 
-ALTER TABLE public.departments ADD CONSTRAINT departments_status_check CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])));
-
-ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_club_id_fkey FOREIGN KEY (club_id) REFERENCES fic_clubs(id) ON DELETE CASCADE;
-
 ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_club_id_user_id_key UNIQUE (club_id, user_id);
 
 ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.fic_clubs ADD CONSTRAINT fic_clubs_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
 ALTER TABLE public.fic_clubs ADD CONSTRAINT fic_clubs_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.fic_clubs ADD CONSTRAINT fic_clubs_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
-ALTER TABLE public.follows ADD CONSTRAINT follows_check CHECK ((follower_id <> following_id));
-
-ALTER TABLE public.follows ADD CONSTRAINT follows_follower_id_fkey FOREIGN KEY (follower_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.follows ADD CONSTRAINT follows_following_id_fkey FOREIGN KEY (following_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE public.follows ADD CONSTRAINT follows_pkey PRIMARY KEY (follower_id, following_id);
 
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_content_type_check CHECK ((content_type = ANY (ARRAY['profile'::text, 'post'::text, 'story'::text])));
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_details_check CHECK ((char_length(details) <= 3000));
-
 ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reason_check CHECK ((reason = ANY (ARRAY['harassment'::text, 'spam'::text, 'inappropriate'::text, 'copyright'::text, 'safety'::text, 'other'::text])));
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_review'::text, 'resolved'::text, 'dismissed'::text])));
-
-ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES nook_comments(id) ON DELETE CASCADE;
 
 ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_comment_id_user_id_emoji_key UNIQUE (comment_id, user_id, emoji);
 
-ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_emoji_check CHECK ((emoji = ANY (ARRAY['❤️'::text, '😂'::text, '😭'::text, '😱'::text, '👀'::text, '🔥'::text])));
-
 ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_content_check CHECK ((char_length(TRIM(BOTH FROM content)) > 0));
-
-ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES nook_comments(id) ON DELETE CASCADE;
 
 ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
-
-ALTER TABLE public.nook_post_media ADD CONSTRAINT nook_post_media_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text])));
-
 ALTER TABLE public.nook_post_media ADD CONSTRAINT nook_post_media_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.nook_post_media ADD CONSTRAINT nook_post_media_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
-
-ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_emoji_check CHECK ((emoji = ANY (ARRAY['❤️'::text, '😂'::text, '😭'::text, '😱'::text, '👀'::text, '🔥'::text])));
-
 ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
 
 ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_post_id_user_id_emoji_key UNIQUE (post_id, user_id, emoji);
 
 ALTER TABLE public.nook_posts ADD CONSTRAINT nook_posts_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.nook_posts ADD CONSTRAINT nook_posts_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE SET NULL;
-
-ALTER TABLE public.nook_posts ADD CONSTRAINT nook_posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
 ALTER TABLE public.nook_saved_posts ADD CONSTRAINT nook_saved_posts_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.nook_saved_posts ADD CONSTRAINT nook_saved_posts_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
 
 ALTER TABLE public.nook_saved_posts ADD CONSTRAINT nook_saved_posts_user_id_post_id_key UNIQUE (user_id, post_id);
 
 ALTER TABLE public.official_signup_tokens ADD CONSTRAINT official_signup_tokens_pkey PRIMARY KEY (singleton);
 
-ALTER TABLE public.official_signup_tokens ADD CONSTRAINT official_signup_tokens_singleton_check CHECK ((singleton IS TRUE));
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_check CHECK ((closes_at > opens_at));
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_openings_check CHECK ((openings > 0));
-
 ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_questions_check CHECK ((jsonb_typeof(questions) = 'array'::text));
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'open'::text, 'closed'::text, 'archived'::text])));
-
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
 
 ALTER TABLE public.permissions ADD CONSTRAINT permissions_pkey PRIMARY KEY (code);
 
-ALTER TABLE public.permissions ADD CONSTRAINT permissions_scope_check CHECK ((scope = ANY (ARRAY['platform'::text, 'department'::text])));
-
 ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_pkey PRIMARY KEY (user_id);
-
-ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
 
 ALTER TABLE public.poll_options ADD CONSTRAINT poll_options_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.poll_options ADD CONSTRAINT poll_options_poll_id_fkey FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE;
-
-ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_option_id_fkey FOREIGN KEY (option_id) REFERENCES poll_options(id) ON DELETE CASCADE;
-
 ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_pkey PRIMARY KEY (poll_id, user_id);
-
-ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_poll_id_fkey FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE;
-
-ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.polls ADD CONSTRAINT polls_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
 
 ALTER TABLE public.polls ADD CONSTRAINT polls_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.post_likes ADD CONSTRAINT post_likes_pkey PRIMARY KEY (post_id, user_id);
 
-ALTER TABLE public.post_likes ADD CONSTRAINT post_likes_post_id_fkey FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE;
-
-ALTER TABLE public.post_likes ADD CONSTRAINT post_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.posts ADD CONSTRAINT posts_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL;
-
 ALTER TABLE public.posts ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.posts ADD CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_username_key UNIQUE (username);
 
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_username_length CHECK (((username IS NULL) OR ((char_length(username) >= 3) AND (char_length(username) <= 30))));
-
-ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_list_id_fkey FOREIGN KEY (list_id) REFERENCES reading_lists(id) ON DELETE CASCADE;
-
 ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_list_id_story_id_key UNIQUE (list_id, story_id);
 
 ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
 ALTER TABLE public.reading_lists ADD CONSTRAINT reading_lists_pkey PRIMARY KEY (id);
 
-ALTER TABLE public.reading_lists ADD CONSTRAINT reading_lists_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
-
 ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_pkey PRIMARY KEY (user_id, story_id);
-
-ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
-ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.scheduled_chapters ADD CONSTRAINT scheduled_chapters_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
 
 ALTER TABLE public.scheduled_chapters ADD CONSTRAINT scheduled_chapters_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.scheduled_chapters ADD CONSTRAINT scheduled_chapters_unique_chapter UNIQUE (chapter_id);
 
-ALTER TABLE public.social_stories ADD CONSTRAINT social_stories_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text, 'video'::text])));
-
 ALTER TABLE public.social_stories ADD CONSTRAINT social_stories_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.social_stories ADD CONSTRAINT social_stories_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.stories ADD CONSTRAINT stories_author_id_fkey FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
 ALTER TABLE public.stories ADD CONSTRAINT stories_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.story_likes ADD CONSTRAINT story_likes_pkey PRIMARY KEY (story_id, user_id);
 
-ALTER TABLE public.story_likes ADD CONSTRAINT story_likes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
-ALTER TABLE public.story_likes ADD CONSTRAINT story_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
-
 ALTER TABLE public.story_tags ADD CONSTRAINT story_tags_pkey PRIMARY KEY (story_id, tag_id);
-
-ALTER TABLE public.story_tags ADD CONSTRAINT story_tags_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
-
-ALTER TABLE public.story_tags ADD CONSTRAINT story_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE;
 
 ALTER TABLE public.tag_categories ADD CONSTRAINT tag_categories_name_key UNIQUE (name);
 
@@ -1677,33 +1485,207 @@ ALTER TABLE public.tag_categories ADD CONSTRAINT tag_categories_pkey PRIMARY KEY
 
 ALTER TABLE public.tag_categories ADD CONSTRAINT tag_categories_slug_key UNIQUE (slug);
 
-ALTER TABLE public.tags ADD CONSTRAINT tags_category_id_fkey FOREIGN KEY (category_id) REFERENCES tag_categories(id) ON DELETE SET NULL;
-
-ALTER TABLE public.tags ADD CONSTRAINT tags_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL;
-
 ALTER TABLE public.tags ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.tags ADD CONSTRAINT tags_slug_key UNIQUE (slug);
 
-ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.team_role_permissions ADD CONSTRAINT team_role_permissions_pkey PRIMARY KEY (role_id, permission_code);
+
+ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_department_id_name_key UNIQUE (department_id, name);
+
+ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.user_notifications ADD CONSTRAINT user_notifications_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.user_stickers ADD CONSTRAINT user_stickers_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.applications ADD CONSTRAINT applications_answers_check CHECK ((jsonb_typeof(answers) = 'object'::text));
+
+ALTER TABLE public.applications ADD CONSTRAINT applications_status_check CHECK ((status = ANY (ARRAY['submitted'::text, 'in_review'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])));
+
+ALTER TABLE public.auth_accounts ADD CONSTRAINT auth_accounts_account_status_check CHECK ((account_status = ANY (ARRAY['active'::text, 'suspended'::text])));
+
+ALTER TABLE public.auth_rate_limits ADD CONSTRAINT auth_rate_limits_attempts_check CHECK ((attempts >= 0));
+
+ALTER TABLE public.chapter_media ADD CONSTRAINT chapter_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text])));
+
+ALTER TABLE public.chapters ADD CONSTRAINT chapters_publication_status_check CHECK ((publication_status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'published'::text, 'unpublished'::text])));
+
+ALTER TABLE public.departments ADD CONSTRAINT departments_status_check CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])));
+
+ALTER TABLE public.follows ADD CONSTRAINT follows_check CHECK ((follower_id <> following_id));
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_content_type_check CHECK ((content_type = ANY (ARRAY['profile'::text, 'post'::text, 'story'::text])));
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_details_check CHECK ((char_length(details) <= 3000));
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reason_check CHECK ((reason = ANY (ARRAY['harassment'::text, 'spam'::text, 'inappropriate'::text, 'copyright'::text, 'safety'::text, 'other'::text])));
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_review'::text, 'resolved'::text, 'dismissed'::text])));
+
+ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_emoji_check CHECK ((emoji = ANY (ARRAY['❤️'::text, '😂'::text, '😭'::text, '😱'::text, '👀'::text, '🔥'::text])));
+
+ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_content_check CHECK ((char_length(TRIM(BOTH FROM content)) > 0));
+
+ALTER TABLE public.nook_post_media ADD CONSTRAINT nook_post_media_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text])));
+
+ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_emoji_check CHECK ((emoji = ANY (ARRAY['❤️'::text, '😂'::text, '😭'::text, '😱'::text, '👀'::text, '🔥'::text])));
+
+ALTER TABLE public.official_signup_tokens ADD CONSTRAINT official_signup_tokens_singleton_check CHECK ((singleton IS TRUE));
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_check CHECK ((closes_at > opens_at));
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_openings_check CHECK ((openings > 0));
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_questions_check CHECK ((jsonb_typeof(questions) = 'array'::text));
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'open'::text, 'closed'::text, 'archived'::text])));
+
+ALTER TABLE public.permissions ADD CONSTRAINT permissions_scope_check CHECK ((scope = ANY (ARRAY['platform'::text, 'department'::text])));
+
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_username_length CHECK (((username IS NULL) OR ((char_length(username) >= 3) AND (char_length(username) <= 30))));
+
+ALTER TABLE public.social_stories ADD CONSTRAINT social_stories_media_type_check CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text, 'video'::text])));
 
 ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_check CHECK ((((status = 'active'::text) AND (removed_at IS NULL)) OR ((status = 'removed'::text) AND (removed_at IS NOT NULL))));
 
-ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
+ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'removed'::text])));
 
-ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_pkey PRIMARY KEY (id);
+ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_status_check CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])));
+
+ALTER TABLE public.admin_audit_log ADD CONSTRAINT admin_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.applications ADD CONSTRAINT applications_opportunity_id_fkey FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.applications ADD CONSTRAINT applications_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.applications ADD CONSTRAINT applications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.chapter_likes ADD CONSTRAINT chapter_likes_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.chapter_media ADD CONSTRAINT chapter_media_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.chapters ADD CONSTRAINT chapters_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.comment_likes ADD CONSTRAINT comment_likes_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE;
+
+ALTER TABLE public.comment_likes ADD CONSTRAINT comment_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.comments ADD CONSTRAINT comments_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.comments ADD CONSTRAINT comments_parent_comment_id_fkey FOREIGN KEY (parent_comment_id) REFERENCES comments(id) ON DELETE CASCADE;
+
+ALTER TABLE public.comments ADD CONSTRAINT comments_sticker_id_fkey FOREIGN KEY (sticker_id) REFERENCES user_stickers(id) ON DELETE SET NULL;
+
+ALTER TABLE public.comments ADD CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.departments ADD CONSTRAINT departments_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_club_id_fkey FOREIGN KEY (club_id) REFERENCES fic_clubs(id) ON DELETE CASCADE;
+
+ALTER TABLE public.fic_club_members ADD CONSTRAINT fic_club_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.fic_clubs ADD CONSTRAINT fic_clubs_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.fic_clubs ADD CONSTRAINT fic_clubs_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.follows ADD CONSTRAINT follows_follower_id_fkey FOREIGN KEY (follower_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.follows ADD CONSTRAINT follows_following_id_fkey FOREIGN KEY (following_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.moderation_reports ADD CONSTRAINT moderation_reports_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.nook_comment_reactions ADD CONSTRAINT nook_comment_reactions_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES nook_comments(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES nook_comments(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_comments ADD CONSTRAINT nook_comments_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_post_media ADD CONSTRAINT nook_post_media_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_post_reactions ADD CONSTRAINT nook_post_reactions_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_posts ADD CONSTRAINT nook_posts_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE SET NULL;
+
+ALTER TABLE public.nook_posts ADD CONSTRAINT nook_posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.nook_saved_posts ADD CONSTRAINT nook_saved_posts_post_id_fkey FOREIGN KEY (post_id) REFERENCES nook_posts(id) ON DELETE CASCADE;
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.poll_options ADD CONSTRAINT poll_options_poll_id_fkey FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE;
+
+ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_option_id_fkey FOREIGN KEY (option_id) REFERENCES poll_options(id) ON DELETE CASCADE;
+
+ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_poll_id_fkey FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE;
+
+ALTER TABLE public.poll_votes ADD CONSTRAINT poll_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.polls ADD CONSTRAINT polls_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.post_likes ADD CONSTRAINT post_likes_post_id_fkey FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE;
+
+ALTER TABLE public.post_likes ADD CONSTRAINT post_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.posts ADD CONSTRAINT posts_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL;
+
+ALTER TABLE public.posts ADD CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_list_id_fkey FOREIGN KEY (list_id) REFERENCES reading_lists(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_list_items ADD CONSTRAINT reading_list_items_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_lists ADD CONSTRAINT reading_lists_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.reading_progress ADD CONSTRAINT reading_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.scheduled_chapters ADD CONSTRAINT scheduled_chapters_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE;
+
+ALTER TABLE public.social_stories ADD CONSTRAINT social_stories_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.stories ADD CONSTRAINT stories_author_id_fkey FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.story_likes ADD CONSTRAINT story_likes_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.story_likes ADD CONSTRAINT story_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.story_tags ADD CONSTRAINT story_tags_story_id_fkey FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE;
+
+ALTER TABLE public.story_tags ADD CONSTRAINT story_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE;
+
+ALTER TABLE public.tags ADD CONSTRAINT tags_category_id_fkey FOREIGN KEY (category_id) REFERENCES tag_categories(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tags ADD CONSTRAINT tags_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
+
+ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
 
 ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_removed_by_fkey FOREIGN KEY (removed_by) REFERENCES auth_accounts(id) ON DELETE SET NULL;
 
 ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_role_id_fkey FOREIGN KEY (role_id) REFERENCES team_roles(id) ON DELETE RESTRICT;
 
-ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_status_check CHECK ((status = ANY (ARRAY['active'::text, 'removed'::text])));
-
 ALTER TABLE public.team_memberships ADD CONSTRAINT team_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE RESTRICT;
 
 ALTER TABLE public.team_role_permissions ADD CONSTRAINT team_role_permissions_permission_code_fkey FOREIGN KEY (permission_code) REFERENCES permissions(code) ON DELETE RESTRICT;
-
-ALTER TABLE public.team_role_permissions ADD CONSTRAINT team_role_permissions_pkey PRIMARY KEY (role_id, permission_code);
 
 ALTER TABLE public.team_role_permissions ADD CONSTRAINT team_role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES team_roles(id) ON DELETE CASCADE;
 
@@ -1711,17 +1693,7 @@ ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_created_by_fkey FOREIGN 
 
 ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT;
 
-ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_department_id_name_key UNIQUE (department_id, name);
-
-ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.team_roles ADD CONSTRAINT team_roles_status_check CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])));
-
-ALTER TABLE public.user_notifications ADD CONSTRAINT user_notifications_pkey PRIMARY KEY (id);
-
 ALTER TABLE public.user_notifications ADD CONSTRAINT user_notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE CASCADE;
-
-ALTER TABLE public.user_stickers ADD CONSTRAINT user_stickers_pkey PRIMARY KEY (id);
 
 ALTER TABLE public.user_stickers ADD CONSTRAINT user_stickers_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
