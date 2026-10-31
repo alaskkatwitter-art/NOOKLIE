@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], collaborators: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -233,6 +233,15 @@ before(async () => {
       return respondRows(request, response, rows);
     }
 
+    if (path === 'story_collaborators' && request.method === 'GET') {
+      const storyFilter = (url.searchParams.get('story_id') || '').replace(/^eq\./, '');
+      const profileFilter = (url.searchParams.get('profile_id') || '').replace(/^eq\./, '');
+      const roleFilter = (url.searchParams.get('role') || '').replace(/^eq\./, '');
+      const statusFilter = (url.searchParams.get('status') || '').replace(/^eq\./, '');
+      const rows = state.collaborators.filter((item) => item.story_id === storyFilter && item.profile_id === profileFilter && item.role === roleFilter && item.status === statusFilter);
+      return respondRows(request, response, rows);
+    }
+
     if (path === 'chapters' && request.method === 'GET') {
       if ((url.searchParams.get('select') || '').includes('story_id')) {
         return sendJson(response, state.chapters.filter((chapter) => chapter.published).map((chapter) => ({ story_id: chapter.story_id })));
@@ -399,6 +408,16 @@ test('chapter creation requires authentication and confirms story ownership', as
     body: JSON.stringify(payload),
   });
   assert.equal(forbidden.status, 403);
+
+  state.collaborators.push({ story_id: storyId, profile_id: otherUserId, role: 'coauthor', status: 'active' });
+  state.chapters.push({ id: 'chapter-existing-two', story_id: storyId, chapter_number: 2 });
+  const coauthorCanEdit = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${otherToken}` },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(coauthorCanEdit.status, 201);
+  state.collaborators = [];
 
   const ownerToken = 'owner-session-token';
   state.sessions.push({ user_id: userId, token_hash: hash(ownerToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
