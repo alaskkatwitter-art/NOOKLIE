@@ -269,37 +269,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ id: data }, { status: 201, headers: noStore });
     }
 
-    if (body.resource === 'opportunity') {
-      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
-      const id = cleanText(body.id, 80, true);
-      const title = cleanText(body.title, 120, true);
-      const description = cleanText(body.description, 12000) || '';
-      const requirements = cleanText(body.requirements, 8000) || '';
-      const openings = Number.isInteger(body.openings) ? body.openings : 0;
-      const status = ['draft', 'open', 'closed', 'archived'].includes(body.status) ? body.status : null;
-      const opensAt = new Date(body.opens_at);
-      const closesAt = new Date(body.closes_at);
-      if (!id || !title || typeof body.department_id !== 'string' || !status || !Array.isArray(body.questions) ||
-          !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
-        return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
-      }
-      const { data, error } = await supabase.rpc('admin_update_opportunity', {
-        p_session_token_hash: staff.sessionTokenHash,
-        p_opportunity_id: id,
-        p_department_id: body.department_id,
-        p_title: title,
-        p_description: description,
-        p_requirements: requirements,
-        p_openings: openings,
-        p_questions: body.questions,
-        p_opens_at: opensAt.toISOString(),
-        p_closes_at: closesAt.toISOString(),
-        p_status: status,
-      });
-      if (error) return dbError(error, 'PATCH admin opportunity');
-      return NextResponse.json({ updated: Boolean(data) }, { headers: noStore });
-    }
-
     if (body.resource === 'role') {
       if (!(await hasStaffPermission(staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
@@ -421,6 +390,37 @@ export async function PATCH(request: NextRequest) {
         p_permission_codes: permissionCodes,
       });
       if (error) return dbError(error, 'PATCH admin role');
+      return NextResponse.json({ updated: Boolean(data) }, { headers: noStore });
+    }
+
+    if (body.resource === 'opportunity') {
+      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
+      const id = cleanText(body.id, 80, true);
+      const title = cleanText(body.title, 120, true);
+      const description = cleanText(body.description, 12000) || '';
+      const requirements = cleanText(body.requirements, 8000) || '';
+      const openings = Number.isInteger(body.openings) ? body.openings : 0;
+      const status = ['draft', 'open', 'closed', 'archived'].includes(body.status) ? body.status : null;
+      const opensAt = new Date(body.opens_at);
+      const closesAt = new Date(body.closes_at);
+      if (!id || !title || typeof body.department_id !== 'string' || !status || !Array.isArray(body.questions) ||
+          !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
+        return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
+      }
+      const { data, error } = await supabase.rpc('admin_update_opportunity', {
+        p_session_token_hash: staff.sessionTokenHash,
+        p_opportunity_id: id,
+        p_department_id: body.department_id,
+        p_title: title,
+        p_description: description,
+        p_requirements: requirements,
+        p_openings: openings,
+        p_questions: body.questions,
+        p_opens_at: opensAt.toISOString(),
+        p_closes_at: closesAt.toISOString(),
+        p_status: status,
+      });
+      if (error) return dbError(error, 'PATCH admin opportunity');
       return NextResponse.json({ updated: Boolean(data) }, { headers: noStore });
     }
 
