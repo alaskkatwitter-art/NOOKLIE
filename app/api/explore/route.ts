@@ -10,6 +10,18 @@ function slugify(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+type StoryRow = {
+  id: string;
+  author_id: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  status: string | null;
+  rating: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 async function getCurrentProfileId() {
   try {
     const cookieStore = await cookies();
@@ -197,7 +209,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const storyRows = stories || [];
+    const storyRows = (stories || []) as StoryRow[];
 
     /*
      * =========================================================
