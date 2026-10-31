@@ -37,3 +37,13 @@ A equipe consulta candidaturas em `/admin`. O escopo de departamento é aplicado
 ## Migrações e validação
 
 As migrações em `supabase/migrations` devem ser aplicadas e mantidas junto ao código. `supabase/verification/rls_access.sql` contém verificações gerais e `supabase/verification/admin_access.sql` verifica RLS, privilégios das funções e os IDs das duas contas principais. A correção de validação de permissões usa aliases explícitos ao consultar arrays PostgreSQL, evitando referências SQL ambíguas.
+
+## Diretório de usuários e moderação
+
+A seção Usuários do painel exige `users.view` e retorna apenas nome, avatar e data de cadastro. Nunca selecione hashes de senha, códigos ou hashes de recuperação, nem tokens de sessão para a interface administrativa.
+
+Denúncias de perfis, publicações e histórias ficam em `moderation_reports`. O envio usa a sessão de autenticação própria, bloqueia auto denúncia e duplicatas em aberto, e limita denúncias pendentes por conta. RLS é habilitado e acesso direto de clientes é revogado; apenas rotas de servidor com permissão validada podem consultar ou alterar os registros.
+
+A fila de moderação é filtrada por departamento e pelas permissões `moderation.view`/`moderation.manage`. Decisões finais pedem confirmação, atualizam a denúncia e gravam uma entrada append-only no histórico administrativo. O painel registra a análise; a ocultação ou remoção do conteúdo deve ser tratada como uma ação separada com regras próprias.
+
+`supabase/verification/moderation_workflows.sql` testa envio, duplicata, auto denúncia, revisão, auditoria, rollback e privilégios/RLS.

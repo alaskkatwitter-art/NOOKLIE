@@ -1,0 +1,100 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+
+type Report = {
+  id: string;
+  content_type: 'profile' | 'post' | 'story';
+  reason: string;
+  details: string;
+  status: 'pending' | 'in_review' | 'resolved' | 'dismissed';
+  internal_notes: string;
+  created_at: string;
+  reporter: { username: string; display_name: string | null } | null;
+  target: { username: string; display_name: string | null } | null;
+  content: { title?: string; body?: string } | null;
+};
+
+const reasons: Record<string, string> = {
+  harassment: 'Assédio ou abuso',
+  spam: 'Spam',
+  inappropriate: 'Conteúdo inadequado',
+  copyright: 'Direitos autorais',
+  safety: 'Segurança',
+  other: 'Outro',
+};
+
+async function api(url: string, options?: RequestInit) {
+  const response = await fetch(url, { ...options, cache: 'no-store', headers: { 'Content-Type': 'application/json' } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir.');
+  return data;
+}
+
+export default function ModerationPanel({ canManage }: { canManage: boolean }) {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    const data = await api('/api/admin/reports');
+    setReports(data.reports || []);
+    setNotes(Object.fromEntries((data.reports || []).map((report: Report) => [report.id, report.internal_notes || ''])));
+  }, []);
+
+  useEffect(() => {
+    void load().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Falha ao carregar denúncias.'));
+  }, [load]);
+
+  async function update(report: Report, status: 'in_review' | 'resolved' | 'dismissed') {
+    if (!canManage) return;
+    if (status !== 'in_review' && !window.confirm(status === 'resolved' ? 'Marcar esta denúncia como resolvida?' : 'Dispensar esta denúncia?')) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await api('/api/admin/reports', { method: 'PATCH', body: JSON.stringify({
+        id: report.id, status, internal_notes: notes[report.id] || '', confirm: status !== 'in_review',
+      }) });
+      setMessage('Denúncia atualizada e ação registrada no histórico.');
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao atualizar denúncia.'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold">Denúncias da comunidade</h2>
+        <p className="mt-1 text-sm text-white/45">As denúncias são privadas e visíveis apenas à equipe de moderação autorizada.</p>
+      </div>
+      {error && <div role="alert" className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-200">{error}</div>}
+      {message && <div role="status" className="rounded-xl border border-green-400/20 bg-green-400/5 p-3 text-sm text-green-200">{message}</div>}
+      {reports.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 bg-[#191219] p-8 text-center text-sm text-white/40">Nenhuma denúncia registrada.</div>}
+      {reports.map((report) => (
+        <article key={report.id} className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-bold">{report.target?.display_name || report.target?.username || 'Conta indisponível'} <span className="text-xs font-normal text-white/40">· {report.content_type} · {reasons[report.reason] || report.reason}</span></p>
+              <p className="mt-1 text-xs text-white/45">Denunciado por @{report.reporter?.username || 'conta indisponível'} em {new Date(report.created_at).toLocaleString('pt-BR')}</p>
+              {report.content?.title && <p className="mt-2 text-sm font-semibold">{report.content.title}</p>}
+              {report.content?.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/70">{report.content.body}</p>}
+              {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-white/55">{report.details}</p>}
+            </div>
+            <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">{report.status}</span>
+          </div>
+          {canManage && report.status !== 'resolved' && report.status !== 'dismissed' && (
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              <label className="block text-xs font-semibold text-white/55">Observações internas<textarea value={notes[report.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [report.id]: event.target.value }))} maxLength={8000} rows={3} className="mt-2 w-full rounded-xl border border-white/10 bg-[#100b12] p-3 text-sm text-white" /></label>
+              <div className="flex flex-wrap gap-2">
+                <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'in_review')}>Em análise</button>
+                <button disabled={busy} className="rounded-xl bg-[#ff78b9] px-4 py-2 text-sm font-bold text-[#1b1018] disabled:opacity-50" onClick={() => void update(report, 'resolved')}>Resolver</button>
+                <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'dismissed')}>Dispensar</button>
+              </div>
+            </div>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}

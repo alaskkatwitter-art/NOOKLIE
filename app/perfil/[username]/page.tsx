@@ -11,6 +11,7 @@ import {
   useRouter,
 } from 'next/navigation';
 import OfficialBadge from '../../components/OfficialBadge';
+import ReportProfileButton from '../../components/ReportProfileButton';
 
 type User = {
   id: string;
@@ -891,6 +892,7 @@ export default function PublicProfilePage() {
                   <span className="text-white/45"> · {badge.description}</span>
                 </p>
               ))}
+              {!isSelf && <ReportProfileButton profileId={user.id} />}
 
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>

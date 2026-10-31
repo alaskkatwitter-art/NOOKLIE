@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import ModerationPanel from './ModerationPanel';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 
 type Department = {
@@ -45,6 +46,7 @@ type AuditEntry = {
 const tabs = [
   ['overview', 'Visão geral'],
   ['users', 'Usuários'],
+  ['moderation', 'Moderação'],
   ['departments', 'Departamentos'],
   ['roles', 'Cargos e permissões'],
   ['members', 'Equipe'],
@@ -73,12 +75,12 @@ function dateLabel(value: string | null) {
 export default function AdminConsole({
   isPlatformAdmin, canManageMembers, manageableDepartmentIds,
   canManageOpportunities, manageableOpportunityDepartmentIds,
-  canViewUsers, canViewOpportunities, canViewApplications, canReviewApplications,
+  canViewUsers, canViewModeration, canManageModeration, canViewOpportunities, canViewApplications, canReviewApplications,
   reviewableDepartmentIds,
 }: {
   isPlatformAdmin: boolean; canManageMembers: boolean; manageableDepartmentIds: string[];
   canManageOpportunities: boolean; manageableOpportunityDepartmentIds: string[];
-  canViewUsers: boolean; canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
+  canViewUsers: boolean; canViewModeration: boolean; canManageModeration: boolean; canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
   reviewableDepartmentIds: string[];
 }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -389,6 +391,7 @@ export default function AdminConsole({
 
   const visibleTabs = tabs.filter(([key]) =>
     (key !== 'users' || canViewUsers) &&
+    (key !== 'moderation' || canViewModeration) &&
     (key !== 'audit' || isPlatformAdmin) &&
     (key !== 'opportunities' || canViewOpportunities || canManageOpportunities) &&
     (key !== 'applications' || canViewApplications || canReviewApplications)
@@ -461,6 +464,8 @@ export default function AdminConsole({
         {error && <div role="alert" className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-200">{error}</div>}
         {message && <div role="status" className="mb-4 rounded-2xl border border-green-400/20 bg-green-400/5 p-4 text-sm text-green-200">{message}</div>}
         {loading && <p className="mb-4 text-sm text-white/40">Carregando…</p>}
+
+        {tab === 'moderation' && canViewModeration && <ModerationPanel canManage={canManageModeration} />}
 
         {tab === 'users' && canViewUsers && (
           <section className="space-y-4">
