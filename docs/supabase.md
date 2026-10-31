@@ -6,7 +6,11 @@ Projeto conectado: `fwwgoyburkdybbqmvljk` (TORILAND). Esta documentação foi at
 
 O histórico remoto contém **25 migrações aplicadas**. O SQL de cada uma foi lido da tabela `supabase_migrations.schema_migrations` e comparado aos arquivos locais. A comparação encontrou seis versões remotas sem arquivo local e alterações posteriores que haviam sido incorporadas a duas migrações antigas. Os 25 arquivos canônicos agora estão em `supabase/migrations/`, com as versões e o SQL armazenados no banco. As 19 cópias locais anteriores foram preservadas em `supabase/migration_archive/pre-reconciliation/`; **não execute os arquivos do arquivo morto**.
 
-O diretório ativo contém as 25 versões já aplicadas, seguidas pelas três migrações pendentes listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching. Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem validar as migrações num banco de desenvolvimento e obter autorização explícita.
+O diretório ativo contém as 25 versões já aplicadas, seguidas pelas três migrações pendentes listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching.
+
+A validação local adicionada ao CI tentou reconstruir o banco do zero e falhou na primeira migração: ela revoga permissões de `public.handle_new_user()`, que existe na produção, mas não é criada por nenhum arquivo ativo do histórico. Isso confirma que o projeto já possuía um esquema-base criado fora das migrações versionadas. Portanto, a lista de versões está reconciliada, mas a cadeia **não é reproduzível a partir de um banco vazio**. O job permanece como uma barreira visível; não altere migrações históricas com correções pontuais para ocultar a ausência do esquema-base.
+
+Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem reconstruir e validar o esquema-base, testar as três migrações pendentes num ambiente descartável e obter autorização explícita.
 
 ### Histórico remoto observado
 
@@ -63,8 +67,8 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 
 ## Próxima validação segura
 
-1. Obter um banco de desenvolvimento; o plano atual bloqueia branches e não foi feita alteração ao plano nem criada outra cobrança.
-2. Aplicar nele, em ordem, as três migrações pendentes e executar todos os arquivos em `supabase/verification/`.
+1. Criar uma representação versionada e sem dados pessoais do esquema-base que já existia antes da primeira migração aplicada, preservando as migrações históricas e a ordem de produção.
+2. Reproduzir esse esquema num banco local descartável, validar a cadeia e então aplicar nele, em ordem, as três migrações pendentes e todos os arquivos em `supabase/verification/`.
 3. Comparar o schema e as permissões resultantes aos fluxos da aplicação e corrigir os erros encontrados.
 4. Só depois de validar e revisar, aplicar as migrações à produção com autorização explícita. Os dados da produção permanecem intocados até lá.
 
