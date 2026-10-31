@@ -56,10 +56,19 @@ BEGIN
   END;
 END $$;
 
-SELECT
-  NOT EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Workflow test', 'Duplicate')) AS test_reports_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('h',64)) AS test_session_rolled_back,
-  NOT has_table_privilege('anon', 'public.moderation_reports', 'SELECT') AS anon_cannot_read,
-  NOT has_table_privilege('authenticated', 'public.moderation_reports', 'SELECT') AS authenticated_cannot_read,
-  has_table_privilege('service_role', 'public.moderation_reports', 'SELECT') AS service_role_can_read,
-  (SELECT relrowsecurity FROM pg_class WHERE oid='public.moderation_reports'::regclass) AS rls_enabled;
+DO $test$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Workflow test', 'Duplicate')) THEN
+    RAISE EXCEPTION 'Moderation workflow test reports were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('h',64)) THEN
+    RAISE EXCEPTION 'Moderation workflow test session was not rolled back';
+  END IF;
+  IF has_table_privilege('anon', 'public.moderation_reports', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.moderation_reports', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.moderation_reports', 'SELECT')
+     OR NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.moderation_reports'::regclass) THEN
+    RAISE EXCEPTION 'Moderation reports access controls are incorrect';
+  END IF;
+END;
+$test$;

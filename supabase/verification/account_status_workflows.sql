@@ -53,7 +53,16 @@ BEGIN
   END;
 END $$;
 
-SELECT
-  EXISTS (SELECT 1 FROM public.platform_admins admin JOIN public.auth_accounts account ON account.id=admin.user_id WHERE account.username='astriddy' AND account.account_status='active') AS root_remains_active,
-  NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('j',64),repeat('k',64))) AS test_sessions_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.admin_audit_log WHERE action IN ('user.suspended','user.reactivated') AND details->>'reason'='Test suspension') AS audit_test_rolled_back;
+DO $test$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.platform_admins admin JOIN public.auth_accounts account ON account.id=admin.user_id WHERE account.username='astriddy' AND account.account_status='active') THEN
+    RAISE EXCEPTION 'Primary administrator account did not remain active';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('j',64),repeat('k',64))) THEN
+    RAISE EXCEPTION 'Account status test sessions were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.admin_audit_log WHERE action IN ('user.suspended','user.reactivated') AND details->>'reason'='Test suspension') THEN
+    RAISE EXCEPTION 'Account status test audit rows were not rolled back';
+  END IF;
+END;
+$test$;

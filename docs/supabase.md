@@ -8,9 +8,11 @@ O histórico remoto contém **25 migrações aplicadas**. O SQL de cada uma foi 
 
 O diretório ativo contém as 25 versões já aplicadas, seguidas pelas três migrações pendentes listadas abaixo. Essa reconciliação muda apenas o controle de versão; **nenhum SQL foi aplicado ao banco ativo**. Uma tentativa de criar uma branch de desenvolvimento confirmou que o projeto está no plano Free, que não oferece branching.
 
-A validação local adicionada ao CI tentou reconstruir o banco do zero e falhou na primeira migração: ela revoga permissões de `public.handle_new_user()`, que existe na produção, mas não é criada por nenhum arquivo ativo do histórico. Isso confirma que o projeto já possuía um esquema-base criado fora das migrações versionadas. Portanto, a lista de versões está reconciliada, mas a cadeia **não é reproduzível a partir de um banco vazio**. O job permanece como uma barreira visível; não altere migrações históricas com correções pontuais para ocultar a ausência do esquema-base.
+A tentativa de reconstrução histórica no CI falhou na primeira migração: ela revoga permissões de `public.handle_new_user()`, que existe na produção, mas não é criada por nenhum arquivo ativo do histórico. Isso confirma que o banco recebeu um esquema-base fora das migrações versionadas e que a cadeia **não é reproduzível a partir de um banco vazio**.
 
-Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção sem reconstruir e validar o esquema-base, testar as três migrações pendentes num ambiente descartável e obter autorização explícita.
+Para permitir testes sem branch paga nem escrita na produção, o CI agora inicia apenas um PostgreSQL local descartável, carrega `supabase/verification/applied_schema_fixture.sql` e executa as três migrações pendentes e os fluxos SQL/RLS sobre esse estado. O fixture contém DDL observado no schema aplicado em 31/10/2026, sem linhas de produção; é somente um ponto de partida para validar as migrações pendentes, **não** uma migração canônica nem uma solução para a reprodução completa das 25 versões históricas.
+
+Não rode `db push`, `migration repair`, reset ou qualquer reaplicação na produção. A cadeia histórica segue não reproduzível e qualquer migração em produção exige validação completa e autorização explícita.
 
 ### Histórico remoto observado
 
@@ -67,10 +69,10 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 
 ## Próxima validação segura
 
-1. Criar uma representação versionada e sem dados pessoais do esquema-base que já existia antes da primeira migração aplicada, preservando as migrações históricas e a ordem de produção.
-2. Reproduzir esse esquema num banco local descartável, validar a cadeia e então aplicar nele, em ordem, as três migrações pendentes e todos os arquivos em `supabase/verification/`.
-3. Comparar o schema e as permissões resultantes aos fluxos da aplicação e corrigir os erros encontrados.
-4. Só depois de validar e revisar, aplicar as migrações à produção com autorização explícita. Os dados da produção permanecem intocados até lá.
+1. Carregar o fixture sem dados em PostgreSQL local descartável, executar as três migrações pendentes e rodar cada verificação SQL/RLS listada no CI.
+2. Corrigir falhas de compatibilidade entre as migrações pendentes, permissões e os fluxos da aplicação, repetindo a validação local.
+3. Tratar a reconstrução histórica completa como trabalho separado: o fixture representa o estado atual aplicado, não prova a reprodução das 25 migrações desde uma instalação vazia.
+4. Manter a produção sem alterações até que a cadeia aplicável esteja validada e exista autorização explícita.
 
 ## Descoberta e recursos em implementação
 

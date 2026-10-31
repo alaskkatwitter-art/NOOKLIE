@@ -39,8 +39,14 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
     IF SQLERRM <> 'rollback_moderation_visibility_test' THEN RAISE; END IF;
   END;
-END $$;
 
-SELECT NOT EXISTS (SELECT 1 FROM public.profiles WHERE moderation_hidden_at IS NOT NULL) AS profile_changes_rolled_back,
-       NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('m',64)) AS sessions_rolled_back,
-       NOT EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Visibility test','Restore test')) AS reports_rolled_back;
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id=target_profile AND moderation_hidden_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Visibility test did not restore the target profile';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('m',64)) THEN
+    RAISE EXCEPTION 'Visibility test session was not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.moderation_reports WHERE id=report_id) THEN
+    RAISE EXCEPTION 'Visibility test report was not rolled back';
+  END IF;
+END $$;

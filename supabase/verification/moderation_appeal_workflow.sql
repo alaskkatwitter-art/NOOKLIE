@@ -45,7 +45,17 @@ BEGIN
 end;
 $$;
 
-select not exists(select 1 from public.moderation_appeals where details='Solicito revisão desta decisão.') as appeal_rolled_back,
-       not exists(select 1 from public.auth_sessions where token_hash in (repeat('v',64), repeat('w',64))) as sessions_rolled_back,
-       not has_table_privilege('anon', 'public.moderation_appeals', 'SELECT') as anon_cannot_read,
-       not has_table_privilege('authenticated', 'public.moderation_appeals', 'SELECT') as authenticated_cannot_read;
+DO $test$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.moderation_appeals WHERE details='Solicito revisão desta decisão.') THEN
+    RAISE EXCEPTION 'Appeal verification row was not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('v',64), repeat('w',64))) THEN
+    RAISE EXCEPTION 'Appeal verification sessions were not rolled back';
+  END IF;
+  IF has_table_privilege('anon', 'public.moderation_appeals', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.moderation_appeals', 'SELECT') THEN
+    RAISE EXCEPTION 'Appeal data is directly readable by a client role';
+  END IF;
+END;
+$test$;

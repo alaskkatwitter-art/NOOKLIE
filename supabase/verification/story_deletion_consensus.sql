@@ -8,7 +8,7 @@ declare
   rejected_story uuid;
   approved_request uuid;
   rejected_request uuid;
-BEGIN
+begin
   SELECT account.id INTO root_id
   FROM public.platform_admins admin
   JOIN public.auth_accounts account ON account.id=admin.user_id
@@ -47,9 +47,15 @@ BEGIN
   exception when sqlstate 'P0001' then
     if sqlerrm <> 'rollback_story_deletion_test' then raise; end if;
   end;
+
+  if EXISTS (SELECT 1 FROM public.stories WHERE id IN (approved_story,rejected_story)) THEN
+    RAISE EXCEPTION 'Story deletion test stories were not rolled back';
+  END IF;
+  if EXISTS (SELECT 1 FROM public.story_deletion_requests WHERE id IN (approved_request,rejected_request)) THEN
+    RAISE EXCEPTION 'Story deletion test requests were not rolled back';
+  END IF;
+  if EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('x',64),repeat('y',64))) THEN
+    RAISE EXCEPTION 'Story deletion test sessions were not rolled back';
+  END IF;
 end;
 $$;
-
-select not exists(select 1 from public.stories where title like '__deletion_consensus_%') as stories_rolled_back,
-       not exists(select 1 from public.story_deletion_requests where story_id in (select id from public.stories where title like '__deletion_consensus_%')) as requests_rolled_back,
-       not exists(select 1 from public.auth_sessions where token_hash in (repeat('x',64), repeat('y',64))) as sessions_rolled_back;

@@ -177,9 +177,22 @@ BEGIN
 END;
 $$;
 
-SELECT
-  NOT EXISTS (SELECT 1 FROM public.opportunities WHERE title IN ('__admin_workflow_test_job','__admin_workflow_self_test')) AS opportunities_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.applications WHERE internal_notes='Nota privada de teste') AS applications_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('e',64),repeat('f',64),repeat('g',64))) AS test_sessions_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.team_roles WHERE name='__admin_workflow_test_role') AS test_role_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.user_notifications WHERE notification_type='team_appointment' AND body LIKE '%__admin_workflow_test%') AS test_notifications_rolled_back;
+DO $test$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.opportunities WHERE title IN ('__admin_workflow_test_job','__admin_workflow_self_test')) THEN
+    RAISE EXCEPTION 'Admin workflow test opportunities were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.applications WHERE internal_notes='Nota privada de teste') THEN
+    RAISE EXCEPTION 'Admin workflow test applications were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('e',64),repeat('f',64),repeat('g',64))) THEN
+    RAISE EXCEPTION 'Admin workflow test sessions were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.team_roles WHERE name='__admin_workflow_test_role') THEN
+    RAISE EXCEPTION 'Admin workflow test role was not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.user_notifications WHERE notification_type='team_appointment' AND body LIKE '%__admin_workflow_test%') THEN
+    RAISE EXCEPTION 'Admin workflow test notifications were not rolled back';
+  END IF;
+END;
+$test$;
