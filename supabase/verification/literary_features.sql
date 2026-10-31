@@ -81,5 +81,4 @@ begin
   ) then
     raise exception 'Story age-rating constraint is missing';
   end if;
-end;
-$;
+end;$$;
