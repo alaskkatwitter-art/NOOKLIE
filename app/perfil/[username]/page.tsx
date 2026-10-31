@@ -881,6 +881,9 @@ export default function PublicProfilePage() {
                 ) : user.verified ? (
                   <VerifiedBadge />
                 ) : null}
+                {!!user.staff_badges?.length && (
+                  <span title="Integrante oficial da equipe" aria-label="Integrante oficial da equipe" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ff78b9] text-xs font-black text-[#190d16]">✦</span>
+                )}
               </div>
 
               <p className="mt-1 text-sm font-semibold text-white/40">

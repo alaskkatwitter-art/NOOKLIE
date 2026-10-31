@@ -2629,6 +2629,9 @@ export default function PerfilPage() {
                 <h1 className="break-words text-2xl font-black sm:text-3xl">
                   {displayName}
                 </h1>
+                {!!user.staff_badges?.length && (
+                  <span title="Integrante oficial da equipe" aria-label="Integrante oficial da equipe" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ff78b9] text-xs font-black text-[#190d16]">✦</span>
+                )}
 
                 <p
                   className="mt-1 text-sm"
