@@ -42,6 +42,9 @@ begin
   if not has_column_privilege('service_role', 'public.moderation_actions', 'appeal_status', 'UPDATE') then
     raise exception 'service_role needs column-only update access for the appeal state';
   end if;
+  if not has_column_privilege('service_role', 'public.moderation_actions', 'ends_at', 'UPDATE') then
+    raise exception 'service_role needs column-only update access for suspension end times';
+  end if;
 
   if not exists (
     select 1 from pg_constraint
