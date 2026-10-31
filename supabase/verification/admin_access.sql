@@ -60,10 +60,26 @@ BEGIN
     RAISE EXCEPTION 'The append-only audit trigger is missing';
   END IF;
 
-  IF (SELECT count(*) FROM public.platform_admins pa
-      JOIN public.auth_accounts a ON a.id=pa.user_id
-      WHERE a.username IN ('astriddy','nooklie')) <> 2 THEN
-    RAISE EXCEPTION 'Both principal account IDs must be registered';
+  IF (SELECT count(*) FROM public.platform_admins) <> 2
+     OR NOT EXISTS (
+       SELECT 1 FROM public.platform_admins
+       WHERE user_id='be272a49-1f7b-49ca-998f-d265029f4b34'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.platform_admins
+       WHERE user_id='5685e19f-3d1e-4551-918d-036f7fa78aee'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.auth_accounts
+       WHERE id='be272a49-1f7b-49ca-998f-d265029f4b34'
+         AND username='astriddy'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.auth_accounts
+       WHERE id='5685e19f-3d1e-4551-918d-036f7fa78aee'
+         AND username='nooklie'
+     ) THEN
+    RAISE EXCEPTION 'Only the verified account IDs for astriddy and nooklie may be platform admins';
   END IF;
 END;
 $$;

@@ -4,7 +4,7 @@
 
 O sistema mantém as contas em `auth_accounts` e valida sessões de `auth_sessions`. Permissões derivam do ID associado à sessão; o servidor não confia em username, flags visuais do perfil ou dados enviados pelo navegador.
 
-As contas principais ficam em `platform_admins`. Essa tabela não tem operações de criação ou edição no painel e não concede acesso por `profiles.verified` ou `profiles.is_official`. As contas iniciais foram vinculadas a IDs confirmados no banco.
+As contas principais ficam em `platform_admins`. Essa tabela não tem operações de criação ou edição no painel e não concede acesso por `profiles.verified` ou `profiles.is_official`. A migração `20261031100000_seed_platform_admin_ids.sql` vincula os UUIDs verificados de `astriddy` e `nooklie`; ela falha se os IDs não corresponderem às contas esperadas.
 
 Em outra instalação, confirme primeiro a relação entre perfil e conta de autenticação e só então cadastre os IDs principais. Nunca use apenas username para conceder acesso.
 
