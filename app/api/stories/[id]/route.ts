@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { getStoryEditAccess } from '@/lib/stories/access';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -302,6 +303,10 @@ export async function GET(
         }
       );
     }
+
+    const editAccess = currentUserId
+      ? await getStoryEditAccess(supabase, id, currentUserId)
+      : { canEdit: false, isOwner: false };
 
     /*
      * ==================================================
@@ -645,6 +650,7 @@ export async function GET(
       {
         story: {
           ...story,
+          can_edit: editAccess.canEdit,
 
           author:
             author || null,
@@ -805,10 +811,8 @@ export async function PUT(
       );
     }
 
-    if (
-      existingStory.author_id !==
-      userId
-    ) {
+    const editAccess = await getStoryEditAccess(supabase, id, userId);
+    if (!editAccess.canEdit) {
       return NextResponse.json(
         {
           error:
@@ -1093,6 +1097,15 @@ export async function PUT(
      * ATUALIZA HISTÓRIA
      * ==================================================
      */
+
+    const { error: historyError } = await supabase.from('story_edit_history').insert({
+      story_id: id,
+      actor_id: userId,
+      entity_type: 'story',
+      entity_id: id,
+      snapshot: existingStory,
+    });
+    if (historyError) throw historyError;
 
     const {
       data: updatedStory,

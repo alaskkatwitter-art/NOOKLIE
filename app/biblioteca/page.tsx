@@ -442,6 +442,7 @@ export default function BibliotecaPage() {
               <h1 className="mt-1 truncate text-xl font-black tracking-tight text-white sm:text-2xl">
                 Minha biblioteca
               </h1>
+                <Link href="/favoritos/capitulos" className="mt-2 inline-block text-xs font-semibold text-[#ff9aca] hover:underline">Capítulos favoritos</Link>
             </div>
 
           </div>
@@ -811,3 +812,5 @@ export default function BibliotecaPage() {
     </main>
   );
 }
+
+

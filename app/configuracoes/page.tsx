@@ -496,6 +496,13 @@ export default function ConfiguracoesPage() {
                 </div>
               </div>
 
+              <div className="px-6 pt-5">
+                <Link href="/bloqueios" className="text-sm font-semibold text-[#ff9aca] hover:underline">Gerenciar perfis bloqueados →</Link>
+                <a href="/api/account/export" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Baixar meus dados</a>
+                <Link href="/conta/privacidade" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Privacidade da conta →</Link>
+                <Link href="/convites" className="ml-4 text-sm font-semibold text-[#ff9aca] hover:underline">Convites de colaboração →</Link>
+              </div>
+
               <div className="divide-y divide-white/6">
                 <div className="flex items-center justify-between gap-5 px-6 py-5">
                   <div>
@@ -563,3 +570,4 @@ export default function ConfiguracoesPage() {
     </main>
   );
 }
+

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import AdminConsole from './AdminConsole';
 import {
   getStaffContext,
@@ -20,8 +21,11 @@ export default async function AdminPage() {
   })));
   const manageableDepartmentIds = capabilities.filter((item) => item.members).map((item) => item.departmentId);
   const manageableOpportunityDepartmentIds = capabilities.filter((item) => item.opportunities).map((item) => item.departmentId);
+  const canManagePolicies = await hasStaffPermission(staff, 'policies.manage');
 
   return (
+    <>
+    {canManagePolicies && <div className="mx-auto max-w-7xl px-4 pt-5 sm:px-6"><Link href="/admin/politicas" className="inline-flex rounded-xl border border-[#ff78b9]/30 bg-[#ff78b9]/10 px-4 py-2 text-sm font-semibold text-[#ff9aca] hover:bg-[#ff78b9]/15">Gerenciar políticas institucionais</Link></div>}
     <AdminConsole
       isPlatformAdmin={staff.isPlatformAdmin}
       canManageMembers={staff.isPlatformAdmin || manageableDepartmentIds.length > 0}
@@ -37,5 +41,6 @@ export default async function AdminPage() {
       canReviewApplications={staff.isPlatformAdmin || capabilities.some((item) => item.applications)}
       reviewableDepartmentIds={capabilities.filter((item) => item.applications).map((item) => item.departmentId)}
     />
+    </>
   );
 }

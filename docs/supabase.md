@@ -1,56 +1,66 @@
-# Supabase: banco e migrações
+# Supabase: banco, segurança e migrações
 
-Este documento registra o estado observado no projeto Supabase **TORILAND** (ref `fwwgoyburkdybbqmvljk`). O banco já existia; o código SQL original dessas migrações não está versionado neste repositório. A lista abaixo veio do histórico de migrações do projeto conectado.
+Projeto conectado: `fwwgoyburkdybbqmvljk` (TORILAND). Esta documentação foi atualizada após uma nova leitura do histórico remoto em 31/10/2026.
 
-## Migrações já registradas no banco
+## Situação que exige reconciliação
+
+O histórico remoto contém **25 migrações aplicadas**. O repositório contém **19 arquivos de migração**, mas somente três têm a mesma versão e o mesmo nome do histórico remoto. Os outros nomes e versões podem representar alterações equivalentes com timestamps diferentes, mas isso ainda não foi comparado por SQL.
+
+**Não rode `supabase db push`, `migration repair`, reset ou qualquer reaplicação em produção até concluir essa comparação.** Uma cópia de desenvolvimento do banco não pôde ser criada porque o plano conectado não permite branching. O arquivo da nova migração literária está em preparação, sem aplicação no banco ativo.
+
+### Histórico remoto observado
 
 | Versão | Nome |
 | --- | --- |
-| `20261031013628` | `add_tag_aware_story_discovery` |
-| `20261031014115` | `exclude_unpublished_stories_before_paging` |
-| `20261031012246` | `secure_public_access_and_optimize_rls` |
 | `20261030021627` | `harden_public_schema_access_and_function_security` |
 | `20261030024020` | `auth_attempt_rate_limits` |
 | `20261030025623` | `complete_auth_recovery_atomically` |
+| `20261031012246` | `secure_public_access_and_optimize_rls` |
+| `20261031013628` | `add_tag_aware_story_discovery` |
+| `20261031014115` | `exclude_unpublished_stories_before_paging` |
+| `20261031015325` | `add_official_account_auto_follow` |
+| `20261031174358` | `admin_foundation_rbac` |
+| `20261031174855` | `admin_management_operations` |
+| `20261031175148` | `admin_operations_role_permission_validation_fix` |
+| `20261031175926` | `admin_opportunities_and_applications` |
+| `20261031180005` | `admin_applications_prevent_self_appointment` |
+| `20261031181002` | `admin_archived_roles_revoke_access` |
+| `20261031181140` | `admin_active_role_permission_scope` |
+| `20261031181704` | `moderation_reports_and_review` |
+| `20261031183008` | `admin_user_account_status` |
+| `20261031183656` | `moderation_content_visibility_actions` |
+| `20261031184442` | `guard_moderation_visibility` |
+| `20261031184537` | `allow_trusted_moderation_visibility_actors` |
+| `20261031184710` | `restore_content_from_resolved_reports` |
+| `20261031185255` | `admin_rls_and_fk_indexes` |
+| `20261031185934` | `seed_platform_admin_ids` |
+| `20261031190044` | `enforce_opportunity_openings` |
+| `20261031190107` | `serialize_application_reviews` |
+| `20261031190603` | `profile_theme_persistence` |
 
-Não reaplique essas alterações manualmente nem use um reset do banco para reconstruir o histórico. Primeiro sincronize o esquema remoto e revise o arquivo gerado.
+## Segurança observada
 
-## Tabelas observadas
+- Todas as tabelas listadas do schema `public` estavam com RLS habilitado.
+- `anon` e `authenticated` não tinham privilégio direto de `SELECT` nas tabelas consultadas. Isso complementa RLS; não substitui as verificações das rotas do Next.js, que usam a chave privada do servidor e passam por RLS.
+- Algumas políticas de leitura para `public` usam `USING (true)`. Sem concessão de privilégio de tabela, elas não permitem leitura direta pela Data API. Como a chave privada ignora RLS, cada rota pública ainda precisa filtrar conteúdo não publicado, oculto, desativado e dados privados.
+- O assessor de segurança retornou zero avisos. O assessor de desempenho mostrou 64 índices ainda não observados em uso; como o banco tem pouco tráfego/dados, não remover sem medir consultas reais.
 
-Todas as tabelas públicas listadas abaixo estavam com RLS habilitado durante a inspeção.
+## Estruturas observadas
 
-- **Contas e segurança:** `profiles`, `auth_accounts`, `auth_sessions`, `auth_rate_limits`.
+- **Contas:** `profiles`, `auth_accounts`, `auth_sessions`, `auth_rate_limits`, `official_signup_tokens`.
 - **Histórias e leitura:** `stories`, `chapters`, `chapter_media`, `chapter_likes`, `scheduled_chapters`, `story_likes`, `reading_progress`, `reading_lists`, `reading_list_items`, `social_stories`.
-- **Comunidade e reações:** `follows`, `posts`, `post_likes`, `comments`, `comment_likes`, `polls`, `poll_options`, `poll_votes`, `nook_posts`, `nook_post_media`, `nook_post_reactions`, `nook_comments`, `nook_comment_reactions`, `nook_saved_posts`.
-- **Descoberta e clubes:** `tags`, `tag_categories`, `story_tags`, `user_stickers`, `fic_clubs`, `fic_club_members`.
+- **Comunidade:** `follows`, `posts`, `post_likes`, `comments`, `comment_likes`, `polls`, `poll_options`, `poll_votes`, `nook_posts`, `nook_post_media`, `nook_post_reactions`, `nook_comments`, `nook_comment_reactions`, `nook_saved_posts`.
+- **Descoberta:** `tags`, `tag_categories`, `story_tags`, `user_stickers`, `fic_clubs`, `fic_club_members`.
+- **Administração/moderação:** `platform_admins`, `permissions`, `departments`, `team_roles`, `team_role_permissions`, `team_memberships`, `admin_audit_log`, `user_notifications`, `opportunities`, `applications`, `moderation_reports`.
 
-## Sincronizar migrações
+## Sincronização segura futura
 
-Com o Supabase CLI instalado e autenticado:
+1. Obter uma cópia/exportação do schema remoto ou sincronizar com Supabase CLI autenticado.
+2. Comparar cada versão aplicada com o conteúdo dos arquivos locais; documentar equivalências e diferenças sem alterar a tabela de histórico.
+3. Gerar uma linha de base revisada para controle de versão e validar que o próximo `migration list` não mostra migrações antigas como pendentes.
+4. Aplicar novas migrações em desenvolvimento primeiro. Produção permanece sem alterações até revisão e autorização explícita.
 
-1. Vincule o projeto remoto: `supabase link --project-ref fwwgoyburkdybbqmvljk`.
-2. Confira o histórico local e remoto: `supabase migration list`.
-3. Gere uma migração base a partir do esquema remoto existente: `supabase db pull`.
-4. Revise cuidadosamente o SQL em `supabase/migrations/` e compare a lista com as três versões já aplicadas.
-5. Salve o arquivo gerado no GitHub antes de propor qualquer mudança de esquema.
+## Descoberta e recursos em implementação
 
-Para alterações futuras, crie arquivos com `supabase migration new <nome>`, revise o SQL, aplique primeiro em um ambiente de desenvolvimento e só então use `supabase db push` no projeto pretendido. Mantenha RLS e políticas explícitas em todas as tabelas expostas.
+As categorias e filtros de tags já vivem no catálogo do Supabase. Sugestões de tag podem ser publicadas imediatamente, com normalização de slug e limite de criação. A funcionalidade nova de avaliações, favoritos, bloqueios, privacidade, coautoria, créditos e histórico está sendo preparada em migração aditiva. A verificação correspondente está em `supabase/verification/literary_features.sql`.
 
-## Segurança de acesso e desempenho
-
-A migração `20261031012246_secure_public_access_and_optimize_rls` mantém as tabelas do aplicativo acessíveis somente pelas rotas de servidor que usam a chave secreta. As 21 tabelas que não tinham política receberam uma política restritiva de bloqueio para `anon` e `authenticated`, além da revogação explícita de privilégios. As políticas existentes que usam `auth.uid()` foram ajustadas para avaliar a identidade uma vez por instrução; 13 índices foram criados nas colunas de chaves estrangeiras que ainda não tinham índice pelo primeiro campo.
-
-A recuperação de conta usa a função atômica `complete_auth_recovery`: ela troca a senha e a chave de recuperação somente se a chave apresentada continuar válida e revoga as sessões antigas na mesma transação. Login e recuperação aplicam limites de tentativas com chaves armazenadas como hash.
-
-## Verificação do banco
-
-O arquivo `supabase/verification/rls_access.sql` verifica as políticas restritivas, a ausência de permissões para os papéis de cliente, as expressões RLS otimizadas e os índices de chaves estrangeiras. Após aplicar as migrações, cole o conteúdo no SQL Editor do Supabase; a consulta termina sem erro quando todas as verificações passam. A suíte de integração do app cobre login, recuperação de conta e criação de capítulos no CI do GitHub.
-
-
-## Descoberta e catálogo de tags
-
-A tabela `tag_categories` já contém categorias de fandom, gênero, personagens, relacionamentos, avisos, tropes e tags livres. A página `/explorar` agora lê esse catálogo do banco. A pessoa pode incluir várias tags (todas devem combinar), excluir tags (qualquer uma remove a história), e combinar isso com classificação, status e ordenação. Só aparecem histórias com pelo menos um capítulo publicado.
-
-Quem está conectado pode adicionar uma tag com categoria pelo painel de exploração. Ela é normalizada em um slug, publicada imediatamente e fica disponível no catálogo; slugs duplicados reutilizam a tag existente. O endpoint aplica limite de criação e grava com a identidade da sessão. A tabela continua fechada para acesso direto do navegador; a gravação ocorre pela rota de servidor usando a chave secreta.
-
-A função `search_public_stories` executa os filtros no banco antes de paginar e só pode ser chamada pelo papel de servidor `service_role`. Para evitar que rascunhos escondam histórias publicadas, a função exige capítulos publicados antes do limite de resultados. O arquivo de verificação SQL também confirma essas permissões.

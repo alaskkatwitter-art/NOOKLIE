@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { areUsersBlocked } from '@/lib/community/blocks';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY!;
@@ -290,6 +291,13 @@ export async function POST(
         {
           status: 404,
         }
+      );
+    }
+
+    if (await areUsersBlocked(supabase, currentUserId, followingId)) {
+      return NextResponse.json(
+        { error: 'Não é possível seguir este perfil.' },
+        { status: 403 }
       );
     }
 

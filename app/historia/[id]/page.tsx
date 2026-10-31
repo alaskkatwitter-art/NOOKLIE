@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import StoryCollaboratorsPanel from '@/app/components/StoryCollaboratorsPanel';
 
 type Author = {
   id: string;
@@ -42,6 +43,7 @@ type Story = {
   chapters: Chapter[];
   likes: number;
   liked: boolean;
+  can_edit?: boolean;
 };
 
 export default function HistoriaPage() {
@@ -219,9 +221,7 @@ export default function HistoriaPage() {
     );
   }
 
-  const isOwner =
-    Boolean(currentUserId) &&
-    currentUserId === story.author_id;
+  const isOwner = story.can_edit === true || (Boolean(currentUserId) && currentUserId === story.author_id);
 
   const publishedChapters =
     story.chapters?.filter(
@@ -389,6 +389,14 @@ export default function HistoriaPage() {
                 </span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => router.push(`/historia/${story.id}/avaliacoes`)}
+                className="rounded-xl border border-[#ff78b9]/25 bg-[#ff78b9]/10 px-5 py-3 text-sm font-medium text-[#ff9aca] transition hover:border-[#ff78b9]/50"
+              >
+                Avaliações e resenhas
+              </button>
+
               {isOwner && (
                 <button
                   type="button"
@@ -421,6 +429,8 @@ export default function HistoriaPage() {
             </div>
           </div>
         </div>
+
+        {isOwner && <StoryCollaboratorsPanel storyId={story.id} />}
 
         <section className="mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">

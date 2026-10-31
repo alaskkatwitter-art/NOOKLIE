@@ -85,7 +85,7 @@ export async function GET() {
       await supabase
         .from('profiles')
         .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color'
+          'id, username, display_name, bio, avatar_url, cover_url, theme_color, deactivated_at'
         )
         .eq('user_id', session.user_id)
         .maybeSingle();

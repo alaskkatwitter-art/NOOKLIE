@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ChapterFavoriteButton from '@/components/ChapterFavoriteButton';
 
 type Chapter = {
   id: string;
@@ -1151,6 +1152,8 @@ export default function CapituloPage() {
             >
               Comentar
             </button>
+
+            {chapter.published && <ChapterFavoriteButton chapterId={chapter.id} />}
           </div>
 
           {error && (
@@ -2275,3 +2278,4 @@ export default function CapituloPage() {
     </main>
   );
 }
+
