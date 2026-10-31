@@ -1697,189 +1697,189 @@ ALTER TABLE public.user_notifications ADD CONSTRAINT user_notifications_user_id_
 
 ALTER TABLE public.user_stickers ADD CONSTRAINT user_stickers_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
-CREATE INDEX admin_audit_log_created_at_idx ON public.admin_audit_log USING btree (created_at DESC)
+CREATE INDEX admin_audit_log_created_at_idx ON public.admin_audit_log USING btree (created_at DESC);
 
-CREATE INDEX admin_audit_log_subject_idx ON public.admin_audit_log USING btree (subject_type, subject_id, created_at DESC)
+CREATE INDEX admin_audit_log_subject_idx ON public.admin_audit_log USING btree (subject_type, subject_id, created_at DESC);
 
-CREATE INDEX admin_audit_log_actor_user_id_idx ON public.admin_audit_log USING btree (actor_user_id)
+CREATE INDEX admin_audit_log_actor_user_id_idx ON public.admin_audit_log USING btree (actor_user_id);
 
-CREATE INDEX applications_opportunity_status_idx ON public.applications USING btree (opportunity_id, status, created_at DESC)
+CREATE INDEX applications_opportunity_status_idx ON public.applications USING btree (opportunity_id, status, created_at DESC);
 
-CREATE INDEX applications_user_created_idx ON public.applications USING btree (user_id, created_at DESC)
+CREATE INDEX applications_user_created_idx ON public.applications USING btree (user_id, created_at DESC);
 
-CREATE INDEX applications_reviewer_idx ON public.applications USING btree (reviewer_id, reviewed_at DESC)
+CREATE INDEX applications_reviewer_idx ON public.applications USING btree (reviewer_id, reviewed_at DESC);
 
-CREATE INDEX auth_accounts_account_status_idx ON public.auth_accounts USING btree (account_status)
+CREATE INDEX auth_accounts_account_status_idx ON public.auth_accounts USING btree (account_status);
 
-CREATE INDEX auth_sessions_user_id_idx ON public.auth_sessions USING btree (user_id)
+CREATE INDEX auth_sessions_user_id_idx ON public.auth_sessions USING btree (user_id);
 
-CREATE INDEX auth_sessions_expires_at_idx ON public.auth_sessions USING btree (expires_at)
+CREATE INDEX auth_sessions_expires_at_idx ON public.auth_sessions USING btree (expires_at);
 
-CREATE INDEX chapter_likes_chapter_id_idx ON public.chapter_likes USING btree (chapter_id)
+CREATE INDEX chapter_likes_chapter_id_idx ON public.chapter_likes USING btree (chapter_id);
 
-CREATE INDEX chapter_likes_user_id_idx ON public.chapter_likes USING btree (user_id)
+CREATE INDEX chapter_likes_user_id_idx ON public.chapter_likes USING btree (user_id);
 
-CREATE INDEX chapter_media_chapter_id_idx ON public.chapter_media USING btree (chapter_id)
+CREATE INDEX chapter_media_chapter_id_idx ON public.chapter_media USING btree (chapter_id);
 
-CREATE INDEX chapter_media_position_idx ON public.chapter_media USING btree (chapter_id, "position")
+CREATE INDEX chapter_media_position_idx ON public.chapter_media USING btree (chapter_id, "position");
 
-CREATE INDEX chapters_story_id_idx ON public.chapters USING btree (story_id)
+CREATE INDEX chapters_story_id_idx ON public.chapters USING btree (story_id);
 
-CREATE INDEX chapters_publication_status_idx ON public.chapters USING btree (publication_status)
+CREATE INDEX chapters_publication_status_idx ON public.chapters USING btree (publication_status);
 
-CREATE INDEX comment_likes_user_id_idx ON public.comment_likes USING btree (user_id)
+CREATE INDEX comment_likes_user_id_idx ON public.comment_likes USING btree (user_id);
 
-CREATE INDEX comments_chapter_id_idx ON public.comments USING btree (chapter_id)
+CREATE INDEX comments_chapter_id_idx ON public.comments USING btree (chapter_id);
 
-CREATE INDEX comments_parent_id_idx ON public.comments USING btree (parent_comment_id)
+CREATE INDEX comments_parent_id_idx ON public.comments USING btree (parent_comment_id);
 
-CREATE INDEX comments_sticker_id_idx ON public.comments USING btree (sticker_id)
+CREATE INDEX comments_sticker_id_idx ON public.comments USING btree (sticker_id);
 
-CREATE INDEX comments_user_id_idx ON public.comments USING btree (user_id)
+CREATE INDEX comments_user_id_idx ON public.comments USING btree (user_id);
 
-CREATE INDEX departments_created_by_idx ON public.departments USING btree (created_by)
+CREATE INDEX departments_created_by_idx ON public.departments USING btree (created_by);
 
-CREATE INDEX fic_club_members_club_id_idx ON public.fic_club_members USING btree (club_id)
+CREATE INDEX fic_club_members_club_id_idx ON public.fic_club_members USING btree (club_id);
 
-CREATE INDEX fic_club_members_user_id_idx ON public.fic_club_members USING btree (user_id)
+CREATE INDEX fic_club_members_user_id_idx ON public.fic_club_members USING btree (user_id);
 
-CREATE INDEX fic_clubs_story_id_idx ON public.fic_clubs USING btree (story_id)
+CREATE INDEX fic_clubs_story_id_idx ON public.fic_clubs USING btree (story_id);
 
-CREATE INDEX fic_clubs_creator_id_idx ON public.fic_clubs USING btree (creator_id)
+CREATE INDEX fic_clubs_creator_id_idx ON public.fic_clubs USING btree (creator_id);
 
-CREATE INDEX follows_following_id_idx ON public.follows USING btree (following_id)
+CREATE INDEX follows_following_id_idx ON public.follows USING btree (following_id);
 
-CREATE INDEX moderation_reports_department_status_created_idx ON public.moderation_reports USING btree (department_id, status, created_at DESC)
+CREATE INDEX moderation_reports_department_status_created_idx ON public.moderation_reports USING btree (department_id, status, created_at DESC);
 
-CREATE INDEX moderation_reports_target_user_created_idx ON public.moderation_reports USING btree (target_user_id, created_at DESC)
+CREATE INDEX moderation_reports_target_user_created_idx ON public.moderation_reports USING btree (target_user_id, created_at DESC);
 
-CREATE UNIQUE INDEX moderation_reports_one_open_reporter_content_idx ON public.moderation_reports USING btree (reporter_id, content_type, content_id) WHERE (status = ANY (ARRAY['pending'::text, 'in_review'::text]))
+CREATE UNIQUE INDEX moderation_reports_one_open_reporter_content_idx ON public.moderation_reports USING btree (reporter_id, content_type, content_id) WHERE (status = ANY (ARRAY['pending'::text, 'in_review'::text]));
 
-CREATE INDEX moderation_reports_reviewer_id_idx ON public.moderation_reports USING btree (reviewer_id)
+CREATE INDEX moderation_reports_reviewer_id_idx ON public.moderation_reports USING btree (reviewer_id);
 
-CREATE INDEX nook_comment_reactions_comment_id_idx ON public.nook_comment_reactions USING btree (comment_id)
+CREATE INDEX nook_comment_reactions_comment_id_idx ON public.nook_comment_reactions USING btree (comment_id);
 
-CREATE INDEX nook_comment_reactions_user_id_idx ON public.nook_comment_reactions USING btree (user_id)
+CREATE INDEX nook_comment_reactions_user_id_idx ON public.nook_comment_reactions USING btree (user_id);
 
-CREATE INDEX nook_comments_post_id_idx ON public.nook_comments USING btree (post_id)
+CREATE INDEX nook_comments_post_id_idx ON public.nook_comments USING btree (post_id);
 
-CREATE INDEX nook_comments_parent_id_idx ON public.nook_comments USING btree (parent_id)
+CREATE INDEX nook_comments_parent_id_idx ON public.nook_comments USING btree (parent_id);
 
-CREATE INDEX nook_comments_author_id_idx ON public.nook_comments USING btree (author_id)
+CREATE INDEX nook_comments_author_id_idx ON public.nook_comments USING btree (author_id);
 
-CREATE INDEX nook_post_media_post_id_idx ON public.nook_post_media USING btree (post_id)
+CREATE INDEX nook_post_media_post_id_idx ON public.nook_post_media USING btree (post_id);
 
-CREATE INDEX nook_post_media_post_position_idx ON public.nook_post_media USING btree (post_id, "position")
+CREATE INDEX nook_post_media_post_position_idx ON public.nook_post_media USING btree (post_id, "position");
 
-CREATE INDEX nook_post_reactions_post_id_idx ON public.nook_post_reactions USING btree (post_id)
+CREATE INDEX nook_post_reactions_post_id_idx ON public.nook_post_reactions USING btree (post_id);
 
-CREATE INDEX nook_post_reactions_user_id_idx ON public.nook_post_reactions USING btree (user_id)
+CREATE INDEX nook_post_reactions_user_id_idx ON public.nook_post_reactions USING btree (user_id);
 
-CREATE INDEX nook_posts_story_id_idx ON public.nook_posts USING btree (story_id)
+CREATE INDEX nook_posts_story_id_idx ON public.nook_posts USING btree (story_id);
 
-CREATE INDEX nook_posts_user_id_idx ON public.nook_posts USING btree (user_id)
+CREATE INDEX nook_posts_user_id_idx ON public.nook_posts USING btree (user_id);
 
-CREATE INDEX nook_posts_public_created_idx ON public.nook_posts USING btree (created_at DESC) WHERE (moderation_hidden_at IS NULL)
+CREATE INDEX nook_posts_public_created_idx ON public.nook_posts USING btree (created_at DESC) WHERE (moderation_hidden_at IS NULL);
 
-CREATE INDEX nook_saved_posts_user_id_idx ON public.nook_saved_posts USING btree (user_id)
+CREATE INDEX nook_saved_posts_user_id_idx ON public.nook_saved_posts USING btree (user_id);
 
-CREATE INDEX nook_saved_posts_post_id_idx ON public.nook_saved_posts USING btree (post_id)
+CREATE INDEX nook_saved_posts_post_id_idx ON public.nook_saved_posts USING btree (post_id);
 
-CREATE INDEX nook_saved_posts_created_at_idx ON public.nook_saved_posts USING btree (created_at DESC)
+CREATE INDEX nook_saved_posts_created_at_idx ON public.nook_saved_posts USING btree (created_at DESC);
 
-CREATE INDEX opportunities_public_listing_idx ON public.opportunities USING btree (status, opens_at, closes_at, created_at DESC)
+CREATE INDEX opportunities_public_listing_idx ON public.opportunities USING btree (status, opens_at, closes_at, created_at DESC);
 
-CREATE INDEX opportunities_department_status_idx ON public.opportunities USING btree (department_id, status, created_at DESC)
+CREATE INDEX opportunities_department_status_idx ON public.opportunities USING btree (department_id, status, created_at DESC);
 
-CREATE INDEX opportunities_created_by_idx ON public.opportunities USING btree (created_by)
+CREATE INDEX opportunities_created_by_idx ON public.opportunities USING btree (created_by);
 
-CREATE INDEX opportunities_updated_by_idx ON public.opportunities USING btree (updated_by)
+CREATE INDEX opportunities_updated_by_idx ON public.opportunities USING btree (updated_by);
 
-CREATE INDEX poll_options_poll_id_idx ON public.poll_options USING btree (poll_id)
+CREATE INDEX poll_options_poll_id_idx ON public.poll_options USING btree (poll_id);
 
-CREATE INDEX poll_votes_option_id_idx ON public.poll_votes USING btree (option_id)
+CREATE INDEX poll_votes_option_id_idx ON public.poll_votes USING btree (option_id);
 
-CREATE INDEX poll_votes_user_id_idx ON public.poll_votes USING btree (user_id)
+CREATE INDEX poll_votes_user_id_idx ON public.poll_votes USING btree (user_id);
 
-CREATE INDEX polls_chapter_id_idx ON public.polls USING btree (chapter_id)
+CREATE INDEX polls_chapter_id_idx ON public.polls USING btree (chapter_id);
 
-CREATE INDEX post_likes_user_id_idx ON public.post_likes USING btree (user_id)
+CREATE INDEX post_likes_user_id_idx ON public.post_likes USING btree (user_id);
 
-CREATE INDEX posts_user_id_idx ON public.posts USING btree (user_id)
+CREATE INDEX posts_user_id_idx ON public.posts USING btree (user_id);
 
-CREATE INDEX posts_created_at_idx ON public.posts USING btree (created_at DESC)
+CREATE INDEX posts_created_at_idx ON public.posts USING btree (created_at DESC);
 
-CREATE INDEX posts_chapter_id_idx ON public.posts USING btree (chapter_id)
+CREATE INDEX posts_chapter_id_idx ON public.posts USING btree (chapter_id);
 
-CREATE UNIQUE INDEX profiles_username_unique ON public.profiles USING btree (lower(username))
+CREATE UNIQUE INDEX profiles_username_unique ON public.profiles USING btree (lower(username));
 
-CREATE UNIQUE INDEX profiles_user_id_unique ON public.profiles USING btree (user_id)
+CREATE UNIQUE INDEX profiles_user_id_unique ON public.profiles USING btree (user_id);
 
-CREATE UNIQUE INDEX profiles_recovery_key_hash_unique ON public.profiles USING btree (recovery_key_hash)
+CREATE UNIQUE INDEX profiles_recovery_key_hash_unique ON public.profiles USING btree (recovery_key_hash);
 
-CREATE INDEX reading_list_items_list_id_idx ON public.reading_list_items USING btree (list_id)
+CREATE INDEX reading_list_items_list_id_idx ON public.reading_list_items USING btree (list_id);
 
-CREATE INDEX reading_list_items_story_id_idx ON public.reading_list_items USING btree (story_id)
+CREATE INDEX reading_list_items_story_id_idx ON public.reading_list_items USING btree (story_id);
 
-CREATE INDEX reading_lists_user_id_idx ON public.reading_lists USING btree (user_id)
+CREATE INDEX reading_lists_user_id_idx ON public.reading_lists USING btree (user_id);
 
-CREATE INDEX reading_progress_story_id_idx ON public.reading_progress USING btree (story_id)
+CREATE INDEX reading_progress_story_id_idx ON public.reading_progress USING btree (story_id);
 
-CREATE INDEX reading_progress_chapter_id_idx ON public.reading_progress USING btree (chapter_id)
+CREATE INDEX reading_progress_chapter_id_idx ON public.reading_progress USING btree (chapter_id);
 
-CREATE INDEX social_stories_user_id_idx ON public.social_stories USING btree (user_id)
+CREATE INDEX social_stories_user_id_idx ON public.social_stories USING btree (user_id);
 
-CREATE INDEX social_stories_expires_at_idx ON public.social_stories USING btree (expires_at)
+CREATE INDEX social_stories_expires_at_idx ON public.social_stories USING btree (expires_at);
 
-CREATE INDEX social_stories_created_at_idx ON public.social_stories USING btree (created_at DESC)
+CREATE INDEX social_stories_created_at_idx ON public.social_stories USING btree (created_at DESC);
 
-CREATE INDEX stories_author_id_idx ON public.stories USING btree (author_id)
+CREATE INDEX stories_author_id_idx ON public.stories USING btree (author_id);
 
-CREATE INDEX stories_rating_idx ON public.stories USING btree (rating)
+CREATE INDEX stories_rating_idx ON public.stories USING btree (rating);
 
-CREATE INDEX stories_expires_at_idx ON public.stories USING btree (expires_at)
+CREATE INDEX stories_expires_at_idx ON public.stories USING btree (expires_at);
 
-CREATE INDEX stories_public_updated_idx ON public.stories USING btree (updated_at DESC) WHERE (moderation_hidden_at IS NULL)
+CREATE INDEX stories_public_updated_idx ON public.stories USING btree (updated_at DESC) WHERE (moderation_hidden_at IS NULL);
 
-CREATE INDEX story_likes_user_id_idx ON public.story_likes USING btree (user_id)
+CREATE INDEX story_likes_user_id_idx ON public.story_likes USING btree (user_id);
 
-CREATE INDEX story_tags_story_id_idx ON public.story_tags USING btree (story_id)
+CREATE INDEX story_tags_story_id_idx ON public.story_tags USING btree (story_id);
 
-CREATE INDEX story_tags_tag_id_idx ON public.story_tags USING btree (tag_id)
+CREATE INDEX story_tags_tag_id_idx ON public.story_tags USING btree (tag_id);
 
-CREATE UNIQUE INDEX tags_name_lower_idx ON public.tags USING btree (lower(name))
+CREATE UNIQUE INDEX tags_name_lower_idx ON public.tags USING btree (lower(name));
 
-CREATE INDEX tags_category_id_idx ON public.tags USING btree (category_id)
+CREATE INDEX tags_category_id_idx ON public.tags USING btree (category_id);
 
-CREATE INDEX tags_slug_idx ON public.tags USING btree (slug)
+CREATE INDEX tags_slug_idx ON public.tags USING btree (slug);
 
-CREATE INDEX tags_created_by_idx ON public.tags USING btree (created_by)
+CREATE INDEX tags_created_by_idx ON public.tags USING btree (created_by);
 
-CREATE UNIQUE INDEX team_memberships_one_active_role_idx ON public.team_memberships USING btree (user_id, role_id) WHERE (status = 'active'::text)
+CREATE UNIQUE INDEX team_memberships_one_active_role_idx ON public.team_memberships USING btree (user_id, role_id) WHERE (status = 'active'::text);
 
-CREATE INDEX team_memberships_user_status_idx ON public.team_memberships USING btree (user_id, status)
+CREATE INDEX team_memberships_user_status_idx ON public.team_memberships USING btree (user_id, status);
 
-CREATE INDEX team_memberships_department_status_idx ON public.team_memberships USING btree (department_id, status)
+CREATE INDEX team_memberships_department_status_idx ON public.team_memberships USING btree (department_id, status);
 
-CREATE INDEX team_memberships_assigned_by_idx ON public.team_memberships USING btree (assigned_by)
+CREATE INDEX team_memberships_assigned_by_idx ON public.team_memberships USING btree (assigned_by);
 
-CREATE INDEX team_memberships_removed_by_idx ON public.team_memberships USING btree (removed_by)
+CREATE INDEX team_memberships_removed_by_idx ON public.team_memberships USING btree (removed_by);
 
-CREATE INDEX team_memberships_role_id_idx ON public.team_memberships USING btree (role_id)
+CREATE INDEX team_memberships_role_id_idx ON public.team_memberships USING btree (role_id);
 
-CREATE INDEX team_role_permissions_permission_code_idx ON public.team_role_permissions USING btree (permission_code)
+CREATE INDEX team_role_permissions_permission_code_idx ON public.team_role_permissions USING btree (permission_code);
 
-CREATE INDEX team_roles_department_status_idx ON public.team_roles USING btree (department_id, status)
+CREATE INDEX team_roles_department_status_idx ON public.team_roles USING btree (department_id, status);
 
-CREATE INDEX team_roles_created_by_idx ON public.team_roles USING btree (created_by)
+CREATE INDEX team_roles_created_by_idx ON public.team_roles USING btree (created_by);
 
-CREATE INDEX user_notifications_user_created_idx ON public.user_notifications USING btree (user_id, created_at DESC)
+CREATE INDEX user_notifications_user_created_idx ON public.user_notifications USING btree (user_id, created_at DESC);
 
-CREATE INDEX user_notifications_unread_idx ON public.user_notifications USING btree (user_id, created_at DESC) WHERE (read_at IS NULL)
+CREATE INDEX user_notifications_unread_idx ON public.user_notifications USING btree (user_id, created_at DESC) WHERE (read_at IS NULL);
 
-CREATE INDEX user_stickers_user_id_idx ON public.user_stickers USING btree (user_id)
+CREATE INDEX user_stickers_user_id_idx ON public.user_stickers USING btree (user_id);
 
-CREATE INDEX user_stickers_last_used_at_idx ON public.user_stickers USING btree (last_used_at)
+CREATE INDEX user_stickers_last_used_at_idx ON public.user_stickers USING btree (last_used_at);
 
 ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
 
