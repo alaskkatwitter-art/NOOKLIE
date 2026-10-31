@@ -263,7 +263,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: 'Não foi possível salvar o post.',
-          details: insertError.message,
         },
         { status: 500 }
       );

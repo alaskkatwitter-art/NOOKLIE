@@ -65,7 +65,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar histórias.',
-          details: storiesError.message,
         },
         { status: 500 }
       );

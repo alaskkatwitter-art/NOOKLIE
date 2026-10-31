@@ -107,8 +107,6 @@ export async function GET(
         {
           error:
             'Erro ao buscar comentários.',
-          details:
-            error.message,
         },
         { status: 500 }
       );
@@ -291,8 +289,6 @@ export async function POST(
         {
           error:
             'Erro ao validar o post.',
-          details:
-            postError.message,
         },
         { status: 500 }
       );
@@ -330,8 +326,6 @@ export async function POST(
           {
             error:
               'Erro ao validar o comentário pai.',
-            details:
-              parentError.message,
           },
           { status: 500 }
         );
@@ -393,10 +387,6 @@ export async function POST(
         {
           error:
             'Não foi possível criar o comentário.',
-          details:
-            error.message,
-          code:
-            error.code || null,
         },
         { status: 500 }
       );
@@ -432,10 +422,6 @@ export async function POST(
       {
         error:
           'Erro interno do servidor.',
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error),
       },
       { status: 500 }
     );

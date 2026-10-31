@@ -646,8 +646,6 @@ export async function POST(
         {
           error:
             'A imagem foi enviada, mas não foi possível salvar o Story.',
-          details:
-            insertError.message,
         },
         {
           status: 500,

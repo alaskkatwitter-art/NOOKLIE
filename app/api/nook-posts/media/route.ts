@@ -325,8 +325,6 @@ export async function POST(
         {
           error:
             'Não foi possível enviar a mídia.',
-          details:
-            uploadError.message,
         },
         { status: 500 }
       );
@@ -389,8 +387,6 @@ export async function POST(
         {
           error:
             'A mídia foi enviada, mas não pôde ser registrada.',
-          details:
-            mediaError.message,
         },
         { status: 500 }
       );

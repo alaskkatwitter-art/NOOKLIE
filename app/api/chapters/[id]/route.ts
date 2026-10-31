@@ -825,8 +825,6 @@ export async function PUT(
         {
           error:
             'Não foi possível salvar as alterações.',
-          details:
-            updateError.message,
         },
         {
           status: 500,

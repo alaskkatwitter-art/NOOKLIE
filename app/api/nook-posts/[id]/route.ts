@@ -104,7 +104,6 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: 'Erro ao buscar o post.',
-          details: existingError.message,
         },
         {
           status: 500,
@@ -233,7 +232,6 @@ export async function PATCH(
           {
             error:
               'Não foi possível validar a história.',
-            details: storyError.message,
           },
           {
             status: 500,
@@ -323,7 +321,6 @@ export async function PATCH(
         {
           error:
             'Não foi possível atualizar o post.',
-          details: error.message,
         },
         {
           status: 500,
@@ -417,7 +414,6 @@ export async function DELETE(
         {
           error:
             'Não foi possível excluir o post.',
-          details: error.message,
         },
         {
           status: 500,

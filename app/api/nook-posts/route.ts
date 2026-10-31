@@ -96,7 +96,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar os posts.',
-          details: postsError.message,
         },
         {
           status: 500,
@@ -141,7 +140,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar as mídias dos posts.',
-          details: mediaError.message,
         },
         {
           status: 500,
@@ -173,7 +171,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar as reações dos posts.',
-          details: reactionsError.message,
         },
         {
           status: 500,
@@ -205,7 +202,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar os comentários dos posts.',
-          details: commentsError.message,
         },
         {
           status: 500,
@@ -240,7 +236,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao buscar os dados do autor.',
-          details: authorError.message,
         },
         {
           status: 500,
@@ -430,7 +425,6 @@ export async function POST(request: Request) {
           {
             error:
               'Não foi possível validar a história.',
-            details: storyError.message,
           },
           {
             status: 500,
@@ -484,7 +478,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: 'Não foi possível criar o post.',
-          details: postError.message,
         },
         {
           status: 500,

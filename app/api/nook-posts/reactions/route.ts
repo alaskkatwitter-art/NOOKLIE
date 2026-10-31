@@ -210,7 +210,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: 'Não foi possível adicionar a reação.',
-          details: insertError.message,
         },
         { status: 500 }
       );

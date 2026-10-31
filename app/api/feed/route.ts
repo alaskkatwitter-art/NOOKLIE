@@ -91,7 +91,6 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error: 'Não foi possível carregar o Feed.',
-          details: postsError.message,
         },
         { status: 500 }
       );

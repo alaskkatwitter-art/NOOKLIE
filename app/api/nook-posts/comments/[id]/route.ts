@@ -121,8 +121,6 @@ export async function PATCH(
         {
           error:
             'Erro ao buscar comentário.',
-          details:
-            findError.message,
         },
         { status: 500 }
       );
@@ -225,10 +223,6 @@ export async function PATCH(
         {
           error:
             'Não foi possível editar o comentário.',
-          details:
-            error.message,
-          code:
-            error.code || null,
         },
         { status: 500 }
       );
@@ -247,10 +241,6 @@ export async function PATCH(
       {
         error:
           'Erro interno do servidor.',
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error),
       },
       { status: 500 }
     );
@@ -321,8 +311,6 @@ export async function DELETE(
         {
           error:
             'Erro ao buscar comentário.',
-          details:
-            findError.message,
         },
         { status: 500 }
       );
@@ -372,10 +360,6 @@ export async function DELETE(
         {
           error:
             'Não foi possível excluir o comentário.',
-          details:
-            deleteError.message,
-          code:
-            deleteError.code || null,
         },
         { status: 500 }
       );
@@ -397,10 +381,6 @@ export async function DELETE(
       {
         error:
           'Erro interno do servidor.',
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error),
       },
       { status: 500 }
     );
