@@ -10,23 +10,23 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@supabase/ssr": "latest",
-    "@supabase/supabase-js": "latest",
-    "bcryptjs": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.118.0",
+    "bcryptjs": "3.0.3",
+    "lucide-react": "1.65.0",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "eslint": "latest",
-    "eslint-config-next": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "latest",
-    "tailwindcss": "latest",
-    "@tailwindcss/postcss": "latest",
-    "postcss": "latest"
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.3",
+    "postcss": "8.5.32",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
   }
 }
