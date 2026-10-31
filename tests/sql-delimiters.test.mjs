@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { test } from 'node:test';
 
 const sqlDirectories = [
@@ -12,9 +11,9 @@ test('migration and verification SQL has balanced dollar-quote delimiters', asyn
   for (const directory of sqlDirectories) {
     for (const filename of await readdir(directory)) {
       if (!filename.endsWith('.sql')) continue;
-      const source = await readFile(join(directory.pathname, filename), 'utf8');
+      const source = await readFile(new URL(filename, directory), 'utf8');
       const counts = new Map();
-      for (const [delimiter] of source.matchAll(/\\$([A-Za-z_][A-Za-z0-9_]*)?\\$/g)) {
+      for (const [delimiter] of source.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)?\$/g)) {
         counts.set(delimiter, (counts.get(delimiter) || 0) + 1);
       }
       for (const [delimiter, count] of counts) {
