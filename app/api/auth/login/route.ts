@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data: account, error: accountError } = await supabase
       .from('auth_accounts')
-      .select('id, username, password_hash')
+      .select('id, username, password_hash, account_status')
       .eq('username', username)
       .maybeSingle();
 
@@ -72,6 +72,9 @@ export async function POST(request: Request) {
       : false;
     if (!account || !passwordIsValid) {
       return NextResponse.json({ error: 'Username ou senha incorretos.' }, { status: 401, headers: noStoreHeaders() });
+    }
+    if (account.account_status !== 'active') {
+      return NextResponse.json({ error: 'Esta conta está suspensa. Entre em contato com o suporte do Nooklie.' }, { status: 403, headers: noStoreHeaders() });
     }
 
     const sessionToken = crypto.randomBytes(32).toString('hex');

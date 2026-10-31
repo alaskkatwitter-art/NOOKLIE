@@ -47,3 +47,9 @@ Denúncias de perfis, publicações e histórias ficam em `moderation_reports`. 
 A fila de moderação é filtrada por departamento e pelas permissões `moderation.view`/`moderation.manage`. Decisões finais pedem confirmação, atualizam a denúncia e gravam uma entrada append-only no histórico administrativo. O painel registra a análise; a ocultação ou remoção do conteúdo deve ser tratada como uma ação separada com regras próprias.
 
 `supabase/verification/moderation_workflows.sql` testa envio, duplicata, auto denúncia, revisão, auditoria, rollback e privilégios/RLS.
+
+## Gerenciamento de contas
+
+Contas podem ser suspensas e reativadas pela permissão de plataforma `users.manage`. Suspender revoga todas as sessões existentes na mesma transação; o login verifica `auth_accounts.account_status` antes de criar outra sessão. Reativar permite um novo login. As duas ações geram auditoria e notificação. A conta do próprio administrador e os dois administradores principais não podem ser suspensos.
+
+`supabase/verification/account_status_workflows.sql` verifica suspensão, revogação de sessões, reativação, proteção das contas principais, bloqueio para não administradores e rollback dos dados de teste.

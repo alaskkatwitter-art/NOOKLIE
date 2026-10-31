@@ -171,7 +171,17 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) return dbError(error, 'GET admin users');
-      return NextResponse.json({ users: data || [] }, { headers: noStore });
+      const userIds = (data || []).map((user) => user.user_id);
+      const { data: accounts, error: accountsError } = userIds.length
+        ? await supabase.from('auth_accounts').select('id, account_status').in('id', userIds)
+        : { data: [], error: null };
+      if (accountsError) return dbError(accountsError, 'GET admin account status');
+      return NextResponse.json({
+        users: (data || []).map((user) => ({
+          ...user,
+          account_status: (accounts || []).find((account) => account.id === user.user_id)?.account_status || 'active',
+        })),
+      }, { headers: noStore });
     }
 
     if (resource === 'candidates') {
@@ -223,6 +233,23 @@ export async function POST(request: NextRequest) {
     if (!staff) return response || staffPermissionErrorResponse(401);
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400, headers: noStore });
+
+    if (body.resource === 'user_status') {
+      if (!(await hasStaffPermission(staff, 'users.manage'))) return staffPermissionErrorResponse(403);
+      if (typeof body.user_id !== 'string' || !['active', 'suspended'].includes(body.status) ||
+          body.confirm !== true) {
+        return NextResponse.json({ error: 'Confirme a ação e informe um status válido.' }, { status: 400, headers: noStore });
+      }
+      const reason = cleanText(body.reason, 1000) || '';
+      const { data, error } = await supabase.rpc('admin_set_account_status', {
+        p_session_token_hash: staff.sessionTokenHash,
+        p_target_user_id: body.user_id,
+        p_status: body.status,
+        p_reason: reason,
+      });
+      if (error) return dbError(error, 'POST admin account status');
+      return NextResponse.json({ updated: Boolean(data) }, { headers: noStore });
+    }
 
     if (body.resource === 'department') {
       if (!(await hasStaffPermission(staff, 'departments.manage'))) return staffPermissionErrorResponse(403);

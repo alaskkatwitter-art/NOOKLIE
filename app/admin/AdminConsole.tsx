@@ -23,7 +23,7 @@ type Member = {
   department: { name: string } | null;
 };
 type Candidate = { user_id: string; username: string; display_name: string | null; avatar_url: string | null };
-type AdminUser = { user_id: string; username: string; display_name: string | null; avatar_url: string | null; created_at: string };
+type AdminUser = { user_id: string; username: string; display_name: string | null; avatar_url: string | null; created_at: string; account_status: 'active' | 'suspended' };
 type OpportunityQuestion = { id: string; prompt: string; required: boolean };
 type Opportunity = {
   id: string; department_id: string; title: string; description: string; requirements: string;
@@ -75,12 +75,12 @@ function dateLabel(value: string | null) {
 export default function AdminConsole({
   isPlatformAdmin, canManageMembers, manageableDepartmentIds,
   canManageOpportunities, manageableOpportunityDepartmentIds,
-  canViewUsers, canViewModeration, canManageModeration, canViewOpportunities, canViewApplications, canReviewApplications,
+  canViewUsers, canManageUsers, canViewModeration, canManageModeration, canViewOpportunities, canViewApplications, canReviewApplications,
   reviewableDepartmentIds,
 }: {
   isPlatformAdmin: boolean; canManageMembers: boolean; manageableDepartmentIds: string[];
   canManageOpportunities: boolean; manageableOpportunityDepartmentIds: string[];
-  canViewUsers: boolean; canViewModeration: boolean; canManageModeration: boolean; canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
+  canViewUsers: boolean; canManageUsers: boolean; canViewModeration: boolean; canManageModeration: boolean; canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
   reviewableDepartmentIds: string[];
 }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -153,6 +153,24 @@ export default function AdminConsole({
     const data = await request<{ applications: AdminApplication[] }>('/api/admin/applications');
     setApplications(data.applications);
   }, []);
+  async function changeUserStatus(user: AdminUser) {
+    const status = user.account_status === 'active' ? 'suspended' : 'active';
+    const label = user.display_name || user.username;
+    if (!window.confirm(status === 'suspended'
+      ? 'Suspender ' + label + '? As sessões atuais serão encerradas.'
+      : 'Reativar ' + label + '? A pessoa poderá entrar novamente.')) return;
+    const reason = status === 'suspended' ? (window.prompt('Motivo da suspensão:') || '') : '';
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await request('/api/admin/manage', { method: 'POST', body: JSON.stringify({
+        resource: 'user_status', user_id: user.user_id, status, reason, confirm: true,
+      }) });
+      setMessage(status === 'suspended' ? 'Conta suspensa e sessões revogadas.' : 'Conta reativada.');
+      await loadUsers();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a conta.'); }
+    finally { setBusy(false); }
+  }
+
   const loadUsers = useCallback(async () => {
     if (userSearch.trim().length < 2) { setAdminUsers([]); return; }
     const data = await request<{ users: AdminUser[] }>('/api/admin/manage?resource=users&q=' + encodeURIComponent(userSearch));
@@ -482,11 +500,12 @@ export default function AdminConsole({
               {adminUsers.map((item) => (
                 <article key={item.user_id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#191219] p-4">
                   {item.avatar_url ? <img src={item.avatar_url} alt="" className="h-11 w-11 rounded-full object-cover" /> : <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">✦</span>}
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">{item.display_name || item.username}</p>
                     <p className="truncate text-xs text-white/45">@{item.username}</p>
-                    <p className="mt-1 text-[10px] text-white/30">Conta criada em {dateLabel(item.created_at)}</p>
+                    <p className="mt-1 text-[10px] text-white/30">Criada em {dateLabel(item.created_at)} · {item.account_status === 'active' ? 'Ativa' : 'Suspensa'}</p>
                   </div>
+                  {canManageUsers && <button type="button" disabled={busy} onClick={() => void changeUserStatus(item)} className={item.account_status === 'active' ? 'rounded-lg border border-red-400/20 px-3 py-2 text-xs font-semibold text-red-200 disabled:opacity-50' : 'rounded-lg border border-green-400/20 px-3 py-2 text-xs font-semibold text-green-200 disabled:opacity-50'}>{item.account_status === 'active' ? 'Suspender' : 'Reativar'}</button>}
                 </article>
               ))}
               {!loading && userSearch.trim().length >= 2 && adminUsers.length === 0 && <p className="text-sm text-white/40">Nenhum usuário encontrado.</p>}

@@ -1,0 +1,53 @@
+DO $$
+DECLARE
+  root_id uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  target_id uuid;
+  second_id uuid;
+BEGIN
+  SELECT account.id INTO target_id FROM public.auth_accounts account WHERE NOT EXISTS (SELECT 1 FROM public.platform_admins admin WHERE admin.user_id=account.id) ORDER BY account.created_at LIMIT 1;
+  SELECT account.id INTO second_id FROM public.auth_accounts account WHERE account.id NOT IN (root_id, target_id) AND NOT EXISTS (SELECT 1 FROM public.platform_admins admin WHERE admin.user_id=account.id) ORDER BY account.created_at LIMIT 1;
+  IF target_id IS NULL OR second_id IS NULL THEN RAISE EXCEPTION 'Test accounts are unavailable'; END IF;
+
+  BEGIN
+    INSERT INTO public.auth_sessions (id,user_id,token_hash,expires_at)
+    VALUES
+      (gen_random_uuid(),root_id,repeat('j',64),now()+interval '5 minutes'),
+      (gen_random_uuid(),target_id,repeat('k',64),now()+interval '5 minutes');
+
+    PERFORM public.admin_set_account_status(repeat('j',64),target_id,'suspended','Test suspension');
+    IF NOT EXISTS (SELECT 1 FROM public.auth_accounts account WHERE account.id=target_id AND account.account_status='suspended') THEN
+      RAISE EXCEPTION 'Account was not suspended';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.auth_sessions session WHERE session.user_id=target_id) THEN
+      RAISE EXCEPTION 'Suspension did not revoke existing sessions';
+    END IF;
+
+    PERFORM public.admin_set_account_status(repeat('j',64),target_id,'active','');
+    IF NOT EXISTS (SELECT 1 FROM public.auth_accounts account WHERE account.id=target_id AND account.account_status='active') THEN
+      RAISE EXCEPTION 'Account was not reactivated';
+    END IF;
+
+    BEGIN
+      PERFORM public.admin_set_account_status(repeat('j',64),root_id,'suspended','');
+      RAISE EXCEPTION 'Primary administrator account could be suspended';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+
+    INSERT INTO public.auth_sessions (id,user_id,token_hash,expires_at)
+    VALUES (gen_random_uuid(),target_id,repeat('k',64),now()+interval '5 minutes');
+    BEGIN
+      PERFORM public.admin_set_account_status(repeat('k',64),second_id,'suspended','');
+      RAISE EXCEPTION 'Non-admin could manage accounts';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+
+    RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='rollback_user_status_test';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    IF SQLERRM <> 'rollback_user_status_test' THEN RAISE; END IF;
+  END;
+END $$;
+
+SELECT
+  (SELECT account_status FROM public.auth_accounts WHERE id='be272a49-1f7b-49ca-998f-d265029f4b34')='active' AS root_remains_active,
+  NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash IN (repeat('j',64),repeat('k',64))) AS test_sessions_rolled_back,
+  NOT EXISTS (SELECT 1 FROM public.admin_audit_log WHERE action IN ('user.suspended','user.reactivated') AND details->>'reason'='Test suspension') AS audit_test_rolled_back;
