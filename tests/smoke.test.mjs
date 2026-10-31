@@ -417,6 +417,7 @@ test('chapter creation requires authentication and confirms story ownership', as
     body: JSON.stringify(payload),
   });
   assert.equal(coauthorCanEdit.status, 201);
+  assert.equal((await coauthorCanEdit.json()).chapter.chapter_number, 3);
   state.collaborators = [];
 
   const ownerToken = 'owner-session-token';
@@ -429,7 +430,7 @@ test('chapter creation requires authentication and confirms story ownership', as
   });
   assert.equal(created.status, 201);
   const result = await created.json();
-  assert.equal(result.chapter.chapter_number, 3);
+  assert.equal(result.chapter.chapter_number, 4);
   assert.equal(result.chapter.title, 'Novo capítulo');
 });
 
