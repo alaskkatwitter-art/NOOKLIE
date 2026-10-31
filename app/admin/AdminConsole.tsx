@@ -22,6 +22,7 @@ type Member = {
   department: { name: string } | null;
 };
 type Candidate = { user_id: string; username: string; display_name: string | null; avatar_url: string | null };
+type AdminUser = { user_id: string; username: string; display_name: string | null; avatar_url: string | null; created_at: string };
 type OpportunityQuestion = { id: string; prompt: string; required: boolean };
 type Opportunity = {
   id: string; department_id: string; title: string; description: string; requirements: string;
@@ -43,6 +44,7 @@ type AuditEntry = {
 
 const tabs = [
   ['overview', 'Visão geral'],
+  ['users', 'Usuários'],
   ['departments', 'Departamentos'],
   ['roles', 'Cargos e permissões'],
   ['members', 'Equipe'],
@@ -71,12 +73,12 @@ function dateLabel(value: string | null) {
 export default function AdminConsole({
   isPlatformAdmin, canManageMembers, manageableDepartmentIds,
   canManageOpportunities, manageableOpportunityDepartmentIds,
-  canViewOpportunities, canViewApplications, canReviewApplications,
+  canViewUsers, canViewOpportunities, canViewApplications, canReviewApplications,
   reviewableDepartmentIds,
 }: {
   isPlatformAdmin: boolean; canManageMembers: boolean; manageableDepartmentIds: string[];
   canManageOpportunities: boolean; manageableOpportunityDepartmentIds: string[];
-  canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
+  canViewUsers: boolean; canViewOpportunities: boolean; canViewApplications: boolean; canReviewApplications: boolean;
   reviewableDepartmentIds: string[];
 }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -86,6 +88,8 @@ export default function AdminConsole({
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [userSearch, setUserSearch] = useState('');
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
@@ -147,6 +151,12 @@ export default function AdminConsole({
     const data = await request<{ applications: AdminApplication[] }>('/api/admin/applications');
     setApplications(data.applications);
   }, []);
+  const loadUsers = useCallback(async () => {
+    if (userSearch.trim().length < 2) { setAdminUsers([]); return; }
+    const data = await request<{ users: AdminUser[] }>('/api/admin/manage?resource=users&q=' + encodeURIComponent(userSearch));
+    setAdminUsers(data.users);
+  }, [userSearch]);
+
   const loadAudit = useCallback(async () => {
     const data = await request<{ entries: AuditEntry[] }>('/api/admin/manage?resource=audit');
     setAudit(data.entries);
@@ -165,11 +175,12 @@ export default function AdminConsole({
       : tab === 'members' ? Promise.all([loadDepartments(), loadRoles(), loadMembers()]).then(() => undefined)
       : tab === 'opportunities' ? Promise.all([loadDepartments(), loadOpportunities()]).then(() => undefined)
       : tab === 'applications' ? Promise.all([loadDepartments(), loadRoles(), loadApplications()]).then(() => undefined)
+      : tab === 'users' ? loadUsers()
       : loadAudit();
     work.catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : 'Falha ao carregar o painel.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [tab, memberStatus, loadOverview, loadDepartments, loadRoles, loadMembers, loadOpportunities, loadApplications, loadAudit]);
+  }, [tab, memberStatus, loadOverview, loadDepartments, loadRoles, loadMembers, loadOpportunities, loadApplications, loadUsers, loadAudit]);
 
 
   function resetDepartmentForm() {
@@ -377,6 +388,7 @@ export default function AdminConsole({
   }
 
   const visibleTabs = tabs.filter(([key]) =>
+    (key !== 'users' || canViewUsers) &&
     (key !== 'audit' || isPlatformAdmin) &&
     (key !== 'opportunities' || canViewOpportunities || canManageOpportunities) &&
     (key !== 'applications' || canViewApplications || canReviewApplications)
@@ -449,6 +461,32 @@ export default function AdminConsole({
         {error && <div role="alert" className="mb-4 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-200">{error}</div>}
         {message && <div role="status" className="mb-4 rounded-2xl border border-green-400/20 bg-green-400/5 p-4 text-sm text-green-200">{message}</div>}
         {loading && <p className="mb-4 text-sm text-white/40">Carregando…</p>}
+
+        {tab === 'users' && canViewUsers && (
+          <section className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
+              <h2 className="text-xl font-bold">Gerenciar usuários</h2>
+              <p className="mb-4 mt-1 text-sm text-white/45">Consulte contas pelo nome de usuário ou nome de exibição. Dados de autenticação permanecem privados.</p>
+              <form onSubmit={(event) => { event.preventDefault(); setLoading(true); void loadUsers().finally(() => setLoading(false)); }} className="flex flex-col gap-2 sm:flex-row">
+                <input className={inputClass} minLength={2} maxLength={40} value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Buscar usuário" />
+                <button className={secondaryButton} disabled={busy || userSearch.trim().length < 2}>Buscar</button>
+              </form>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {adminUsers.map((item) => (
+                <article key={item.user_id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#191219] p-4">
+                  {item.avatar_url ? <img src={item.avatar_url} alt="" className="h-11 w-11 rounded-full object-cover" /> : <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">✦</span>}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{item.display_name || item.username}</p>
+                    <p className="truncate text-xs text-white/45">@{item.username}</p>
+                    <p className="mt-1 text-[10px] text-white/30">Conta criada em {dateLabel(item.created_at)}</p>
+                  </div>
+                </article>
+              ))}
+              {!loading && userSearch.trim().length >= 2 && adminUsers.length === 0 && <p className="text-sm text-white/40">Nenhum usuário encontrado.</p>}
+            </div>
+          </section>
+        )}
 
         {tab === 'overview' && (
           <section>

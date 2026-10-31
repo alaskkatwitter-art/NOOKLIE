@@ -28,6 +28,7 @@ export default async function AdminPage() {
       manageableDepartmentIds={manageableDepartmentIds}
       canManageOpportunities={staff.isPlatformAdmin || manageableOpportunityDepartmentIds.length > 0}
       manageableOpportunityDepartmentIds={manageableOpportunityDepartmentIds}
+      canViewUsers={staff.isPlatformAdmin || await hasStaffPermission(staff, 'users.view')}
       canViewOpportunities={staff.isPlatformAdmin || await hasStaffPermission(staff, 'opportunities.view')}
       canViewApplications={staff.isPlatformAdmin || await hasStaffPermission(staff, 'applications.view')}
       canReviewApplications={staff.isPlatformAdmin || capabilities.some((item) => item.applications)}

@@ -159,6 +159,21 @@ export async function GET(request: NextRequest) {
       }, { headers: noStore });
     }
 
+    if (resource === 'users') {
+      if (!(await hasStaffPermission(staff, 'users.view'))) return staffPermissionErrorResponse(403);
+      const raw = request.nextUrl.searchParams.get('q') || '';
+      const term = raw.trim().replace(/[^a-zA-Z0-9À-ÿ _.-]/g, '').slice(0, 40);
+      if (term.length < 2) return NextResponse.json({ users: [] }, { headers: noStore });
+      const pattern = '%' + term + '%';
+      const { data, error } = await supabase.from('profiles')
+        .select('user_id, username, display_name, avatar_url, created_at')
+        .or('username.ilike.' + pattern + ',display_name.ilike.' + pattern)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) return dbError(error, 'GET admin users');
+      return NextResponse.json({ users: data || [] }, { headers: noStore });
+    }
+
     if (resource === 'candidates') {
       const manageable = staff.isPlatformAdmin || await canAny(staff, ['members.manage']);
       if (!manageable) return staffPermissionErrorResponse(403);
