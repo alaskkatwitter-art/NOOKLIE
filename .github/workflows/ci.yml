@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: main
       - uses: actions/download-artifact@v4
         with:
           name: resolved-dependencies
@@ -86,6 +86,10 @@ jobs:
       - name: Save the verified dependency versions
         shell: bash
         run: |
+          if ! cmp -s package.json <(git show "$GITHUB_SHA:package.json"); then
+            echo "package.json changed after validation; refusing to overwrite it."
+            exit 1
+          fi
           cp ci-dependencies/package.json package.json
           cp ci-dependencies/package-lock.json package-lock.json
           git config user.name "github-actions[bot]"
@@ -96,4 +100,4 @@ jobs:
             exit 0
           fi
           git commit -m "chore: pin dependencies and add npm lockfile"
-          git push
+          git push origin main
