@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [officialSignupCode, setOfficialSignupCode] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -40,6 +41,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           username,
           password,
+          officialSignupCode,
         }),
       });
 
@@ -308,6 +310,26 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
+
+            {mode === "signup" &&
+              username.trim().toLowerCase() === "nooklie" && (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold">
+                    Código da conta oficial
+                  </label>
+                  <input
+                    type="password"
+                    value={officialSignupCode}
+                    onChange={(event) => setOfficialSignupCode(event.target.value)}
+                    autoComplete="off"
+                    required
+                    className="w-full rounded-2xl border border-[#ff78b9]/30 bg-[#100b12] px-4 py-3.5 text-sm outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/60"
+                  />
+                  <p className="mt-2 text-xs leading-5 text-white/40">
+                    Esse código de uso único confirma que você está criando a conta oficial do Nooklie.
+                  </p>
+                </div>
+              )}
 
             {mode !== "recover" && (
               <div>

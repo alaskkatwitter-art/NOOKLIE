@@ -52,7 +52,9 @@ export async function GET(
           display_name,
           bio,
           avatar_url,
-          cover_url
+          cover_url,
+          verified,
+          is_official
           `
         )
         .eq("username", decodedUsername)

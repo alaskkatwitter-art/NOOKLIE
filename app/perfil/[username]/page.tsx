@@ -10,6 +10,7 @@ import {
   useParams,
   useRouter,
 } from 'next/navigation';
+import OfficialBadge from '../../components/OfficialBadge';
 
 type User = {
   id: string;
@@ -19,6 +20,7 @@ type User = {
   avatar_url: string | null;
   cover_url: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 type Story = {
@@ -872,9 +874,11 @@ export default function PublicProfilePage() {
                   )}
                 </h1>
 
-                {user.verified && (
+                {user.is_official ? (
+                  <OfficialBadge />
+                ) : user.verified ? (
                   <VerifiedBadge />
-                )}
+                ) : null}
               </div>
 
               <p className="mt-1 text-sm font-semibold text-white/40">

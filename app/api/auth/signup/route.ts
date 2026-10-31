@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const { username, password, officialSignupCode } = await request.json();
 
     const cleanUsername = username?.trim().toLowerCase();
 
@@ -58,6 +58,45 @@ export async function POST(request: Request) {
       );
     }
 
+    const isOfficialAccount = cleanUsername === 'nooklie';
+
+    if (isOfficialAccount) {
+      if (typeof officialSignupCode !== 'string' || !officialSignupCode.trim()) {
+        return NextResponse.json(
+          { error: 'A conta @nooklie só pode ser criada com o código oficial de uso único.' },
+          { status: 403 }
+        );
+      }
+
+      const { data: claim, error: claimError } = await supabase
+        .from('official_signup_tokens')
+        .select('token_hash')
+        .eq('singleton', true)
+        .is('used_at', null)
+        .maybeSingle();
+
+      const suppliedHash = crypto
+        .createHash('sha256')
+        .update(officialSignupCode.trim())
+        .digest();
+
+      const expectedHash = claim?.token_hash
+        ? Buffer.from(claim.token_hash, 'hex')
+        : null;
+
+      if (
+        claimError ||
+        !expectedHash ||
+        suppliedHash.length !== expectedHash.length ||
+        !crypto.timingSafeEqual(suppliedHash, expectedHash)
+      ) {
+        return NextResponse.json(
+          { error: 'O código da conta oficial é inválido ou já foi usado.' },
+          { status: 403 }
+        );
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const recoveryKey = crypto.randomBytes(16).toString('hex');
@@ -81,12 +120,31 @@ export async function POST(request: Request) {
       );
     }
 
+    if (isOfficialAccount) {
+      const { data: claimedToken, error: claimError } = await supabase
+        .from('official_signup_tokens')
+        .update({ used_at: new Date().toISOString() })
+        .eq('singleton', true)
+        .is('used_at', null)
+        .select('singleton')
+        .maybeSingle();
+
+      if (claimError || !claimedToken) {
+        await supabase.from('auth_accounts').delete().eq('id', userId);
+        return NextResponse.json(
+          { error: 'O código oficial já foi usado. Solicite um novo código.' },
+          { status: 409 }
+        );
+      }
+    }
+
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
         id: userId,
         user_id: userId,
         username: cleanUsername,
+        is_official: isOfficialAccount,
       });
 
     if (profileError) {
