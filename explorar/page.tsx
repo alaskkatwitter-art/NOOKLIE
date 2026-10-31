@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 
 type Story = {
   title: string;
@@ -110,49 +111,49 @@ export default function ExplorePage() {
     <main className="min-h-screen bg-[#100b12] text-white">
       <header className="border-b border-white/10 bg-[#100b12]">
         <div className="mx-auto flex max-w-7xl flex-col items-center px-5 pt-5">
-          <a href="/" className="flex flex-col items-center">
+          <Link href="/" className="flex flex-col items-center">
             <CloudLogo />
 
             <span className="mt-1 text-2xl font-bold tracking-[0.18em] text-[#ff78b9]">
               TORILAND
             </span>
-          </a>
+          </Link>
 
           <nav className="mt-6 flex w-full items-center justify-center gap-1 overflow-x-auto border-t border-white/5 py-3">
-            <a
+            <Link
               href="/"
               className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
             >
               Início
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/explorar"
               className="whitespace-nowrap rounded-full bg-[#ff78b9] px-5 py-2 text-sm font-medium text-[#180d15]"
             >
               Explorar
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/escrever"
               className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
             >
               Escrever
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/notificacoes"
               className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
             >
               Notificações
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/perfil"
               className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
             >
               Perfil
-            </a>
+            </Link>
           </nav>
         </div>
       </header>
