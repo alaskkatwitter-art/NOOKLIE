@@ -122,7 +122,8 @@ async function publishDueScheduledChapters(
       .select(`
         id,
         story_id,
-        published
+        published,
+        moderation_hidden_at
       `)
       .eq(
         'id',
@@ -150,6 +151,7 @@ async function publishDueScheduledChapters(
 
       continue;
     }
+    if (chapter.moderation_hidden_at) continue;
 
     if (
       chapter.story_id !==
@@ -395,7 +397,7 @@ export async function GET(
         chaptersQuery.eq(
           'published',
           true
-        );
+        ).is('moderation_hidden_at', null);
     }
 
     const {

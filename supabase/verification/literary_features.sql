@@ -7,7 +7,7 @@ declare
     'story_reviews', 'review_likes', 'review_comments', 'chapter_favorites', 'user_blocks',
     'story_collaborators', 'collaborator_invites', 'story_credits', 'story_deletion_requests',
     'story_deletion_votes', 'story_edit_history', 'policy_documents', 'policy_acceptances',
-    'moderation_actions', 'account_lifecycle_requests', 'story_anonymity_events'
+    'moderation_actions', 'moderation_appeals', 'account_lifecycle_requests', 'story_anonymity_events'
   ];
   table_oid oid;
 begin
@@ -38,6 +38,9 @@ begin
   end if;
   if has_table_privilege('service_role', 'public.moderation_actions', 'UPDATE,DELETE,TRUNCATE') then
     raise exception 'Moderation action history must be append-only for service_role';
+  end if;
+  if not has_column_privilege('service_role', 'public.moderation_actions', 'appeal_status', 'UPDATE') then
+    raise exception 'service_role needs column-only update access for the appeal state';
   end if;
 
   if not exists (

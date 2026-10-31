@@ -24,7 +24,7 @@ export async function POST(_request: Request, context: Context) {
     const user = await getAuthenticatedUserContext();
     if (!user) return NextResponse.json({ error: 'Entre na sua conta para favoritar capítulos.' }, { status: 401 });
     const { id } = await context.params;
-    const { data: chapter, error: chapterError } = await supabase.from('chapters').select('id, published, story_id').eq('id', id).maybeSingle();
+    const { data: chapter, error: chapterError } = await supabase.from('chapters').select('id, published, story_id').eq('id', id).is('moderation_hidden_at', null).maybeSingle();
     if (chapterError) throw chapterError;
     if (!chapter || !chapter.published || !(await isPublicStoryVisible(supabase, chapter.story_id))) return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404 });
     const { error } = await supabase.from('chapter_favorites').upsert({ chapter_id: id, user_id: user.userId }, { onConflict: 'chapter_id,user_id', ignoreDuplicates: true });

@@ -34,14 +34,41 @@ export async function GET(_request: Request, context: Context) {
       .select(`id, story_id, reviewer_id, rating, body, contains_spoilers, created_at, updated_at,
         reviewer:profiles!story_reviews_reviewer_id_fkey(id, username, display_name, avatar_url, deactivated_at, moderation_hidden_at)`)
       .eq('story_id', id)
+      .is('moderation_hidden_at', null)
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) throw error;
 
-    const visible = (reviews || []).filter((review) => {
+    let filteredReviews = (reviews || []).filter((review) => {
       const profile = Array.isArray(review.reviewer) ? review.reviewer[0] : review.reviewer;
       return profile && !profile.deactivated_at && !profile.moderation_hidden_at;
-    }).map((review) => {
+    });
+    if (viewer && filteredReviews.length) {
+      const reviewerIds = Array.from(new Set(filteredReviews.map((review) => review.reviewer_id)));
+      const [outgoing, incoming] = await Promise.all([
+        supabase.from('user_blocks').select('blocked_id').eq('blocker_id', viewer.userId).in('blocked_id', reviewerIds),
+        supabase.from('user_blocks').select('blocker_id').eq('blocked_id', viewer.userId).in('blocker_id', reviewerIds),
+      ]);
+      if (outgoing.error || incoming.error) throw outgoing.error || incoming.error;
+      const blockedIds = new Set([...(outgoing.data || []).map((item) => item.blocked_id), ...(incoming.data || []).map((item) => item.blocker_id)]);
+      filteredReviews = filteredReviews.filter((review) => !blockedIds.has(review.reviewer_id));
+    }
+    const reviewIds = filteredReviews.map((review) => review.id);
+    const [likesResult, commentsResult] = reviewIds.length ? await Promise.all([
+      supabase.from('review_likes').select('review_id, user_id').in('review_id', reviewIds),
+      supabase.from('review_comments').select('review_id').in('review_id', reviewIds).is('moderation_hidden_at', null),
+    ]) : [{ data: [], error: null }, { data: [], error: null }];
+    if (likesResult.error) throw likesResult.error;
+    if (commentsResult.error) throw commentsResult.error;
+    const likeCounts = new Map<string, number>();
+    const likedByViewer = new Set<string>();
+    for (const like of likesResult.data || []) {
+      likeCounts.set(like.review_id, (likeCounts.get(like.review_id) || 0) + 1);
+      if (viewer?.userId === like.user_id) likedByViewer.add(like.review_id);
+    }
+    const commentCounts = new Map<string, number>();
+    for (const comment of commentsResult.data || []) commentCounts.set(comment.review_id, (commentCounts.get(comment.review_id) || 0) + 1);
+    const visible = filteredReviews.map((review) => {
       const profile = Array.isArray(review.reviewer) ? review.reviewer[0] : review.reviewer;
       return {
         id: review.id,
@@ -51,6 +78,9 @@ export async function GET(_request: Request, context: Context) {
         created_at: review.created_at,
         updated_at: review.updated_at,
         is_mine: viewer?.userId === review.reviewer_id,
+        likes_count: likeCounts.get(review.id) || 0,
+        liked_by_me: likedByViewer.has(review.id),
+        comments_count: commentCounts.get(review.id) || 0,
         reviewer: { username: profile.username, display_name: profile.display_name, avatar_url: profile.avatar_url },
       };
     });
@@ -91,7 +121,7 @@ export async function POST(request: Request, context: Context) {
     }
 
     const [{ data: lastChapter, error: chapterError }, { data: blockedByAuthor, error: blockError }] = await Promise.all([
-      supabase.from('chapters').select('id').eq('story_id', id).eq('published', true).order('chapter_number', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('chapters').select('id').eq('story_id', id).eq('published', true).is('moderation_hidden_at', null).order('chapter_number', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('user_blocks').select('id').eq('blocker_id', story.author_id).eq('blocked_id', user.userId).maybeSingle(),
     ]);
     if (chapterError || blockError) throw chapterError || blockError;

@@ -57,6 +57,11 @@ export async function GET(
           cover_url,
           verified,
           is_official,
+          designer_portfolio_enabled,
+          reviewer_portfolio_enabled,
+          beta_reader_portfolio_enabled,
+          translator_portfolio_enabled,
+          available_for_design_requests,
           moderation_hidden_at
           `
         )
@@ -98,6 +103,35 @@ export async function GET(
     }
 
     const staffBadges = await getPublicStaffBadges(supabase, accountIdentity.user_id);
+
+    const enabledCreditRoles = [
+      profile.designer_portfolio_enabled ? 'designer' : null,
+      profile.reviewer_portfolio_enabled ? 'reviewer' : null,
+      profile.beta_reader_portfolio_enabled ? 'beta_reader' : null,
+      profile.translator_portfolio_enabled ? 'translator' : null,
+    ].filter((role): role is string => Boolean(role));
+    const { data: credits, error: creditsError } = enabledCreditRoles.length
+      ? await supabase.from('story_credits').select('story_id, role, created_at')
+        .eq('contributor_id', profile.id).eq('status', 'accepted').eq('portfolio_visible', true).in('role', enabledCreditRoles)
+        .order('created_at', { ascending: false }).limit(100)
+      : { data: [], error: null };
+    if (creditsError) throw creditsError;
+    const creditStoryIds = Array.from(new Set((credits || []).map((credit) => credit.story_id)));
+    const [{ data: creditStories, error: creditStoriesError }, { data: chapters, error: chaptersError }] = creditStoryIds.length
+      ? await Promise.all([
+          supabase.from('stories').select('id, title, cover_url, author_id, moderation_hidden_at, hidden_by_deactivation').in('id', creditStoryIds).is('moderation_hidden_at', null),
+          supabase.from('chapters').select('story_id').in('story_id', creditStoryIds).eq('published', true).is('moderation_hidden_at', null),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+    if (creditStoriesError) throw creditStoriesError;
+    if (chaptersError) throw chaptersError;
+    const publicAuthorIds = await getPublicProfileIds(supabase, (creditStories || []).map((story) => story.author_id));
+    const readableStoryIds = new Set((chapters || []).map((chapter) => chapter.story_id));
+    const creditPortfolio = (credits || []).flatMap((credit) => {
+      const story = (creditStories || []).find((item) => item.id === credit.story_id);
+      if (!story || story.hidden_by_deactivation || !readableStoryIds.has(story.id) || !publicAuthorIds.has(story.author_id)) return [];
+      return [{ story_id: story.id, title: story.title, cover_url: story.cover_url, role: credit.role, credited_at: credit.created_at }];
+    });
 
     // =========================================================
     // 2. HISTÓRIAS
@@ -536,6 +570,7 @@ export async function GET(
       user: { ...profile, staff_badges: staffBadges },
       stories: stories || [],
       posts: postsWithMedia,
+      credits: creditPortfolio,
       reading_lists:
         readingListsWithItems,
       fic_clubs: ficClubs,

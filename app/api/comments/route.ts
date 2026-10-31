@@ -60,10 +60,10 @@ if (!chapterId) {
 
 const { data: chapterVisibility } = await supabase
   .from('chapters')
-  .select('story_id')
+  .select('story_id, moderation_hidden_at')
   .eq('id', chapterId)
   .maybeSingle();
-if (!chapterVisibility || !(await isPublicStoryVisible(supabase, chapterVisibility.story_id))) {
+if (!chapterVisibility || chapterVisibility.moderation_hidden_at || !(await isPublicStoryVisible(supabase, chapterVisibility.story_id))) {
   return NextResponse.json({ comments: [] });
 }
 
@@ -90,6 +90,7 @@ const { data: comments, error } = await supabase
     )
   `)
   .eq('chapter_id', chapterId)
+  .is('moderation_hidden_at', null)
   .order('created_at', {
     ascending: true,
   });
@@ -183,9 +184,10 @@ if (
 
 const { data: chapter } = await supabase
   .from('chapters')
-  .select('id')
+  .select('id, moderation_hidden_at')
   .eq('id', chapterId)
   .eq('published', true)
+  .is('moderation_hidden_at', null)
   .maybeSingle();
 
 if (!chapter) {
@@ -211,7 +213,7 @@ if (storyOwner && await areUsersBlocked(supabase, userId, storyOwner.author_id))
 
 if (typeof body.parent_comment_id === 'string') {
   const { data: parent, error: parentError } = await supabase.from('comments')
-    .select('user_id').eq('id', body.parent_comment_id).eq('chapter_id', chapterId).maybeSingle();
+    .select('user_id').eq('id', body.parent_comment_id).eq('chapter_id', chapterId).is('moderation_hidden_at', null).maybeSingle();
   if (parentError) throw parentError;
   if (parent && await areUsersBlocked(supabase, userId, parent.user_id)) {
     return NextResponse.json({ error: 'Esta interação não está disponível.' }, { status: 403 });

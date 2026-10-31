@@ -4,9 +4,9 @@ Projeto conectado: `fwwgoyburkdybbqmvljk` (TORILAND). Esta documentação foi at
 
 ## Situação que exige reconciliação
 
-O histórico remoto contém **25 migrações aplicadas**. O repositório contém **19 arquivos de migração**, mas somente três têm a mesma versão e o mesmo nome do histórico remoto. Os outros nomes e versões podem representar alterações equivalentes com timestamps diferentes, mas isso ainda não foi comparado por SQL.
+O histórico remoto contém **25 migrações aplicadas**. O repositório contém **21 arquivos de migração**; somente três têm a mesma versão e o mesmo nome do histórico remoto. Os outros nomes e versões podem representar alterações equivalentes com timestamps diferentes, mas isso ainda não foi comparado por SQL.
 
-**Não rode `supabase db push`, `migration repair`, reset ou qualquer reaplicação em produção até concluir essa comparação.** Uma cópia de desenvolvimento do banco não pôde ser criada porque o plano conectado não permite branching. O arquivo da nova migração literária está em preparação, sem aplicação no banco ativo.
+**Não rode `supabase db push`, `migration repair`, reset ou qualquer reaplicação em produção até concluir essa comparação.** Uma cópia de desenvolvimento do banco não pôde ser criada porque o plano conectado não permite branching. As migrações literárias e de recursos de moderação abaixo seguem pendentes; nenhuma foi aplicada ao banco ativo.
 
 ### Histórico remoto observado
 
@@ -38,6 +38,13 @@ O histórico remoto contém **25 migrações aplicadas**. O repositório contém
 | `20261031190107` | `serialize_application_reviews` |
 | `20261031190603` | `profile_theme_persistence` |
 
+Migrações pendentes no branch da implementação:
+
+- `20261031194437_add_literary_collaboration_review_privacy_features`
+- `20261031210000_extend_moderation_reports_and_appeals`
+
+Elas criam estruturas usadas por avaliações, colaboração, políticas, denúncias de conteúdo literário e recursos. Esses fluxos só devem ser ativados depois da validação e aplicação ordenada em um ambiente de desenvolvimento.
+
 ## Segurança observada
 
 - Todas as tabelas listadas do schema `public` estavam com RLS habilitado.
@@ -62,5 +69,5 @@ O histórico remoto contém **25 migrações aplicadas**. O repositório contém
 
 ## Descoberta e recursos em implementação
 
-As categorias e filtros de tags já vivem no catálogo do Supabase. Sugestões de tag podem ser publicadas imediatamente, com normalização de slug e limite de criação. A funcionalidade nova de avaliações, favoritos, bloqueios, privacidade, coautoria, créditos e histórico está sendo preparada em migração aditiva. A verificação correspondente está em `supabase/verification/literary_features.sql`.
+As categorias e filtros de tags já vivem no catálogo do Supabase. Sugestões de tag podem ser publicadas imediatamente, com normalização de slug e limite de criação. Avaliações, favoritos, bloqueios, privacidade, coautoria, créditos, histórico, recursos e denúncias de conteúdo literário estão em migrações aditivas pendentes. As verificações estão em `supabase/verification/literary_features.sql` e `supabase/verification/moderation_appeal_workflow.sql`.
 

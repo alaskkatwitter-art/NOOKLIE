@@ -218,7 +218,8 @@ export async function GET(
           original_published_at,
           republished_at,
           updated_at,
-          publication_status
+          publication_status,
+          moderation_hidden_at
         `)
         .eq('id', id)
         .maybeSingle();
@@ -256,6 +257,11 @@ export async function GET(
     if (!(await isPublicStoryVisible(supabase, chapter.story_id))) {
       return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
     }
+    if (chapter.moderation_hidden_at) {
+      const viewerId = await getAuthenticatedUser(request);
+      const access = viewerId ? await getStoryEditAccess(supabase, chapter.story_id, viewerId) : { canEdit: false };
+      if (!access.canEdit) return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
+    }
 
     const { data: media, error: mediaError } =
       await supabase
@@ -290,6 +296,7 @@ export async function GET(
       )
       .eq('story_id', chapter.story_id)
       .eq('published', true)
+      .is('moderation_hidden_at', null)
       .lt(
         'chapter_number',
         chapter.chapter_number
@@ -317,6 +324,7 @@ export async function GET(
       )
       .eq('story_id', chapter.story_id)
       .eq('published', true)
+      .is('moderation_hidden_at', null)
       .gt(
         'chapter_number',
         chapter.chapter_number
@@ -336,7 +344,7 @@ export async function GET(
 
     return NextResponse.json(
       {
-        chapter,
+        chapter: (({ moderation_hidden_at: _hiddenAt, ...visibleChapter }) => visibleChapter)(chapter),
         media: media || [],
         previousChapter:
           previousChapter || null,

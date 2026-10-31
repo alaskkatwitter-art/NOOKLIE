@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import StoryCollaboratorsPanel from '@/app/components/StoryCollaboratorsPanel';
 import AnonymousStoryControl from '@/components/AnonymousStoryControl';
+import ReportContentButton from '@/components/ReportContentButton';
 
 type Author = {
   id: string;
@@ -302,6 +303,7 @@ export default function HistoriaPage() {
             <h1 className="mb-5 text-4xl font-bold tracking-tight sm:text-5xl">
               {story.title}
             </h1>
+            <div className="mb-5"><ReportContentButton contentType="story" contentId={story.id} /></div>
 
             {story.is_anonymous ? (
               <div className="mb-6 flex w-fit items-center gap-3 text-left">

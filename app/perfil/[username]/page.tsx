@@ -12,6 +12,7 @@ import {
 } from 'next/navigation';
 import OfficialBadge from '../../components/OfficialBadge';
 import ReportProfileButton from '@/components/ReportProfileButton';
+import ReportContentButton from '@/components/ReportContentButton';
 
 type User = {
   id: string;
@@ -23,7 +24,10 @@ type User = {
   verified?: boolean;
   is_official?: boolean;
   staff_badges?: { title: string; description: string }[];
+  available_for_design_requests?: boolean;
 };
+
+type StoryCredit = { story_id: string; title: string; cover_url: string | null; role: 'designer' | 'reviewer' | 'beta_reader' | 'translator'; credited_at: string };
 
 type Story = {
   id: string;
@@ -97,6 +101,7 @@ type ProfileResponse = {
   posts?: NookPost[];
   reading_lists?: ReadingList[];
   fic_clubs?: FicClub[];
+  credits?: StoryCredit[];
   error?: string;
 };
 
@@ -113,13 +118,15 @@ type Tab =
   | 'stories'
   | 'nook'
   | 'lists'
-  | 'clubs';
+  | 'clubs'
+  | 'credits';
 
 const TAB_ORDER: Tab[] = [
   'stories',
   'nook',
   'lists',
   'clubs',
+  'credits',
 ];
 
 function formatDate(
@@ -362,6 +369,8 @@ export default function PublicProfilePage() {
   const [posts, setPosts] =
     useState<NookPost[]>([]);
 
+  const [credits, setCredits] = useState<StoryCredit[]>([]);
+
   const [
     readingLists,
     setReadingLists,
@@ -487,6 +496,8 @@ export default function PublicProfilePage() {
             ? data.posts
             : []
         );
+
+        setCredits(Array.isArray(data.credits) ? data.credits : []);
 
         setReadingLists(
           Array.isArray(
@@ -854,17 +865,10 @@ export default function PublicProfilePage() {
               )}
 
               {isSelf && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      '/perfil'
-                    )
-                  }
-                  className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
-                >
-                  Editar perfil
-                </button>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => router.push('/perfil')} className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10">Editar perfil</button>
+                  <button type="button" onClick={() => router.push('/conta/creditos')} className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10">Créditos e portfólio</button>
+                </div>
               )}
             </div>
 
@@ -896,6 +900,7 @@ export default function PublicProfilePage() {
                 </p>
               ))}
               {!isSelf && <ReportProfileButton profileId={user.id} />}
+              {user.available_for_design_requests && <p className="mt-2 text-xs font-medium text-[#ff9aca]">Disponível para conversar sobre pedidos de design</p>}
 
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>
@@ -935,7 +940,7 @@ export default function PublicProfilePage() {
         {/* ABAS */}
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             {TAB_ORDER.map(
               (tab) => {
                 const labels: Record<
@@ -949,6 +954,7 @@ export default function PublicProfilePage() {
                     'Listas',
                   clubs:
                     'Clubes',
+                  credits: 'Créditos',
                 };
 
                 return (
@@ -989,17 +995,17 @@ export default function PublicProfilePage() {
           <div
             className="flex transition-transform duration-300 ease-out"
             style={{
-              width: '400%',
+              width: '500%',
               transform: `translateX(-${
                 activeIndex *
-                25
+                20
               }%)`,
             }}
           >
 
             {/* HISTÓRIAS */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section className="w-1/5 shrink-0 px-0.5">
               {stories.length ===
               0 ? (
                 <EmptyState
@@ -1032,7 +1038,7 @@ export default function PublicProfilePage() {
 
             {/* MURAL */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section className="w-1/5 shrink-0 px-0.5">
               {posts.length ===
               0 ? (
                 <EmptyState
@@ -1099,6 +1105,7 @@ export default function PublicProfilePage() {
                                 📌
                               </span>
                             )}
+                            <ReportContentButton contentType="post" contentId={post.id} compact />
                           </div>
 
                           {post.body && (
@@ -1170,7 +1177,7 @@ export default function PublicProfilePage() {
 
             {/* LISTAS */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section className="w-1/5 shrink-0 px-0.5">
               {readingLists.length ===
               0 ? (
                 <EmptyState
@@ -1297,7 +1304,7 @@ export default function PublicProfilePage() {
 
             {/* CLUBES */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section className="w-1/5 shrink-0 px-0.5">
               {ficClubs.length ===
               0 ? (
                 <EmptyState
@@ -1413,6 +1420,19 @@ export default function PublicProfilePage() {
                   )}
                 </div>
               )}
+            </section>
+
+            {/* CRÉDITOS */}
+            <section className="w-1/5 shrink-0 px-0.5">
+              {credits.length === 0 ? <EmptyState icon="✦" title="Nenhum crédito público" description="Créditos aceitos aparecerão aqui quando esta pessoa escolher exibir a seção." /> : <div className="mx-auto w-full max-w-2xl space-y-3">
+                {credits.map((credit) => {
+                  const roleLabel = credit.role === 'designer' ? 'Capa por' : credit.role === 'reviewer' ? 'Revisão por' : credit.role === 'beta_reader' ? 'Leitura beta por' : 'Tradução por';
+                  return <button key={`${credit.story_id}-${credit.role}`} type="button" onClick={() => router.push(`/historia/${encodeURIComponent(credit.story_id)}`)} className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#151015] p-3 text-left hover:border-[#ff78b9]/30">
+                    <div className="h-14 w-12 shrink-0 overflow-hidden rounded-lg bg-white/5">{credit.cover_url && <img src={credit.cover_url} alt="" className="h-full w-full object-cover" />}</div>
+                    <span className="min-w-0"><span className="block text-[10px] uppercase tracking-wide text-[#ff9aca]">{roleLabel}</span><span className="mt-1 block truncate text-sm font-semibold text-white">{credit.title}</span></span>
+                  </button>;
+                })}
+              </div>}
             </section>
           </div>
         </div>

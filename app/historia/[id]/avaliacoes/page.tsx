@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import ReviewInteractions from '@/components/ReviewInteractions';
 
-type Review = { id: string; is_mine: boolean; rating: number; body: string | null; contains_spoilers: boolean; created_at: string; reviewer: { username: string; display_name: string | null; avatar_url: string | null } };
+type Review = { id: string; is_mine: boolean; rating: number; body: string | null; contains_spoilers: boolean; created_at: string; likes_count: number; liked_by_me: boolean; comments_count: number; reviewer: { username: string; display_name: string | null; avatar_url: string | null } };
 type Summary = { average: number | null; total: number; distribution: { rating: number; count: number }[] };
 
 export default function StoryReviewsPage() {
@@ -125,6 +126,7 @@ function ReviewCard({ review }: { review: Review }) {
     {review.body && (review.contains_spoilers && !revealed
       ? <button type="button" onClick={() => setRevealed(true)} className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">Esta resenha contém spoilers · Mostrar resenha</button>
       : <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-white/75">{review.body}</p>)}
+    <ReviewInteractions reviewId={review.id} initialLikes={review.likes_count || 0} initiallyLiked={review.liked_by_me || false} initialComments={review.comments_count || 0} canViewComments={!review.contains_spoilers || revealed} />
   </li>;
 }
 

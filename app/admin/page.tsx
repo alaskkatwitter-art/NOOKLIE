@@ -18,6 +18,7 @@ export default async function AdminPage() {
     members: await hasStaffPermission(staff, 'members.manage', membership.department_id),
     opportunities: await hasStaffPermission(staff, 'opportunities.manage', membership.department_id),
     applications: await hasStaffPermission(staff, 'applications.review', membership.department_id),
+    appeals: await hasStaffPermission(staff, 'moderation.appeals.manage', membership.department_id),
   })));
   const manageableDepartmentIds = capabilities.filter((item) => item.members).map((item) => item.departmentId);
   const manageableOpportunityDepartmentIds = capabilities.filter((item) => item.opportunities).map((item) => item.departmentId);
@@ -35,7 +36,9 @@ export default async function AdminPage() {
       canViewUsers={staff.isPlatformAdmin || await hasStaffPermission(staff, 'users.view')}
       canManageUsers={staff.isPlatformAdmin || await hasStaffPermission(staff, 'users.manage')}
       canViewModeration={staff.isPlatformAdmin || await hasStaffPermission(staff, 'moderation.view') || await hasStaffPermission(staff, 'moderation.manage')}
+      canViewAppeals={staff.isPlatformAdmin || capabilities.some((item) => item.appeals)}
       canManageModeration={staff.isPlatformAdmin || await hasStaffPermission(staff, 'moderation.manage')}
+      canManageAppeals={staff.isPlatformAdmin || capabilities.some((item) => item.appeals)}
       canViewOpportunities={staff.isPlatformAdmin || await hasStaffPermission(staff, 'opportunities.view')}
       canViewApplications={staff.isPlatformAdmin || await hasStaffPermission(staff, 'applications.view')}
       canReviewApplications={staff.isPlatformAdmin || capabilities.some((item) => item.applications)}

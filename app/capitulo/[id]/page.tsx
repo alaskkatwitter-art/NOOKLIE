@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ChapterFavoriteButton from '@/components/ChapterFavoriteButton';
+import ReportContentButton from '@/components/ReportContentButton';
 
 type Chapter = {
   id: string;
@@ -1103,6 +1104,7 @@ export default function CapituloPage() {
           <h1 className="text-3xl font-bold">
             {chapter.title}
           </h1>
+          <div className="mt-2"><ReportContentButton contentType="chapter" contentId={chapter.id} /></div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
@@ -2005,6 +2007,7 @@ export default function CapituloPage() {
                         />
                       </div>
                     )}
+                    <div className="mt-3"><ReportContentButton contentType="comment" contentId={comment.id} compact /></div>
                   </div>
                 )
               )}

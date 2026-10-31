@@ -14,6 +14,7 @@ import {
   useRouter,
   useSearchParams,
 } from 'next/navigation';
+import StoryDeletionRequestControl from '@/components/StoryDeletionRequestControl';
 
 type ChapterStatus =
   | 'draft'
@@ -2331,6 +2332,8 @@ export default function EditarHistoriaPage() {
                   Edite as informações da obra ou escolha um capítulo para editar.
                 </p>
               </div>
+
+              <StoryDeletionRequestControl storyId={story.id} />
 
               <form
                 onSubmit={

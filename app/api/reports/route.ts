@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Entre na sua conta para enviar uma denúncia.' }, { status: 401 });
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        !['profile', 'post', 'story'].includes(body.content_type) ||
+        !['profile', 'post', 'story', 'chapter', 'comment', 'review', 'review_comment'].includes(body.content_type) ||
         typeof body.content_id !== 'string' ||
         !allowedReasons.has(body.reason) ||
         (body.details != null && typeof body.details !== 'string') ||

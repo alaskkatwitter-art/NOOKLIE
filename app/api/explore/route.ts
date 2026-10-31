@@ -284,7 +284,8 @@ export async function GET(request: Request) {
         .from('chapters')
         .select('story_id')
         .in('story_id', storyIds)
-        .eq('published', true);
+        .eq('published', true)
+        .is('moderation_hidden_at', null);
 
       if (chaptersError) {
         console.error(

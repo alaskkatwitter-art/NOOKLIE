@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, anonymousStoryIds: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], collaborators: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -193,12 +193,24 @@ before(async () => {
     }
 
     if (path === 'profiles' && request.method === 'GET') {
-      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false, deactivated_at: state.deactivatedAt }]);
+      const profiles = [
+        { id: userId, user_id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false, deactivated_at: state.deactivatedAt, moderation_hidden_at: null },
+        { id: otherUserId, user_id: otherUserId, username: 'reader', display_name: 'Reader', avatar_url: null, verified: false, deactivated_at: null, moderation_hidden_at: null },
+      ];
+      const idFilter = url.searchParams.get('id') || '';
+      const userFilter = url.searchParams.get('user_id') || '';
+      const filterList = (filter) => filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : filter.startsWith('eq.') ? [filter.slice(3)] : [];
+      let rows = profiles;
+      if (idFilter) rows = rows.filter((profile) => filterList(idFilter).includes(profile.id));
+      if (userFilter) rows = rows.filter((profile) => filterList(userFilter).includes(profile.user_id));
+      return respondRows(request, response, rows);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
       const username = (url.searchParams.get('username') || '').replace(/^eq\./, '');
-      const rows = username === state.account.username ? [state.account] : [];
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      const rows = username === state.account.username || id === state.account.id ? [state.account]
+        : id === otherUserId ? [{ id: otherUserId, account_status: 'active' }] : [];
       return respondRows(request, response, rows);
     }
 
@@ -233,8 +245,80 @@ before(async () => {
         return sendJson(response, state.discoveryStories.filter((story) => ids.includes(story.id)).map((story) => ({ id: story.id, is_anonymous: state.anonymousStoryIds.includes(story.id) })));
       }
       const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
-      const rows = id === storyId ? [{ id: storyId, author_id: userId }] : [];
+      const rows = id === storyId ? [{ id: storyId, author_id: userId, moderation_hidden_at: null, hidden_by_deactivation: false }] : [];
       return respondRows(request, response, rows);
+    }
+
+    if (path === 'user_blocks' && request.method === 'GET') {
+      const list = (filter) => filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : filter.startsWith('eq.') ? [filter.slice(3)] : [];
+      const blockerList = list(url.searchParams.get('blocker_id') || '');
+      const blockedList = list(url.searchParams.get('blocked_id') || '');
+      let rows = state.blocks;
+      if (url.searchParams.has('blocker_id')) rows = rows.filter((item) => blockerList.includes(item.blocker_id));
+      if (url.searchParams.has('blocked_id')) rows = rows.filter((item) => blockedList.includes(item.blocked_id));
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'story_reviews' && request.method === 'GET') {
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      const story = (url.searchParams.get('story_id') || '').replace(/^eq\./, '');
+      let rows = state.reviews;
+      if (id) rows = rows.filter((item) => item.id === id);
+      if (story) rows = rows.filter((item) => item.story_id === story);
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'review_likes' && request.method === 'GET') {
+      const reviewFilter = url.searchParams.get('review_id') || '';
+      const userFilter = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+      const ids = reviewFilter.startsWith('in.(') ? reviewFilter.slice(4, -1).split(',') : reviewFilter.startsWith('eq.') ? [reviewFilter.slice(3)] : [];
+      let rows = state.reviewLikes.filter((item) => ids.includes(item.review_id));
+      if (userFilter) rows = rows.filter((item) => item.user_id === userFilter);
+      if ((request.headers.prefer || '').includes('count=exact') && request.method === 'GET') {
+        response.writeHead(200, { 'content-range': `0-0/${rows.length}` });
+        return response.end();
+      }
+      return respondRows(request, response, rows);
+    }
+    if (path === 'review_likes' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const item = JSON.parse(body);
+      if (!state.reviewLikes.some((like) => like.review_id === item.review_id && like.user_id === item.user_id)) state.reviewLikes.push({ id: `like-${state.reviewLikes.length + 1}`, ...item });
+      response.writeHead(201); return response.end();
+    }
+    if (path === 'review_likes' && request.method === 'DELETE') {
+      const review = (url.searchParams.get('review_id') || '').replace(/^eq\./, '');
+      const user = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+      state.reviewLikes = state.reviewLikes.filter((item) => item.review_id !== review || item.user_id !== user);
+      response.writeHead(204); return response.end();
+    }
+
+    if (path === 'review_comments' && request.method === 'GET') {
+      const review = (url.searchParams.get('review_id') || '').replace(/^eq\./, '');
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      let rows = state.reviewComments.filter((item) => item.review_id === review);
+      if (id) rows = rows.filter((item) => item.id === id);
+      return respondRows(request, response, rows);
+    }
+    if (path === 'review_comments' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const item = { id: `review-comment-${state.reviewComments.length + 1}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...JSON.parse(body) };
+      state.reviewComments.push(item);
+      return respondRows(request, response, [item], 201);
+    }
+    if (path === 'review_comments' && request.method === 'DELETE') {
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      state.reviewComments = state.reviewComments.filter((item) => item.id !== id);
+      response.writeHead(204); return response.end();
+    }
+
+    if (path === 'user_notifications' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      state.notifications.push(JSON.parse(body));
+      response.writeHead(201); return response.end();
     }
 
     if (path === 'story_collaborators' && request.method === 'GET') {
@@ -444,6 +528,50 @@ test('chapter creation requires authentication and confirms story ownership', as
   const result = await created.json();
   assert.equal(result.chapter.chapter_number, 4);
   assert.equal(result.chapter.title, 'Novo capítulo');
+});
+
+test('readers can like and discuss a review while spoiler comments stay labeled and manageable', async () => {
+  const reviewId = 'review-one';
+  const otherToken = 'review-owner-session';
+  state.sessions.push({ user_id: otherUserId, token_hash: hash(otherToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  state.reviews.push({ id: reviewId, story_id: storyId, reviewer_id: otherUserId, contains_spoilers: true });
+
+  const ownReviewLike = await fetch(`${baseUrl}/api/reviews/${reviewId}/likes`, {
+    method: 'POST', headers: { Cookie: `toriland_session=${otherToken}` },
+  });
+  assert.equal(ownReviewLike.status, 403);
+
+  const likeUrl = `${baseUrl}/api/reviews/${reviewId}/likes`;
+  const liked = await fetch(likeUrl, { method: 'POST', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.equal(liked.status, 200);
+  assert.deepEqual(await liked.json(), { liked: true, count: 1 });
+  const duplicateLike = await fetch(likeUrl, { method: 'POST', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.equal((await duplicateLike.json()).count, 1);
+
+  const commentsUrl = `${baseUrl}/api/reviews/${reviewId}/comments`;
+  const created = await fetch(commentsUrl, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=owner-session-token` },
+    body: JSON.stringify({ body: 'A reviravolta do final é muito boa.', contains_spoilers: true }),
+  });
+  assert.equal(created.status, 201);
+  const comment = (await created.json()).comment;
+  assert.equal(comment.contains_spoilers, true);
+  assert.equal(state.notifications.length, 1);
+
+  const protectedComments = await fetch(commentsUrl);
+  assert.equal(protectedComments.status, 403);
+  const listed = await fetch(`${commentsUrl}?reveal_spoilers=1`);
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).comments[0].contains_spoilers, true);
+
+  const removed = await fetch(`${commentsUrl}?comment_id=${comment.id}`, {
+    method: 'DELETE', headers: { Cookie: `toriland_session=owner-session-token` },
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(state.reviewComments.length, 0);
+
+  const unliked = await fetch(likeUrl, { method: 'DELETE', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.deepEqual(await unliked.json(), { liked: false, count: 0 });
 });
 
 
