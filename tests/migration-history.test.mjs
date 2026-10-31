@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 
+const pendingMigrations = [
+  '20261031194437_add_literary_collaboration_review_privacy_features.sql',
+  '20261031210000_extend_moderation_reports_and_appeals.sql',
+  '20261031220000_collaborator_exit_and_credit_withdrawal.sql',
+];
+
 const appliedRemoteMigrations = [
   '20261030021627_harden_public_schema_access_and_function_security.sql',
   '20261030024020_auth_attempt_rate_limits.sql',
@@ -36,10 +42,10 @@ test('active migration files retain the exact applied Supabase history', async (
   const versions = activeSqlFiles.map((file) => file.slice(0, file.indexOf('_')));
 
   assert.equal(new Set(versions).size, versions.length, 'migration versions must be unique');
-  for (const migration of appliedRemoteMigrations) {
-    assert.ok(activeSqlFiles.includes(migration), `missing applied migration ${migration}`);
-  }
-  assert.ok(activeSqlFiles.includes('20261031194437_add_literary_collaboration_review_privacy_features.sql'));
-  assert.ok(activeSqlFiles.includes('20261031210000_extend_moderation_reports_and_appeals.sql'));
-  assert.ok(activeSqlFiles.includes('20261031220000_collaborator_exit_and_credit_withdrawal.sql'));
+  const expectedActiveMigrations = [...appliedRemoteMigrations, ...pendingMigrations].sort();
+  assert.deepEqual(
+    activeSqlFiles.sort(),
+    expectedActiveMigrations,
+    'active migrations must equal the applied database history plus the explicitly pending migrations'
+  );
 });
