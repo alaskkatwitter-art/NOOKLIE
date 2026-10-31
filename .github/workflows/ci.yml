@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-dependencies:
+    runs-on: ubuntu-latest
+    outputs:
+      generated: ${{ steps.prepare.outputs.generated }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: prepare
+        name: Prepare exact dependency versions and lockfile
+        shell: bash
+        run: |
+          generated=false
+          if [ ! -f package-lock.json ]; then
+            generated=true
+            npm install --save-exact --no-audit --no-fund --ignore-scripts \
+              @supabase/ssr@latest @supabase/supabase-js@latest bcryptjs@latest \
+              next@latest react@latest react-dom@latest lucide-react@latest
+            npm install --save-dev --save-exact --no-audit --no-fund --ignore-scripts \
+              eslint@latest eslint-config-next@latest @types/node@latest \
+              @types/react@latest @types/react-dom@latest typescript@latest \
+              tailwindcss@latest @tailwindcss/postcss@latest postcss@latest
+            npm install --package-lock-only --no-audit --no-fund --ignore-scripts
+          fi
+          echo "generated=$generated" >> "$GITHUB_OUTPUT"
+          mkdir -p .ci-dependencies
+          cp package.json package-lock.json .ci-dependencies/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-dependencies
+          path: .ci-dependencies/
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    needs: prepare-dependencies
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      SUPABASE_SECRET_KEY: ci-placeholder
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-dependencies
+          path: .ci-dependencies
+      - run: cp .ci-dependencies/package.json .ci-dependencies/package-lock.json .
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  save-initial-lockfile:
+    needs: [prepare-dependencies, verify]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare-dependencies.outputs.generated == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-dependencies
+          path: .ci-dependencies
+      - name: Save the verified dependency versions
+        shell: bash
+        run: |
+          cp .ci-dependencies/package.json package.json
+          cp .ci-dependencies/package-lock.json package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Dependency files already match the verified artifact."
+            exit 0
+          fi
+          git commit -m "chore: pin dependencies and add npm lockfile"
+          git push
