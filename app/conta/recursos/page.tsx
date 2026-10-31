@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 
 type Decision = { id: string; action_type: string; reason: string; starts_at: string; ends_at: string | null; appeal_status: string; appeal: { id: string; details: string; status: string; created_at: string } | null };
 
@@ -34,7 +35,7 @@ export default function AppealsPage() {
 
   return <main className="min-h-screen bg-[#100b12] px-4 py-10 text-white sm:px-6">
     <section className="mx-auto max-w-3xl space-y-5">
-      <a href="/perfil" className="text-sm text-[#ff9aca]">← Voltar ao perfil</a>
+      <Link href="/perfil" className="text-sm text-[#ff9aca]">← Voltar ao perfil</Link>
       <header><h1 className="text-2xl font-bold">Decisões e recursos</h1><p className="mt-2 text-sm text-white/55">Consulte medidas aplicadas à sua conta e, quando disponível, peça uma revisão humana. O recurso não altera automaticamente a medida enquanto estiver em análise.</p></header>
       {error && <p role="alert" className="rounded-xl border border-rose-400/20 p-3 text-sm text-rose-200">{error}</p>}
       {message && <p role="status" className="rounded-xl border border-emerald-400/20 p-3 text-sm text-emerald-200">{message}</p>}
