@@ -18,6 +18,7 @@ type User = {
   avatar_url: string | null;
   cover_url: string | null;
   theme_color: string | null;
+  staff_badges?: { title: string; description: string }[];
 };
 
 type Story = {
@@ -2637,6 +2638,12 @@ export default function PerfilPage() {
                 >
                   @{user.username}
                 </p>
+                {user.staff_badges?.map((badge, index) => (
+                  <p key={`${badge.title}-${index}`} className="mt-1 text-xs font-medium text-[#ff9aca]">
+                    <span className="font-bold">{badge.title}</span>
+                    <span className="text-white/45"> · {badge.description}</span>
+                  </p>
+                ))}
               </div>
 
               <div className="relative flex flex-col gap-2 md:ml-auto md:shrink-0">

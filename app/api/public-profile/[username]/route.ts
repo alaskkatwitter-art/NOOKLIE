@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getPublicStaffBadges } from "@/lib/admin/public-badges";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
@@ -78,6 +79,19 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const { data: accountIdentity, error: identityError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("id", profile.id)
+      .maybeSingle();
+
+    if (identityError || !accountIdentity?.user_id) {
+      console.error("Erro ao buscar identidade do perfil:", identityError);
+      return NextResponse.json({ error: "Erro ao buscar perfil." }, { status: 500 });
+    }
+
+    const staffBadges = await getPublicStaffBadges(supabase, accountIdentity.user_id);
 
     // =========================================================
     // 2. HISTÓRIAS
@@ -496,7 +510,7 @@ export async function GET(
     // =========================================================
 
     return NextResponse.json({
-      user: profile,
+      user: { ...profile, staff_badges: staffBadges },
       stories: stories || [],
       posts: postsWithMedia,
       reading_lists:

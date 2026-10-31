@@ -21,6 +21,7 @@ type User = {
   cover_url: string | null;
   verified?: boolean;
   is_official?: boolean;
+  staff_badges?: { title: string; description: string }[];
 };
 
 type Story = {
@@ -884,6 +885,12 @@ export default function PublicProfilePage() {
               <p className="mt-1 text-sm font-semibold text-white/40">
                 @{user.username}
               </p>
+              {user.staff_badges?.map((badge, index) => (
+                <p key={`${badge.title}-${index}`} className="mt-1 text-xs font-medium text-[#ff9aca]">
+                  <span className="font-bold">{badge.title}</span>
+                  <span className="text-white/45"> · {badge.description}</span>
+                </p>
+              ))}
 
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>

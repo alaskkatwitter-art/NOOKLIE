@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { getPublicStaffBadges } from '@/lib/admin/public-badges';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -114,9 +115,11 @@ export async function GET() {
       );
     }
 
+    const staffBadges = await getPublicStaffBadges(supabase, session.user_id);
+
     return NextResponse.json({
       authenticated: true,
-      user: profile,
+      user: { ...profile, staff_badges: staffBadges },
     });
   } catch (error) {
     console.error(
