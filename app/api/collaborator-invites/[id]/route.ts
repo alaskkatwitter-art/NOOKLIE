@@ -23,13 +23,13 @@ export async function PATCH(request: NextRequest, context: Context) {
     const now = new Date().toISOString();
     if (decision === 'accept') {
       const { error: membershipError } = await supabase.from('story_collaborators').upsert({
-        story_id: invite.story_id, profile_id: user.userId, role: invite.role, status: 'active', invited_by: invite.inviter_id, accepted_at: now,
-      }, { onConflict: 'story_id,profile_id,role', ignoreDuplicates: true });
+        story_id: invite.story_id, profile_id: user.userId, role: invite.role, status: 'active', invited_by: invite.inviter_id, accepted_at: now, removed_at: null,
+      }, { onConflict: 'story_id,profile_id,role' });
       if (membershipError) throw membershipError;
       if (invite.role !== 'coauthor') {
         const { error: creditError } = await supabase.from('story_credits').upsert({
           story_id: invite.story_id, contributor_id: user.userId, requested_by: invite.inviter_id, role: invite.role, status: 'accepted', decided_at: now,
-        }, { onConflict: 'story_id,contributor_id,role', ignoreDuplicates: true });
+        }, { onConflict: 'story_id,contributor_id,role' });
         if (creditError) throw creditError;
       }
     }
