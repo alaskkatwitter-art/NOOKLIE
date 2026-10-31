@@ -78,6 +78,18 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
+      - name: Disable automatic migration replay for the snapshot test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/config.toml")
+          content = path.read_text()
+          marker = "[db.migrations]" + chr(10) + "enabled = true"
+          if content.count(marker) != 1:
+              raise SystemExit("Expected one enabled [db.migrations] block")
+          path.write_text(content.replace(marker, "[db.migrations]" + chr(10) + "enabled = false", 1))
+          PY
       - name: Start an isolated local PostgreSQL database without replaying migrations
         run: supabase db start
       - name: Install the PostgreSQL client
