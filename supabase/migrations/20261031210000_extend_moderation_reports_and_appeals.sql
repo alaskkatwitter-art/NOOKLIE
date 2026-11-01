@@ -238,7 +238,11 @@ begin
     if p_status = 'resolved' then
       insert into public.user_notifications (user_id, notification_type, title, body, href)
       values (v_target, 'moderation_decision', 'Decisão de moderação',
-        'A equipe analisou um conteúdo associado à sua conta. Motivo informado: ' || p_reason || '. Você pode pedir revisão na página de recursos quando uma medida permitir recurso.',
+        case
+          when p_content_action = 'hide' then 'A equipe ocultou um conteúdo associado à sua conta. Consulte as notificações e os recursos disponíveis para ver os próximos passos.'
+          when p_content_action = 'restore' then 'A equipe restaurou um conteúdo associado à sua conta. Consulte as notificações para ver os próximos passos.'
+          else 'A equipe analisou uma denúncia relacionada a um conteúdo associado à sua conta. Consulte as notificações e os recursos disponíveis para ver os próximos passos.'
+        end,
         '/conta/recursos');
     end if;
   end if;

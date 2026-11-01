@@ -49,6 +49,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.admin_audit_log WHERE subject_id=report_id AND action='moderation.report.resolved') THEN
       RAISE EXCEPTION 'Report decision was not audited';
     END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.user_notifications
+      WHERE user_id=v_target_user_id
+        AND notification_type='moderation_decision'
+        AND body LIKE 'A equipe analisou uma denúncia relacionada%'
+        AND position('Resolved' in body)=0
+    ) THEN
+      RAISE EXCEPTION 'Target notification is missing or disclosed internal notes';
+    END IF;
 
     RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='rollback_moderation_test';
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
