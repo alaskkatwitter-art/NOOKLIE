@@ -12,3 +12,6 @@ Quem alegar violação deve indicar o conteúdo e seu endereço, a obra original
 
 ## Encaminhamento
 Use os botões de denúncia disponíveis na história ou no perfil para iniciar a análise. [PREENCHER CANAL EXTERNO PARA TITULARES SEM CONTA E NOTIFICAÇÕES FORMAIS]. Solicitações e ordens válidas seguem a legislação brasileira aplicável; não usamos automaticamente procedimentos estrangeiros de notificação e contranotificação.
+
+## Coleta e treinamento de inteligência artificial
+A publicação no Nooklie não concede licença para coletar ou utilizar contribuições da comunidade em treinamento, ajuste de modelos ou bases de treinamento. O Nooklie não utiliza nem licencia essas contribuições para essa finalidade. A regra de identificação de IA em histórias, capas e imagens está nas Diretrizes da Comunidade. Medidas técnicas para rastreadores não garantem impedir toda cópia ou coleta indevida de conteúdo público.

@@ -839,3 +839,14 @@ test('preview hosts serve new routes without redirecting to production', async (
   assert.equal(response.headers.get('location'), null);
   assert.match(await response.text(), /Políticas do Nooklie/);
 });
+
+
+test('robots declares training opt-outs while allowing ordinary discovery', async () => {
+  const response = await fetch(`${baseUrl}/robots.txt`);
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  assert.match(text, /User-Agent: \*\nAllow: \//i);
+  for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) {
+    assert.match(text, new RegExp(`User-Agent: ${agent}\\n(?:User-Agent: [^\\n]+\\n)*Disallow: /`, 'i'));
+  }
+});

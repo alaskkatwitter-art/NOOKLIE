@@ -36,3 +36,11 @@ Não se deve marcar essas pendências como resolvidas apenas publicando uma decl
 - [ANPD — balanço de implementação, setembro/2026](https://www.gov.br/anpd/pt-br/assuntos/noticias/eca-digital-completa-um-ano-e-e-marco-na-protecao-de-criancas-e-adolescentes-na-internet): proteção por padrão, supervisão e insuficiência de autodeclaração como única barreira.
 
 A aplicação concreta das obrigações depende da operação real do serviço. As fontes e o código não equivalem a um parecer jurídico.
+
+## IA — acréscimo solicitado pela proprietária
+
+A seção `ai.md` integra as Diretrizes da Comunidade e a minuta ainda pendente da migração literária. Histórias com uso de IA e capas/imagens com uso de IA devem ser sinalizadas separadamente. Omissão dá ensejo a advertência após análise, orientação para correção, progressão por reincidência e recurso. Não aplicar punição com base apenas em detector automático.
+
+`app/robots.ts` prepara `/robots.txt` com `Disallow: /` para GPTBot, ClaudeBot e Google-Extended. É instrução para sistemas que a respeitam; não é bloqueio autenticado nem garantia contra raspadores que se disfarçam, cópia manual ou uso passado de dados. Não foi implantado detector de IA, marcação automática ou aplicação automática de advertências. A identificação descrita é uma obrigação de publicação e moderação; ainda não existe campo específico de IA nos formulários. As mudanças continuam na branch, sem publicação na produção.
+
+Fontes técnicas verificadas em 02/11/2026: [OpenAI — crawlers](https://developers.openai.com/api/docs/bots), [Anthropic — ClaudeBot](https://privacy.claude.com/pt/articles/8896518-a-anthropic-rastreia-dados-da-web-e-como-os-proprietarios-de-sites-podem-bloquear-o-rastreador), [Google — crawlers e Google-Extended](https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers), [Google — limites do robots.txt](https://developers.google.com/search/docs/crawling-indexing/robots/intro).
