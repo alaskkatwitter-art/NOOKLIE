@@ -473,3 +473,21 @@ test('story discovery can continue to the next page', async () => {
   assert.equal(secondPage.has_more, false);
   assert.equal(new Set([...firstPage.stories, ...secondPage.stories].map((story) => story.id)).size, 27);
 });
+
+
+test('public policy text and AI training controls are available without authentication', async () => {
+  const response = await fetch(`${baseUrl}/politicas`);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Esta história utiliza IA/);
+  assert.match(html, /Capa gerada com IA/);
+  assert.match(html, /advertência/);
+  assert.match(html, /não utiliza nem licencia/);
+  assert.doesNotMatch(html, /PREENCHER/);
+  const login = await fetch(`${baseUrl}/login`);
+  assert.match(await login.text(), /href="\/politicas"/);
+  const robots = await fetch(`${baseUrl}/robots.txt`);
+  assert.equal(robots.status, 200);
+  const text = await robots.text();
+  for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) assert.match(text, new RegExp(`User-Agent: ${agent}\\n(?:User-Agent: [^\\n]+\\n)*Disallow: /`, 'i'));
+});
