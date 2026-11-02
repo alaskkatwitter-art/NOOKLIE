@@ -482,6 +482,7 @@ test('public policy text and AI training controls are available without authenti
   assert.match(html, /Esta história utiliza IA/);
   assert.match(html, /Capa gerada com IA/);
   assert.match(html, /advertência/);
+  assert.match(html, /<h2[^>]*>Um espaço gratuito para histórias<\/h2>/);
   assert.match(html, /não utiliza nem licencia/);
   assert.doesNotMatch(html, /PREENCHER/);
   const login = await fetch(`${baseUrl}/login`);
