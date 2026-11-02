@@ -141,3 +141,4 @@ body{padding-bottom:108px;background:#100b12}
 @media(min-width:1200px){.discovery-shelf{grid-auto-columns:180px}}
 @media(max-width:640px){.site-shell-inner{min-height:70px;padding:10px 15px}.site-navigation{gap:2px;padding:6px;border-radius:26px}.site-navigation a{flex-direction:column;gap:4px;font-size:10px;min-height:52px;padding:6px 4px}.site-shell-brand span{display:none}.fandom-banner{align-items:flex-start;flex-direction:column}.discovery-card{width:155px}.discovery-shelf{grid-auto-columns:155px;gap:15px}.discovery-section{margin-top:32px}}
 @media(prefers-reduced-motion:reduce){.discovery-card img{transition:none}}
+.site-navigation a{background:#160e18aa}.site-navigation a:hover{background:#160e18dd}.site-navigation [aria-current=page]{background:#ffe0ee}
