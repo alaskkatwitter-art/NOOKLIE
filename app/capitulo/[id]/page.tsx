@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ReadingProgressTracker from '@/components/ReadingProgressTracker';
 import ReaderSettings from '@/app/components/ReaderSettings';
 import { useReaderPreferences } from '@/lib/reader/use-reader-preferences';
 import { readerFontFamily } from '@/lib/reader/preferences';
@@ -1052,6 +1053,7 @@ export default function CapituloPage() {
 
       <div className="max-w-3xl mx-auto px-5 py-8">
 
+        {chapter.story_id && chapter.published && <ReadingProgressTracker chapterId={id} storyId={chapter.story_id} />}
         {/* TOPO */}
 
         <div className="flex items-center justify-between gap-4 mb-8">

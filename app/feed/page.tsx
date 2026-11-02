@@ -3922,76 +3922,7 @@ export default function FeedPage() {
               TOP BAR
           ================================================= */}
 
-          <header className="relative mb-5 flex min-h-16 items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setDrawerOpen(
-                    (value) => !value
-                  )
-                }
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/55 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
-                aria-label="Abrir menu"
-              >
-                <MenuIcon />
-              </button>
-
-              <Link href="/" aria-label="Nooklie — voltar ao início" className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 text-[#ff78b9]"><CloudIcon filled className="h-10 w-12" /><span className="hidden text-lg font-black tracking-widest xl:inline">NOOKLIE</span></Link>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* LUPA */}
-              <button
-                type="button"
-                onClick={() =>
-                  setSearchOpen(true)
-                }
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
-                aria-label="Pesquisar pessoas"
-                title="Pesquisar pessoas"
-              >
-                <SearchIcon />
-              </button>
-
-              <Link
-                href="/perfil"
-                className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] sm:flex"
-              >
-                <Avatar
-                  profile={currentUser}
-                  size="small"
-                />
-
-                <span className="max-w-[120px] truncate text-xs font-bold text-white/60">
-                  @{currentUser?.username ||
-                    'usuario'}
-                </span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  loadFeed(true);
-                  loadStories();
-                  loadUpcomingUpdates();
-                }}
-                disabled={refreshing}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/45 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9] disabled:opacity-40"
-                aria-label="Atualizar"
-              >
-                <span
-                  className={
-                    refreshing
-                      ? 'animate-spin'
-                      : ''
-                  }
-                >
-                  <RefreshIcon />
-                </span>
-              </button>
-            </div>
-          </header>
+          <header className="mb-6 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-[#ffb7da]">Comunidade</p><h1 className="mt-2 text-2xl font-bold">Seu Feed</h1></div><div className="flex gap-2"><button type="button" aria-label="Pesquisar pessoas" onClick={()=>setSearchOpen(true)} className="shell-icon"><SearchIcon /></button><button type="button" aria-label="Atualizar Feed" onClick={()=>{loadFeed(true);loadStories();loadUpcomingUpdates();}} disabled={refreshing} className="shell-icon"><RefreshIcon /></button></div></header>
 
           {/* =================================================
               HERO / BOAS-VINDAS

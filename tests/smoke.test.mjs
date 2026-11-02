@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -106,6 +106,11 @@ before(async () => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
 
+    if (path === 'rpc/discovery_fandom_catalog') return sendJson(response, ['Harry Potter','Marvel']);
+    if (path === 'discovery_preferences') {
+      if (request.method === 'GET') { const id=(url.searchParams.get('user_id')||'').replace(/^eq\./,''); return respondRows(request,response,state.discoveryPreferences.has(id)?[{favorite_fandoms:state.discoveryPreferences.get(id)}]:[]); }
+      if (request.method === 'POST') { let body='';for await(const chunk of request)body+=chunk;const row=JSON.parse(body);state.discoveryPreferences.set(row.user_id,row.favorite_fandoms);response.writeHead(201);return response.end(); }
+    }
     if (path === 'reader_preferences') {
       if (state.readerUnavailable) return sendJson(response, { code: '42P01', message: 'Unavailable fixture' }, 503);
       if (request.method === 'GET') {
@@ -212,7 +217,8 @@ before(async () => {
 
     if (path === 'auth_accounts' && request.method === 'GET') {
       const username = (url.searchParams.get('username') || '').replace(/^eq\./, '');
-      const rows = username === state.account.username ? [state.account] : [];
+      const accountId = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      const rows = username === state.account.username || accountId === state.account.id ? [state.account] : [];
       return respondRows(request, response, rows);
     }
 
@@ -532,4 +538,25 @@ test('reader preferences round-trip by authenticated account and reject foreign 
     assert.equal((await unavailable.json()).user_id, userId);
     assert.equal((await save(preferences)).status, 503);
   } finally { state.readerUnavailable = false; }
+});
+
+
+test('personalized discovery and progress require authentication and public entry pages expose separate navigation', async () => {
+  for (const path of ['/api/discovery','/api/discovery/preferences','/api/reading-progress?chapter=00000000-0000-0000-0000-000000000301']) assert.equal((await fetch(baseUrl+path)).status,401,path);
+  for (const [path,method] of [['/api/discovery/preferences','PUT'],['/api/reading-progress','PUT'],['/api/discovery/activity','POST'],['/api/events','PATCH']]) assert.equal((await fetch(baseUrl+path,{method,headers:{'Content-Type':'application/json'},body:'{}'})).status,401,path);
+  for(const path of ['/inicio','/preferencias','/eventos']) { const response=await fetch(baseUrl+path);assert.equal(response.status,200);const text=await response.text();assert.match(text,/href="\/inicio"/);assert.match(text,/href="\/feed"/);assert.match(text,/Abrir menu de navegação/); }
+});
+
+test('fandom preferences round-trip with account ownership, reject injected owners and suspended accounts', async () => {
+  const token='discovery-preferences-session';state.sessions.push({user_id:userId,token_hash:hash(token),expires_at:new Date(Date.now()+60000).toISOString()});
+  const headers={Cookie:'toriland_session='+token,'Content-Type':'application/json','X-Discovery-Account':userId};
+  const save=(body,extra={})=>fetch(baseUrl+'/api/discovery/preferences',{method:'PUT',headers:{...headers,...extra},body:JSON.stringify(body)});
+  assert.equal((await save({favorite_fandoms:['Harry Potter'],user_id:otherUserId})).status,400);
+  assert.equal((await save({favorite_fandoms:['Harry Potter']},{'X-Discovery-Account':otherUserId})).status,409);
+  assert.equal((await save({favorite_fandoms:['x'.repeat(101)]})).status,400);
+  assert.equal((await save({favorite_fandoms:['Harry Potter']})).status,200);
+  const response=await fetch(baseUrl+'/api/discovery/preferences?user_id='+otherUserId,{headers});assert.match(response.headers.get('cache-control'),/no-store/);
+  const data=await response.json();assert.deepEqual(data.favorite_fandoms,['Harry Potter']);assert.equal(data.account_id,userId);assert.equal(state.discoveryPreferences.has(otherUserId),false);
+  const invalid=await fetch(baseUrl+'/api/reading-progress',{method:'PUT',headers,body:JSON.stringify({chapter_id:'invalid',story_id:'invalid',percent:200})});assert.equal(invalid.status,400);
+  state.account.account_status='suspended';try{assert.equal((await save({favorite_fandoms:['Marvel']})).status,401);}finally{state.account.account_status='active';}
 });

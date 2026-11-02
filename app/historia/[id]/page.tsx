@@ -94,6 +94,7 @@ export default function HistoriaPage() {
     }
 
     loadStory();
+    void fetch('/api/discovery/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ story_id: id }) }).catch(() => undefined);
   }, [id]);
 
   useEffect(() => {
