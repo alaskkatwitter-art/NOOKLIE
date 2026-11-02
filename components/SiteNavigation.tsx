@@ -36,8 +36,16 @@ export default function SiteNavigation() {
     }
     function closeProfile(event: MouseEvent) { if (profileMenu.current && !profileMenu.current.contains(event.target as Node)) profileMenu.current.removeAttribute('open'); }
     function escape(event: KeyboardEvent) { if (event.key === 'Escape') profileMenu.current?.removeAttribute('open'); }
+    async function refreshNotifications() {
+      try {
+        const response = await fetch('/api/notifications', { cache: 'no-store', signal: controller.signal });
+        const data = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted && data) setUnread(data.unread_count || 0);
+      } catch { /* A later navigation retries the badge update. */ }
+    }
+    window.addEventListener('nooklie:notifications-changed', refreshNotifications);
     document.addEventListener('click', closeProfile); document.addEventListener('keydown', escape);
-    void load(); return () => { controller.abort(); document.removeEventListener('click', closeProfile); document.removeEventListener('keydown', escape); };
+    void load(); return () => { controller.abort(); document.removeEventListener('click', closeProfile); document.removeEventListener('keydown', escape); window.removeEventListener('nooklie:notifications-changed', refreshNotifications); };
   }, [pathname]);
   async function logout() {
     setBusy(true); setError('');
