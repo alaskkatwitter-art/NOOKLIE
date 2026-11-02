@@ -1,3 +1,4 @@
+import {getPublicProfileIds} from '@/lib/moderation/content-visibility';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -237,8 +238,9 @@ export async function GET(
       );
     }
 
+    const allowed=await getPublicProfileIds(supabaseAdmin,(stories||[]).map(s=>s.user_id));
     const normalizedStories =
-      (stories || []).map(
+      (stories || []).filter(s=>allowed.has(s.user_id)).map(
         (story: any) => ({
           ...story,
           user: Array.isArray(

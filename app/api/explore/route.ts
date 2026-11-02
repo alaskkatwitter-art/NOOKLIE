@@ -186,7 +186,8 @@ export async function GET(request: Request) {
      * =========================================================
      */
 
-    const { data: stories, error: storiesError } = await supabase.rpc('search_public_stories', {
+    const { data: stories, error: storiesError } = await supabase.rpc('search_visible_stories', {
+      p_viewer: currentProfileId,
       p_query: query || null,
       p_include_slugs: includedTagSlugs,
       p_exclude_slugs: excludedTagSlugs,

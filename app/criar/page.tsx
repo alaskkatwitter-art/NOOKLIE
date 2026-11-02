@@ -1,4 +1,5 @@
 'use client';
+import {contentMediaUrl} from '@/lib/security/content-media';
 import StoryMetadataFields from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
 import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
@@ -367,7 +368,7 @@ export default function CriarPage() {
               {coverPreview ? (
                 <>
                   <img
-                    src={coverPreview}
+                    src={contentMediaUrl(coverPreview)}
                     alt="Prévia da capa"
                     className="h-full w-full object-cover"
                   />

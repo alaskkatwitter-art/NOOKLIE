@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import {
   usePathname,
@@ -455,7 +456,7 @@ function Avatar({
   if (src) {
     return (
       <img
-        src={src}
+        src={contentMediaUrl(src)}
         alt=""
         className={`${classes} shrink-0 rounded-full object-cover ring-1 ring-white/10`}
       />

@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useCallback,
   useEffect,
@@ -292,7 +293,7 @@ function StoryCard({
         >
           {story.cover_url ? (
             <img
-              src={story.cover_url}
+              src={contentMediaUrl(story.cover_url)}
               alt=""
               className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
             />

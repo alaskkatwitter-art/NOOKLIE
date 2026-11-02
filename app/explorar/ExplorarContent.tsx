@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -698,7 +699,7 @@ export default function ExplorarContent() {
                               >
                                 {story.cover_url ? (
                                   <img
-                                    src={story.cover_url}
+                                    src={contentMediaUrl(story.cover_url)}
                                     alt=""
                                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                                   />
@@ -929,7 +930,7 @@ function Avatar({
   if (src) {
     return (
       <img
-        src={src}
+        src={contentMediaUrl(src)}
         alt=""
         className={`${classes} shrink-0 rounded-full object-cover ring-1 ring-white/10`}
       />

@@ -145,7 +145,7 @@ before(async () => {
       return sendJson(response, count <= p_limit);
     }
 
-    if (path === 'rpc/search_public_stories' && request.method === 'POST') {
+    if ((path === 'rpc/search_public_stories' || path === 'rpc/search_visible_stories') && request.method === 'POST') {
       let body = '';
       for await (const chunk of request) body += chunk;
       const input = JSON.parse(body);

@@ -1,3 +1,4 @@
+import FandomManager from '@/components/FandomManager';
 import { Suspense } from 'react';
 import FandomsContent from './FandomsContent';
 
@@ -12,7 +13,7 @@ export default function FandomsPage() {
         </main>
       }
     >
-      <FandomsContent />
+      <><FandomManager/><FandomsContent /></>
     </Suspense>
   );
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
+import LinkedStoryCard from '@/components/LinkedStoryCard';
 import {
   useCallback,
   useEffect,
@@ -647,7 +649,7 @@ function Avatar({
     >
       {profile?.avatar_url ? (
         <img
-          src={profile.avatar_url}
+          src={contentMediaUrl(profile.avatar_url)}
           alt=""
           className="h-full w-full object-cover"
         />
@@ -943,7 +945,7 @@ function StoryViewer({
             <video
               key={currentStory.id}
               src={
-                currentStory.media_url
+                contentMediaUrl(currentStory.media_url)
               }
               autoPlay
               muted
@@ -955,7 +957,7 @@ function StoryViewer({
             <img
               key={currentStory.id}
               src={
-                currentStory.media_url
+                contentMediaUrl(currentStory.media_url)
               }
               alt=""
               className="h-full w-full object-contain"
@@ -1575,7 +1577,7 @@ function SpotifyPreview({
     >
       {data.thumbnail_url ? (
         <img
-          src={data.thumbnail_url}
+          src={contentMediaUrl(data.thumbnail_url)}
           alt=""
           className="h-24 w-24 shrink-0 object-cover"
         />
@@ -1667,7 +1669,7 @@ function PostMedia({
     return (
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
         <img
-          src={item.media_url}
+          src={contentMediaUrl(item.media_url)}
           alt=""
           className="max-h-[620px] w-full object-contain"
         />
@@ -1683,7 +1685,7 @@ function PostMedia({
           className="aspect-square overflow-hidden bg-black/40"
         >
           <img
-            src={item.media_url}
+            src={contentMediaUrl(item.media_url)}
             alt=""
             className="h-full w-full object-cover"
           />
@@ -2295,7 +2297,7 @@ function FeedPost({
           </div>
         </div>
 
-        <PostBody body={post.body} />
+        <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}
 
         <PostMedia post={post} />
 
@@ -4001,7 +4003,7 @@ export default function FeedPage() {
                         {currentUser?.avatar_url ? (
                           <img
                             src={
-                              currentUser.avatar_url
+                              contentMediaUrl(currentUser.avatar_url)
                             }
                             alt=""
                             className="h-full w-full object-cover"

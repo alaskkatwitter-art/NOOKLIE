@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -195,7 +196,7 @@ export default function TagPage() {
                   <div className="w-[125px] shrink-0 bg-white/[0.03]">
                     {story.cover_url ? (
                       <img
-                        src={story.cover_url}
+                        src={contentMediaUrl(story.cover_url)}
                         alt={`Capa de ${story.title}`}
                         className="h-full w-full object-cover"
                       />

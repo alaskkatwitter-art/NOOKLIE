@@ -17,7 +17,7 @@ children: ReactNode;
 }) {
 return (
 <html lang="pt-BR" className={`${nooklieBody.variable} ${nooklieHeading.variable}`}>
-<body><SiteNavigation />{children}<footer className="border-t border-white/10 bg-[#100b12] px-4 py-5 text-center text-sm text-white/70"><Link href="/politicas" className="inline-block min-h-11 rounded-lg px-3 py-3 text-[#ff9aca] hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff78b9]">Políticas do Nooklie</Link>{[["/sobre", "Sobre"], ["/termos", "Termos"], ["/privacidade", "Privacidade"]].map(([href,label]) => <Link key={href} href={href} className="inline-block min-h-11 px-3 py-3 hover:text-[#ff9aca]">{label}</Link>)}</footer></body>
+<body><SiteNavigation />{children}<footer className="border-t border-white/10 bg-[#100b12] px-4 py-5 text-center text-sm text-white/70"><Link href="/politicas" className="inline-block min-h-11 rounded-lg px-3 py-3 text-[#ff9aca] hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff78b9]">Políticas do Nooklie</Link>{[["/sobre", "Sobre"], ["/termos", "Termos"], ["/privacidade", "Privacidade"]].map(([href,label]) => <Link key={href} href={href} className="inline-block min-h-11 px-3 py-3 hover:text-[#ff9aca]">{label}</Link>)}<a href="mailto:appnookie@gmail.com" className="inline-block min-h-11 px-3 py-3 hover:text-[#ff9aca]">Fale conosco: appnookie@gmail.com</a><a href="https://www.tiktok.com/@nooklie.com" target="_blank" rel="noopener noreferrer" className="inline-block min-h-11 px-3 py-3 hover:text-[#ff9aca]">TikTok · @nooklie.com</a></footer></body>
 </html>
 );
 }

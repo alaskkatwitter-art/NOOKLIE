@@ -1,4 +1,5 @@
 'use client';
+import {contentMediaUrl} from '@/lib/security/content-media';
 import StoryMetadataFields from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
 import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
@@ -2298,7 +2299,7 @@ export default function EditarHistoriaPage() {
                 <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
                   {coverPreview ? (
                     <img
-                      src={coverPreview}
+                      src={contentMediaUrl(coverPreview)}
                       alt={`Capa de ${story.title}`}
                       className="h-full w-full object-cover"
                     />
@@ -2685,7 +2686,7 @@ export default function EditarHistoriaPage() {
                 <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
                   {coverPreview ? (
                     <img
-                      src={coverPreview}
+                      src={contentMediaUrl(coverPreview)}
                       alt={`Capa de ${story.title}`}
                       className="h-full w-full object-cover"
                     />
@@ -3313,7 +3314,7 @@ export default function EditarHistoriaPage() {
                               <div className="aspect-video">
                                 <img
                                   src={
-                                    media.url
+                                    contentMediaUrl(media.url)
                                   }
                                   alt="Mídia do capítulo"
                                   className="h-full w-full object-cover"

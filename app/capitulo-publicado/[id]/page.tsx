@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -298,7 +299,7 @@ export default function CapituloPublicadoPage() {
             <div className="mx-auto mt-9 w-36 overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:w-40">
               <div className="aspect-[2/3]">
                 <img
-                  src={story.cover_url}
+                  src={contentMediaUrl(story.cover_url)}
                   alt={`Capa de ${story.title}`}
                   className="h-full w-full object-cover"
                 />

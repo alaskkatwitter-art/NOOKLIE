@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -238,7 +239,7 @@ export default function LerDepoisPage() {
                     <div className="relative h-48 overflow-hidden bg-[#171018]">
                       {item.cover ? (
                         <img
-                          src={item.cover}
+                          src={contentMediaUrl(item.cover)}
                           alt=""
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         />

@@ -1,3 +1,4 @@
+import {isPublicStoryVisible} from '@/lib/moderation/content-visibility';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -149,7 +150,8 @@ export async function GET(
     // MONTA RESULTADO
     // =========================
 
-    const stories = rawStories.map((story: any) => ({
+    const visible=[];for(const story of rawStories){if(!await isPublicStoryVisible(supabase,story.id))continue;const chapters=await supabase.from('chapters').select('id').eq('story_id',story.id).eq('published',true).limit(1);if(chapters.error)throw chapters.error;if(chapters.data?.length)visible.push(story);}
+    const stories = visible.map((story: any) => ({
       ...story,
       author: authorMap.get(story.author_id) || null,
     }));
@@ -163,7 +165,7 @@ export async function GET(
         category_slug: category?.slug || null,
       },
       stories,
-    });
+    },{headers:{'Cache-Control':'no-store, private',Vary:'Cookie'}});
   } catch (error) {
     console.error(
       'Erro inesperado na API da tag:',

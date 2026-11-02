@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useEffect,
   useRef,
@@ -414,7 +415,7 @@ export default function StoryComposer({
                 <div className="relative aspect-[9/14] w-full max-w-[390px] overflow-hidden rounded-[24px] bg-black shadow-2xl">
                   {preview && (
                     <img
-                      src={preview}
+                      src={contentMediaUrl(preview)}
                       alt="Prévia do Story"
                       className="h-full w-full object-cover"
                       style={{

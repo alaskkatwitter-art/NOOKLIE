@@ -1,3 +1,4 @@
+import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -65,42 +66,7 @@ async function getAuthenticatedUser(request: Request) {
   return session.user_id as string;
 }
 
-function cleanHtml(value: unknown) {
-  if (typeof value !== 'string') {
-    return '';
-  }
-
-  return value
-    .replace(
-      /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
-      ''
-    )
-    .replace(
-      /<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi,
-      ''
-    )
-    .replace(
-      /<object[\s\S]*?>[\s\S]*?<\/object>/gi,
-      ''
-    )
-    .replace(
-      /<embed[\s\S]*?>/gi,
-      ''
-    )
-    .replace(
-      /\son[a-z]+\s*=\s*(['"]).*?\1/gi,
-      ''
-    )
-    .replace(
-      /\son[a-z]+\s*=\s*[^\s>]+/gi,
-      ''
-    )
-    .replace(
-      /javascript\s*:/gi,
-      ''
-    )
-    .trim();
-}
+function cleanHtml(value:unknown){return typeof value==='string'?safeChapterHtml(value).trim():'';}
 
 function normalizePublicationStatus(
   value: unknown
@@ -335,7 +301,7 @@ export async function GET(
 
     return NextResponse.json(
       {
-        chapter,
+        chapter:{...chapter,body:safeChapterHtml(chapter.body||'')},
         media: media || [],
         previousChapter:
           previousChapter || null,
