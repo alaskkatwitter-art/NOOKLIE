@@ -415,6 +415,7 @@ before(async () => {
       env: {
         ...process.env,
         NODE_ENV: 'production',
+        VERCEL_ENV: 'preview',
         NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
         SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'ci-placeholder',
@@ -829,4 +830,12 @@ test('publication reports missing service details and denies incomplete document
     const list = await fetch(`${baseUrl}/api/admin/policies`, { headers });
     assert.deepEqual((await list.json()).policies.find((row) => row.id === 'policy-draft').publication_issues, ['CANAL']);
   } finally { state.isAdmin = false; }
+});
+
+
+test('preview hosts serve new routes without redirecting to production', async () => {
+  const response = await fetch(`${baseUrl}/politicas`, { headers: { Host: 'nooklie-qa.vercel.app' }, redirect: 'manual' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+  assert.match(await response.text(), /Políticas do Nooklie/);
 });
