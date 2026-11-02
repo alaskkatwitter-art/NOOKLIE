@@ -43,7 +43,7 @@ export default function Home() {
           >
             <CloudLogo />
 
-            <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9] transition group-hover:text-[#ff9bca]">
+            <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9] transition group-hover:text-[#ff9bca] font-nooklie-logo">
               NOOKLIE
             </span>
           </Link>
