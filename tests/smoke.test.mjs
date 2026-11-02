@@ -793,7 +793,7 @@ test('policy acceptance records only the exact published version the reader view
   const details = await fetch(`${baseUrl}/api/policies/terms`);
   assert.equal((await details.json()).policy.id, 'policy-current');
   const list = await fetch(`${baseUrl}/api/policies`);
-  assert.deepEqual((await list.json()).policies.map((row) => row.id), ['policy-current']);
+  assert.deepEqual((await list.json()).policies.map((row) => row.slug), ['terms']);
   const accept = (body, authenticated = true) => fetch(`${baseUrl}/api/policies/terms/accept`, { method: 'POST', headers: authenticated ? headers : { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' }, false)).status, 401);
   assert.equal((await accept({})).status, 400);
