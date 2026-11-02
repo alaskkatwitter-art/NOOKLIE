@@ -5,6 +5,7 @@ type VisibilityClient = SupabaseClient;
 
 export async function currentViewerProfileId(supabase:VisibilityClient):Promise<string|null>{
  const auth=await getAuthenticatedUserContext();if(!auth)return null;
+ const account=await supabase.from('auth_accounts').select('account_status').eq('id',auth.userId).maybeSingle();if(account.error)throw account.error;if(!account.data||account.data.account_status==='suspended')return null;
  const {data,error}=await supabase.from('profiles').select('id').eq('user_id',auth.userId).maybeSingle();if(error)throw error;return data?.id||null;
 }
 
