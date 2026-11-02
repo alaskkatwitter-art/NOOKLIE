@@ -1,11 +1,17 @@
 DO $$
 DECLARE
-  root_id uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  root_id uuid;
   target_profile_id uuid;
   own_profile_id uuid;
   v_target_user_id uuid;
   report_id uuid;
 BEGIN
+  SELECT account.id INTO root_id
+  FROM public.platform_admins admin
+  JOIN public.auth_accounts account ON account.id=admin.user_id
+  WHERE account.username='astriddy';
+  IF root_id IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
+
   SELECT profile.id, profile.user_id INTO target_profile_id, v_target_user_id
   FROM public.profiles profile
   WHERE profile.user_id <> root_id
@@ -43,6 +49,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.admin_audit_log WHERE subject_id=report_id AND action='moderation.report.resolved') THEN
       RAISE EXCEPTION 'Report decision was not audited';
     END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.user_notifications
+      WHERE user_id=v_target_user_id
+        AND notification_type='moderation_decision'
+        AND body LIKE 'A equipe analisou uma denúncia relacionada%'
+        AND position('Resolved' in body)=0
+    ) THEN
+      RAISE EXCEPTION 'Target notification is missing or disclosed internal notes';
+    END IF;
 
     RAISE EXCEPTION USING ERRCODE='P0001', MESSAGE='rollback_moderation_test';
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
@@ -50,10 +65,19 @@ BEGIN
   END;
 END $$;
 
-SELECT
-  NOT EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Workflow test', 'Duplicate')) AS test_reports_rolled_back,
-  NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('h',64)) AS test_session_rolled_back,
-  NOT has_table_privilege('anon', 'public.moderation_reports', 'SELECT') AS anon_cannot_read,
-  NOT has_table_privilege('authenticated', 'public.moderation_reports', 'SELECT') AS authenticated_cannot_read,
-  has_table_privilege('service_role', 'public.moderation_reports', 'SELECT') AS service_role_can_read,
-  (SELECT relrowsecurity FROM pg_class WHERE oid='public.moderation_reports'::regclass) AS rls_enabled;
+DO $test$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Workflow test', 'Duplicate')) THEN
+    RAISE EXCEPTION 'Moderation workflow test reports were not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('h',64)) THEN
+    RAISE EXCEPTION 'Moderation workflow test session was not rolled back';
+  END IF;
+  IF has_table_privilege('anon', 'public.moderation_reports', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.moderation_reports', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.moderation_reports', 'SELECT')
+     OR NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.moderation_reports'::regclass) THEN
+    RAISE EXCEPTION 'Moderation reports access controls are incorrect';
+  END IF;
+END;
+$test$;

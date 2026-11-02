@@ -69,6 +69,63 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  database-migrations:
+    runs-on: ubuntu-latest
+    env:
+      LOCAL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: Disable automatic migration replay for the snapshot test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/config.toml")
+          content = path.read_text()
+          marker = "[db.migrations]" + chr(10) + "enabled = true"
+          if content.count(marker) != 1:
+              raise SystemExit("Expected one enabled [db.migrations] block")
+          path.write_text(content.replace(marker, "[db.migrations]" + chr(10) + "enabled = false", 1))
+          PY
+      - name: Start an isolated local PostgreSQL database without replaying migrations
+        run: supabase db start
+      - name: Install the PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Load the schema-only snapshot
+        run: psql "$LOCAL_TEST_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file supabase/verification/applied_schema_fixture.sql
+      - name: Apply pending migrations to the disposable database
+        run: |
+          for migration in \
+            supabase/migrations/20261031194437_add_literary_collaboration_review_privacy_features.sql \
+            supabase/migrations/20261031210000_extend_moderation_reports_and_appeals.sql \
+            supabase/migrations/20261031220000_collaborator_exit_and_credit_withdrawal.sql
+          do
+            psql "$LOCAL_TEST_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file "$migration"
+          done
+      - name: Load synthetic test accounts
+        run: psql "$LOCAL_TEST_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file supabase/verification/ci_test_data.sql
+      - name: Verify RLS, moderation, collaboration, and administration workflows
+        run: |
+          for verification in \
+            supabase/verification/admin_access.sql \
+            supabase/verification/admin_workflows.sql \
+            supabase/verification/account_status_workflows.sql \
+            supabase/verification/rls_access.sql \
+            supabase/verification/moderation_workflows.sql \
+            supabase/verification/moderation_content_visibility.sql \
+            supabase/verification/literary_features.sql \
+            supabase/verification/moderation_appeal_workflow.sql \
+            supabase/verification/story_deletion_consensus.sql
+          do
+            echo "Running $verification"
+            psql "$LOCAL_TEST_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file "$verification"
+          done
+
   save-initial-lockfile:
     needs: [prepare-dependencies, verify]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare-dependencies.outputs.generated == 'true'

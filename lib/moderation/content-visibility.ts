@@ -8,20 +8,20 @@ export async function isPublicProfileVisible(
 ): Promise<boolean> {
   let { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, user_id, moderation_hidden_at')
+    .select('id, user_id, moderation_hidden_at, deactivated_at')
     .eq('id', profileOrUserId)
     .maybeSingle();
   if (error) throw error;
   if (!profile) {
     const fallback = await supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, deactivated_at')
       .eq('user_id', profileOrUserId)
       .maybeSingle();
     if (fallback.error) throw fallback.error;
     profile = fallback.data;
   }
-  if (!profile || profile.moderation_hidden_at) return false;
+  if (!profile || profile.moderation_hidden_at || profile.deactivated_at) return false;
 
   const { data: account, error: accountError } = await supabase
     .from('auth_accounts')
@@ -42,11 +42,11 @@ export async function getPublicProfileIds(
   const [profilesById, profilesByUserId] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, deactivated_at')
       .in('id', identifiers),
     supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, deactivated_at')
       .in('user_id', identifiers),
   ]);
 
@@ -58,7 +58,7 @@ export async function getPublicProfileIds(
       [...(profilesById.data || []), ...(profilesByUserId.data || [])]
         .map((profile) => [profile.user_id, profile] as const)
     ).values()
-  ).filter((profile) => !profile.moderation_hidden_at);
+  ).filter((profile) => !profile.moderation_hidden_at && !profile.deactivated_at);
 
   if (profiles.length === 0) return new Set();
 
@@ -89,11 +89,11 @@ export async function isPublicStoryVisible(
 ): Promise<boolean> {
   const { data: story, error } = await supabase
     .from('stories')
-    .select('id, author_id, moderation_hidden_at')
+    .select('id, author_id, moderation_hidden_at, hidden_by_deactivation')
     .eq('id', storyId)
     .maybeSingle();
   if (error) throw error;
-  if (!story || story.moderation_hidden_at) return false;
+  if (!story || story.moderation_hidden_at || story.hidden_by_deactivation) return false;
   return isPublicProfileVisible(supabase, story.author_id);
 }
 

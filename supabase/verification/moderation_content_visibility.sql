@@ -1,10 +1,16 @@
 DO $$
 DECLARE
-  root_id uuid := 'be272a49-1f7b-49ca-998f-d265029f4b34';
+  root_id uuid;
   target_profile uuid;
   target_user uuid;
   report_id uuid;
 BEGIN
+  SELECT account.id INTO root_id
+  FROM public.platform_admins admin
+  JOIN public.auth_accounts account ON account.id=admin.user_id
+  WHERE account.username='astriddy';
+  IF root_id IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
+
   SELECT profile.id, profile.user_id INTO target_profile, target_user
   FROM public.profiles AS profile
   WHERE NOT EXISTS (SELECT 1 FROM public.platform_admins AS root WHERE root.user_id=profile.user_id)
@@ -33,8 +39,14 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'P0001' THEN
     IF SQLERRM <> 'rollback_moderation_visibility_test' THEN RAISE; END IF;
   END;
-END $$;
 
-SELECT NOT EXISTS (SELECT 1 FROM public.profiles WHERE moderation_hidden_at IS NOT NULL) AS profile_changes_rolled_back,
-       NOT EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('m',64)) AS sessions_rolled_back,
-       NOT EXISTS (SELECT 1 FROM public.moderation_reports WHERE details IN ('Visibility test','Restore test')) AS reports_rolled_back;
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id=target_profile AND moderation_hidden_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Visibility test did not restore the target profile';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.auth_sessions WHERE token_hash=repeat('m',64)) THEN
+    RAISE EXCEPTION 'Visibility test session was not rolled back';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.moderation_reports WHERE id=report_id) THEN
+    RAISE EXCEPTION 'Visibility test report was not rolled back';
+  END IF;
+END $$;

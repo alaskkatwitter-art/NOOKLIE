@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
+import { getStoryEditAccess } from '@/lib/stories/access';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -217,7 +218,8 @@ export async function GET(
           original_published_at,
           republished_at,
           updated_at,
-          publication_status
+          publication_status,
+          moderation_hidden_at
         `)
         .eq('id', id)
         .maybeSingle();
@@ -255,6 +257,11 @@ export async function GET(
     if (!(await isPublicStoryVisible(supabase, chapter.story_id))) {
       return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
     }
+    if (chapter.moderation_hidden_at) {
+      const viewerId = await getAuthenticatedUser(request);
+      const access = viewerId ? await getStoryEditAccess(supabase, chapter.story_id, viewerId) : { canEdit: false };
+      if (!access.canEdit) return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
+    }
 
     const { data: media, error: mediaError } =
       await supabase
@@ -289,6 +296,7 @@ export async function GET(
       )
       .eq('story_id', chapter.story_id)
       .eq('published', true)
+      .is('moderation_hidden_at', null)
       .lt(
         'chapter_number',
         chapter.chapter_number
@@ -316,6 +324,7 @@ export async function GET(
       )
       .eq('story_id', chapter.story_id)
       .eq('published', true)
+      .is('moderation_hidden_at', null)
       .gt(
         'chapter_number',
         chapter.chapter_number
@@ -335,7 +344,7 @@ export async function GET(
 
     return NextResponse.json(
       {
-        chapter,
+        chapter: (({ moderation_hidden_at: _hiddenAt, ...visibleChapter }) => visibleChapter)(chapter),
         media: media || [],
         previousChapter:
           previousChapter || null,
@@ -512,10 +521,8 @@ export async function PUT(
       );
     }
 
-    if (
-      !story ||
-      story.author_id !== userId
-    ) {
+    const editAccess = story ? await getStoryEditAccess(supabase, story.id, userId) : { canEdit: false, isOwner: false };
+    if (!story || !editAccess.canEdit) {
       return NextResponse.json(
         {
           error:
@@ -783,6 +790,15 @@ export async function PUT(
      * ATUALIZA O CAPÍTULO
      * ========================================================
      */
+    const { error: historyError } = await supabase.from('story_edit_history').insert({
+      story_id: story.id,
+      actor_id: userId,
+      entity_type: 'chapter',
+      entity_id: chapter.id,
+      snapshot: chapter,
+    });
+    if (historyError) throw historyError;
+
     const {
       data: updatedChapter,
       error: updateError,

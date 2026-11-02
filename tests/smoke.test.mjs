@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { policies: [], policyAcceptances: [], isAdmin: false, account: null, sessions: [], chapters: [], collaborators: [], storyCredits: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -106,6 +106,30 @@ before(async () => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
 
+    if (path === 'policy_documents' && request.method === 'GET') {
+      let rows = [...state.policies];
+      for (const field of ['id', 'slug', 'status']) {
+        const filter = url.searchParams.get(field);
+        if (filter?.startsWith('eq.')) rows = rows.filter((row) => row[field] === filter.slice(3));
+      }
+      rows.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''));
+      return respondRows(request, response, rows.slice(0, Number(url.searchParams.get('limit') || 100)));
+    }
+    if (path === 'policy_acceptances') {
+      if (request.method === 'GET') {
+        const profileId = (url.searchParams.get('profile_id') || '').replace(/^eq\./, '');
+        return respondRows(request, response, state.policyAcceptances.filter((row) => row.profile_id === profileId));
+      }
+      if (request.method === 'POST') {
+        let body = ''; for await (const chunk of request) body += chunk;
+        const row = JSON.parse(body);
+        if (!state.policyAcceptances.some((item) => item.policy_document_id === row.policy_document_id && item.profile_id === row.profile_id)) state.policyAcceptances.push(row);
+        response.writeHead(201); return response.end();
+      }
+    }
+    if (path === 'platform_admins') return respondRows(request, response, state.isAdmin ? [{ user_id: userId }] : []);
+    if (['team_memberships', 'permissions'].includes(path)) return respondRows(request, response, []);
+
     if (path === 'rpc/consume_auth_rate_limit' && request.method === 'POST') {
       let body = '';
       for await (const chunk of request) body += chunk;
@@ -156,6 +180,22 @@ before(async () => {
       return sendJson(response, true);
     }
 
+    if (path === 'rpc/leave_story_collaboration' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const input = JSON.parse(body);
+      const session = state.sessions.find((item) => item.token_hash === input.p_session_token_hash && new Date(item.expires_at).getTime() > Date.now());
+      if (!session) return sendJson(response, { code: '42501' }, 403);
+      const membership = state.collaborators.find((item) => item.story_id === input.p_story_id && item.profile_id === session.user_id && item.role === input.p_role && item.status === 'active');
+      if (!membership) return sendJson(response, { code: 'P0002' }, 400);
+      membership.status = 'left'; membership.removed_at = new Date().toISOString();
+      if (input.p_role !== 'coauthor') {
+        const credit = state.storyCredits.find((item) => item.story_id === input.p_story_id && item.contributor_id === session.user_id && item.role === input.p_role && ['pending', 'accepted'].includes(item.status));
+        if (credit) { credit.status = 'withdrawn'; credit.decided_at = new Date().toISOString(); }
+      }
+      return sendJson(response, { left: true, role: input.p_role });
+    }
+
     if (path === 'tag_categories' && request.method === 'GET') {
       let rows = state.categories;
       const slug = (url.searchParams.get('slug') || '').replace(/^eq\./, '');
@@ -193,12 +233,24 @@ before(async () => {
     }
 
     if (path === 'profiles' && request.method === 'GET') {
-      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false }]);
+      const profiles = [
+        { id: userId, user_id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false, deactivated_at: state.deactivatedAt, moderation_hidden_at: null },
+        { id: otherUserId, user_id: otherUserId, username: 'reader', display_name: 'Reader', avatar_url: null, verified: false, deactivated_at: null, moderation_hidden_at: null },
+      ];
+      const idFilter = url.searchParams.get('id') || '';
+      const userFilter = url.searchParams.get('user_id') || '';
+      const filterList = (filter) => filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : filter.startsWith('eq.') ? [filter.slice(3)] : [];
+      let rows = profiles;
+      if (idFilter) rows = rows.filter((profile) => filterList(idFilter).includes(profile.id));
+      if (userFilter) rows = rows.filter((profile) => filterList(userFilter).includes(profile.user_id));
+      return respondRows(request, response, rows);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
       const username = (url.searchParams.get('username') || '').replace(/^eq\./, '');
-      const rows = username === state.account.username ? [state.account] : [];
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      const rows = username === state.account.username || id === state.account.id ? [state.account]
+        : id === otherUserId ? [{ id: otherUserId, account_status: 'active' }] : [];
       return respondRows(request, response, rows);
     }
 
@@ -228,8 +280,98 @@ before(async () => {
     }
 
     if (path === 'stories' && request.method === 'GET') {
+      if ((url.searchParams.get('select') || '').includes('is_anonymous')) {
+        const ids = (url.searchParams.get('id') || '').replace(/^in\.\(/, '').replace(/\)$/, '').split(',');
+        return sendJson(response, state.discoveryStories.filter((story) => ids.includes(story.id)).map((story) => ({ id: story.id, is_anonymous: state.anonymousStoryIds.includes(story.id) })));
+      }
       const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
-      const rows = id === storyId ? [{ id: storyId, author_id: userId }] : [];
+      const rows = id === storyId ? [{ id: storyId, author_id: userId, moderation_hidden_at: null, hidden_by_deactivation: false }] : [];
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'user_blocks' && request.method === 'GET') {
+      const list = (filter) => filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : filter.startsWith('eq.') ? [filter.slice(3)] : [];
+      const blockerList = list(url.searchParams.get('blocker_id') || '');
+      const blockedList = list(url.searchParams.get('blocked_id') || '');
+      let rows = state.blocks;
+      if (url.searchParams.has('blocker_id')) rows = rows.filter((item) => blockerList.includes(item.blocker_id));
+      if (url.searchParams.has('blocked_id')) rows = rows.filter((item) => blockedList.includes(item.blocked_id));
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'story_reviews' && request.method === 'GET') {
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      const story = (url.searchParams.get('story_id') || '').replace(/^eq\./, '');
+      let rows = state.reviews;
+      if (id) rows = rows.filter((item) => item.id === id);
+      if (story) rows = rows.filter((item) => item.story_id === story);
+      return respondRows(request, response, rows);
+    }
+
+    if (path === 'review_likes' && ['GET', 'HEAD'].includes(request.method)) {
+      const reviewFilter = url.searchParams.get('review_id') || '';
+      const userFilter = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+      const ids = reviewFilter.startsWith('in.(') ? reviewFilter.slice(4, -1).split(',') : reviewFilter.startsWith('eq.') ? [reviewFilter.slice(3)] : [];
+      let rows = state.reviewLikes.filter((item) => ids.includes(item.review_id));
+      if (userFilter) rows = rows.filter((item) => item.user_id === userFilter);
+      if ((request.headers.prefer || '').includes('count=exact')) {
+        response.writeHead(200, { 'content-range': `0-0/${rows.length}` });
+        return response.end();
+      }
+      return respondRows(request, response, rows);
+    }
+    if (path === 'review_likes' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const item = JSON.parse(body);
+      if (!state.reviewLikes.some((like) => like.review_id === item.review_id && like.user_id === item.user_id)) state.reviewLikes.push({ id: `like-${state.reviewLikes.length + 1}`, ...item });
+      response.writeHead(201); return response.end();
+    }
+    if (path === 'review_likes' && request.method === 'DELETE') {
+      const review = (url.searchParams.get('review_id') || '').replace(/^eq\./, '');
+      const user = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
+      state.reviewLikes = state.reviewLikes.filter((item) => item.review_id !== review || item.user_id !== user);
+      response.writeHead(204); return response.end();
+    }
+
+    if (path === 'review_comments' && request.method === 'GET') {
+      const review = (url.searchParams.get('review_id') || '').replace(/^eq\./, '');
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      let rows = state.reviewComments.filter((item) => item.review_id === review);
+      if (id) rows = rows.filter((item) => item.id === id);
+      return respondRows(request, response, rows);
+    }
+    if (path === 'review_comments' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const item = { id: `review-comment-${state.reviewComments.length + 1}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...JSON.parse(body) };
+      state.reviewComments.push(item);
+      return respondRows(request, response, [item], 201);
+    }
+    if (path === 'review_comments' && request.method === 'DELETE') {
+      const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+      state.reviewComments = state.reviewComments.filter((item) => item.id !== id);
+      response.writeHead(204); return response.end();
+    }
+
+    if (path === 'user_notifications' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      state.notifications.push(JSON.parse(body));
+      response.writeHead(201); return response.end();
+    }
+
+    if (path === 'story_collaborators' && request.method === 'GET') {
+      const storyFilter = (url.searchParams.get('story_id') || '').replace(/^eq\./, '');
+      const profileFilter = (url.searchParams.get('profile_id') || '').replace(/^eq\./, '');
+      const roleFilter = (url.searchParams.get('role') || '').replace(/^eq\./, '');
+      const statusFilter = (url.searchParams.get('status') || '').replace(/^eq\./, '');
+      let rows = state.collaborators;
+      if (storyFilter) rows = rows.filter((item) => item.story_id === storyFilter);
+      if (profileFilter) rows = rows.filter((item) => item.profile_id === profileFilter);
+      if (roleFilter) rows = rows.filter((item) => item.role === roleFilter);
+      if (statusFilter) rows = rows.filter((item) => item.status === statusFilter);
+      if ((url.searchParams.get('select') || '').includes('story:stories')) rows = rows.map((item) => ({ ...item, story: { title: item.story_title || 'História de teste' } }));
       return respondRows(request, response, rows);
     }
 
@@ -273,6 +415,7 @@ before(async () => {
       env: {
         ...process.env,
         NODE_ENV: 'production',
+        VERCEL_ENV: 'preview',
         NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
         SUPABASE_URL: `http://127.0.0.1:${mockPort}`,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'ci-placeholder',
@@ -343,6 +486,63 @@ test('login rejects invalid credentials and creates a hashed session on success'
   assert.ok(state.sessions.every((session) => session.token_hash !== cookieToken));
 });
 
+test('content-warning correction requests stay private to authors and authorized moderation staff', async () => {
+  const authorRead = await fetch(`${baseUrl}/api/account/content-warning-corrections`);
+  assert.equal(authorRead.status, 401);
+
+  const authorSubmit = await fetch(`${baseUrl}/api/account/content-warning-corrections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'correction-1', author_response: 'Adicionei os avisos solicitados.' }),
+  });
+  assert.equal(authorSubmit.status, 401);
+
+  const moderationRead = await fetch(`${baseUrl}/api/admin/content-warning-corrections`);
+  assert.equal(moderationRead.status, 401);
+  const moderationCreate = await fetch(`${baseUrl}/api/admin/content-warning-corrections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ story_id: 'story-1', missing_warnings: ['violence'], notice: 'Add a warning.', due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }),
+  });
+  assert.equal(moderationCreate.status, 401);
+});
+
+test('moderation reports reject unsafe or excessive evidence links', async () => {
+  const login = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-vercel-forwarded-for': '198.51.100.55' },
+    body: JSON.stringify({ username: 'owner', password: 'correct-password' }),
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const cases = [
+    ['javascript:alert(1)'],
+    ['https://user:password@example.com/evidence'],
+    ['https://example.com/1', 'https://example.com/2', 'https://example.com/3', 'https://example.com/4'],
+  ];
+  for (const evidence_urls of cases) {
+    const response = await fetch(`${baseUrl}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ content_type: 'story', content_id: 'story-1', reason: 'safety', details: '', evidence_urls }),
+    });
+    assert.equal(response.status, 400);
+  }
+  const invalidImage = new FormData();
+  invalidImage.set('content_type', 'story');
+  invalidImage.set('content_id', 'story-1');
+  invalidImage.set('reason', 'safety');
+  invalidImage.set('details', '');
+  invalidImage.set('evidence_urls', JSON.stringify(['https://example.com/evidence']));
+  invalidImage.append('evidence_files', new Blob(['not an image'], { type: 'image/png' }), 'evidence.png');
+  const invalidImageResponse = await fetch(`${baseUrl}/api/reports`, {
+    method: 'POST', headers: { Cookie: cookie }, body: invalidImage,
+  });
+  assert.equal(invalidImageResponse.status, 400);
+  const unauthorizedEvidence = await fetch(`${baseUrl}/api/admin/reports/00000000-0000-4000-8000-000000000001/evidence/0`);
+  assert.equal(unauthorizedEvidence.status, 401);
+});
+
 test('login rate-limits repeated attempts', async () => {
   let response;
   for (let attempt = 0; attempt < 11; attempt += 1) {
@@ -400,8 +600,27 @@ test('chapter creation requires authentication and confirms story ownership', as
   });
   assert.equal(forbidden.status, 403);
 
+  state.collaborators.push({ story_id: storyId, profile_id: otherUserId, role: 'coauthor', status: 'active' });
+  state.chapters.push({ id: 'chapter-existing-two', story_id: storyId, chapter_number: 2 });
+  const coauthorCanEdit = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${otherToken}` },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(coauthorCanEdit.status, 201);
+  assert.equal((await coauthorCanEdit.json()).chapter.chapter_number, 3);
+  state.collaborators = [];
+
   const ownerToken = 'owner-session-token';
   state.sessions.push({ user_id: userId, token_hash: hash(ownerToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  state.deactivatedAt = new Date().toISOString();
+  const deactivatedCannotInteract = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${ownerToken}` },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(deactivatedCannotInteract.status, 401);
+  state.deactivatedAt = null;
   state.chapters.push({ id: 'chapter-existing', story_id: storyId, chapter_number: 2 });
   const created = await fetch(endpoint, {
     method: 'POST',
@@ -410,12 +629,91 @@ test('chapter creation requires authentication and confirms story ownership', as
   });
   assert.equal(created.status, 201);
   const result = await created.json();
-  assert.equal(result.chapter.chapter_number, 3);
+  assert.equal(result.chapter.chapter_number, 4);
   assert.equal(result.chapter.title, 'Novo capítulo');
+});
+
+test('collaborators can leave only their own role and withdraw a confirmed credit', async () => {
+  const otherToken = 'designer-collaboration-session';
+  const ownerToken = 'owner-session-token';
+  const collaborationStoryId = '00000000-0000-4000-8000-000000000001';
+  state.sessions.push({ user_id: otherUserId, token_hash: hash(otherToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  if (!state.sessions.some((session) => session.token_hash === hash(ownerToken))) {
+    state.sessions.push({ user_id: userId, token_hash: hash(ownerToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  }
+  state.collaborators.push({ id: 'designer-membership', story_id: collaborationStoryId, profile_id: otherUserId, role: 'designer', status: 'active', story_title: 'História colaborativa' });
+  state.storyCredits.push({ story_id: collaborationStoryId, contributor_id: otherUserId, role: 'designer', status: 'accepted' });
+
+  const list = await fetch(`${baseUrl}/api/account/collaborations`, { headers: { Cookie: `toriland_session=${otherToken}` } });
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).collaborations[0].story_title, 'História colaborativa');
+
+  const unauthorized = await fetch(`${baseUrl}/api/account/collaborations`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${ownerToken}` },
+    body: JSON.stringify({ story_id: collaborationStoryId, role: 'designer' }),
+  });
+  assert.equal(unauthorized.status, 404);
+  assert.equal(state.collaborators[0].status, 'active');
+
+  const withdrawn = await fetch(`${baseUrl}/api/account/collaborations`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=${otherToken}` },
+    body: JSON.stringify({ story_id: collaborationStoryId, role: 'designer' }),
+  });
+  assert.equal(withdrawn.status, 200);
+  assert.deepEqual(await withdrawn.json(), { left: true, role: 'designer' });
+  assert.equal(state.collaborators[0].status, 'left');
+  assert.equal(state.storyCredits[0].status, 'withdrawn');
+  state.collaborators = [];
+  state.storyCredits = [];
+});
+
+test('readers can like and discuss a review while spoiler comments stay labeled and manageable', async () => {
+  const reviewId = 'review-one';
+  const otherToken = 'review-owner-session';
+  state.sessions.push({ user_id: otherUserId, token_hash: hash(otherToken), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  state.reviews.push({ id: reviewId, story_id: storyId, reviewer_id: otherUserId, contains_spoilers: true });
+
+  const ownReviewLike = await fetch(`${baseUrl}/api/reviews/${reviewId}/likes`, {
+    method: 'POST', headers: { Cookie: `toriland_session=${otherToken}` },
+  });
+  assert.equal(ownReviewLike.status, 403);
+
+  const likeUrl = `${baseUrl}/api/reviews/${reviewId}/likes`;
+  const liked = await fetch(likeUrl, { method: 'POST', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.equal(liked.status, 200);
+  assert.deepEqual(await liked.json(), { liked: true, count: 1 });
+  const duplicateLike = await fetch(likeUrl, { method: 'POST', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.equal((await duplicateLike.json()).count, 1);
+
+  const commentsUrl = `${baseUrl}/api/reviews/${reviewId}/comments`;
+  const created = await fetch(commentsUrl, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: `toriland_session=owner-session-token` },
+    body: JSON.stringify({ body: 'A reviravolta do final é muito boa.', contains_spoilers: true }),
+  });
+  assert.equal(created.status, 201);
+  const comment = (await created.json()).comment;
+  assert.equal(comment.contains_spoilers, true);
+  assert.equal(state.notifications.length, 1);
+
+  const protectedComments = await fetch(commentsUrl);
+  assert.equal(protectedComments.status, 403);
+  const listed = await fetch(`${commentsUrl}?reveal_spoilers=1`);
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).comments[0].contains_spoilers, true);
+
+  const removed = await fetch(`${commentsUrl}?comment_id=${comment.id}`, {
+    method: 'DELETE', headers: { Cookie: `toriland_session=owner-session-token` },
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(state.reviewComments.length, 0);
+
+  const unliked = await fetch(likeUrl, { method: 'DELETE', headers: { Cookie: `toriland_session=owner-session-token` } });
+  assert.deepEqual(await unliked.json(), { liked: false, count: 0 });
 });
 
 
 test('discovery applies included and excluded tags, rating, status, and sort', async () => {
+  state.anonymousStoryIds.push('story-filter-one');
   const response = await fetch(
     `${baseUrl}/api/explore?includeTag=fantasia&includeTag=romance&excludeTag=terror&rating=12&status=${encodeURIComponent('Concluída')}&sort=newest`,
   );
@@ -423,6 +721,9 @@ test('discovery applies included and excluded tags, rating, status, and sort', a
   const result = await response.json();
   assert.deepEqual(result.stories.map((story) => story.id), ['story-filter-one']);
   assert.deepEqual(result.stories[0].tags.map((tag) => tag.slug).sort(), ['fantasia', 'romance']);
+  assert.equal(result.stories[0].author, null);
+  assert.equal(result.stories[0].author_label, 'Autor anônimo');
+  state.anonymousStoryIds = [];
 });
 
 test('signed-in readers can publish a categorized tag immediately and duplicates are reused', async () => {
@@ -472,4 +773,80 @@ test('story discovery can continue to the next page', async () => {
   assert.equal(secondPage.stories.length, 3);
   assert.equal(secondPage.has_more, false);
   assert.equal(new Set([...firstPage.stories, ...secondPage.stories].map((story) => story.id)).size, 27);
+});
+
+
+
+test('story discovery rejects unsupported age ratings', async () => {
+  const invalidFilter = await fetch(`${baseUrl}/api/explore?rating=10`);
+  assert.equal(invalidFilter.status, 400);
+});
+
+
+test('policy acceptance records only the exact published version the reader viewed', async () => {
+  state.policies = [
+    { id: 'policy-current', slug: 'terms', version: '1.0.0', title: 'Termos', content_md: '## Regras\nTexto.', status: 'published', requires_reacceptance: true, published_at: '2026-11-02T12:00:00Z' },
+    { id: 'policy-draft', slug: 'privacy', version: '2.0.0', title: 'Privacidade', content_md: '[PREENCHER CANAL]', status: 'draft', requires_reacceptance: false, published_at: null },
+  ];
+  const token = 'policy-reader-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60000).toISOString() });
+  const headers = { Cookie: `toriland_session=${token}`, 'Content-Type': 'application/json' };
+  const details = await fetch(`${baseUrl}/api/policies/terms`);
+  assert.equal((await details.json()).policy.id, 'policy-current');
+  const list = await fetch(`${baseUrl}/api/policies`);
+  assert.deepEqual((await list.json()).policies.map((row) => row.slug), ['terms']);
+  const accept = (body, authenticated = true) => fetch(`${baseUrl}/api/policies/terms/accept`, { method: 'POST', headers: authenticated ? headers : { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' }, false)).status, 401);
+  assert.equal((await accept({})).status, 400);
+  assert.equal((await accept({ policy_id: 'policy-old', version: '0.1.0' })).status, 409);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '0.1.0' })).status, 409);
+  assert.equal(state.policyAcceptances.length, 0);
+  let status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required.length, 1);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 200);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 200);
+  assert.equal(state.policyAcceptances.length, 1);
+  status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required.length, 0);
+  state.policies[0].status = 'archived';
+  state.policies.push({ ...state.policies[0], id: 'policy-new', version: '1.1.0', status: 'published', published_at: '2026-11-03T12:00:00Z' });
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 409);
+  status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required[0].id, 'policy-new');
+});
+
+test('publication reports missing service details and denies incomplete documents', async () => {
+  const token = 'policy-admin-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60000).toISOString() });
+  const headers = { Cookie: `toriland_session=${token}`, 'Content-Type': 'application/json' };
+  const publish = () => fetch(`${baseUrl}/api/admin/policies`, { method: 'POST', headers, body: JSON.stringify({ action: 'publish', policy_id: 'policy-draft' }) });
+  state.isAdmin = false;
+  assert.equal((await publish()).status, 403);
+  state.isAdmin = true;
+  try {
+    const response = await publish();
+    assert.equal(response.status, 422);
+    assert.deepEqual((await response.json()).issues, ['CANAL']);
+    const list = await fetch(`${baseUrl}/api/admin/policies`, { headers });
+    assert.deepEqual((await list.json()).policies.find((row) => row.id === 'policy-draft').publication_issues, ['CANAL']);
+  } finally { state.isAdmin = false; }
+});
+
+
+test('preview hosts serve new routes without redirecting to production', async () => {
+  const response = await fetch(`${baseUrl}/politicas`, { headers: { Host: 'nooklie-qa.vercel.app' }, redirect: 'manual' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+  assert.match(await response.text(), /Políticas do Nooklie/);
+});
+
+
+test('robots declares training opt-outs while allowing ordinary discovery', async () => {
+  const response = await fetch(`${baseUrl}/robots.txt`);
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  assert.match(text, /User-Agent: \*\nAllow: \//i);
+  for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) {
+    assert.match(text, new RegExp(`User-Agent: ${agent}\\n(?:User-Agent: [^\\n]+\\n)*Disallow: /`, 'i'));
+  }
 });

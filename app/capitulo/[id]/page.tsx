@@ -5,8 +5,12 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type MouseEvent,
+  type TouchEvent,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ChapterFavoriteButton from '@/components/ChapterFavoriteButton';
+import ReportContentButton from '@/components/ReportContentButton';
 
 type Chapter = {
   id: string;
@@ -75,6 +79,12 @@ export default function CapituloPage() {
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
+
+  const chapterContentRef =
+    useRef<HTMLElement | null>(null);
+
+  const readerTouchRef =
+    useRef<{ x: number; y: number; timer: number } | null>(null);
 
   const [chapter, setChapter] =
     useState<Chapter | null>(null);
@@ -426,49 +436,81 @@ export default function CapituloPage() {
     setShowCommentBox(true);
   }
 
-  function handleTextSelection() {
+  function openCommentForText(text: string, start: number) {
+    if (!text || start < 0) return;
     setCommentMode('selection');
-
-    const selection =
-      window.getSelection();
-
-    if (
-      !selection ||
-      selection.isCollapsed
-    ) {
-      return;
-    }
-
-    const text =
-      selection.toString().trim();
-
-    if (!text) {
-      return;
-    }
-
-    if (!chapter?.body) {
-      return;
-    }
-
-    const plainBody =
-      chapter.body.replace(
-        /<[^>]*>/g,
-        ''
-      );
-
-    const start =
-      plainBody.indexOf(text);
-
-    if (start === -1) {
-      return;
-    }
-
     setSelectedText(text);
     setSelectionOffset(start);
     setCommentText('');
     setSelectedSticker(null);
     setShowStickers(false);
     setShowCommentBox(true);
+  }
+
+  function selectReaderWordAtPoint(x: number, y: number) {
+    const contentRoot = chapterContentRef.current;
+    if (!contentRoot) return;
+
+    const pointDocument = document as Document & {
+      caretRangeFromPoint?: (clientX: number, clientY: number) => Range | null;
+      caretPositionFromPoint?: (clientX: number, clientY: number) => { offsetNode: Node; offset: number } | null;
+    };
+    let pointRange = pointDocument.caretRangeFromPoint?.(x, y) || null;
+    if (!pointRange) {
+      const position = pointDocument.caretPositionFromPoint?.(x, y);
+      if (position) {
+        pointRange = document.createRange();
+        pointRange.setStart(position.offsetNode, position.offset);
+        pointRange.collapse(true);
+      }
+    }
+    if (!pointRange || !contentRoot.contains(pointRange.startContainer)) return;
+
+    const prefixRange = document.createRange();
+    prefixRange.selectNodeContents(contentRoot);
+    prefixRange.setEnd(pointRange.startContainer, pointRange.startOffset);
+    const offset = prefixRange.toString().length;
+    const content = contentRoot.textContent || '';
+    const word = Array.from(content.matchAll(/[\p{L}\p{N}_]+/gu))
+      .find((match) => {
+        const start = match.index ?? 0;
+        return offset >= start && offset <= start + match[0].length;
+      });
+    if (!word) return;
+    openCommentForText(word[0], word.index ?? 0);
+  }
+
+  function handleReaderDoubleClick(event: MouseEvent<HTMLElement>) {
+    event.preventDefault();
+    selectReaderWordAtPoint(event.clientX, event.clientY);
+  }
+
+  function handleReaderTouchStart(event: TouchEvent<HTMLElement>) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    if (readerTouchRef.current) window.clearTimeout(readerTouchRef.current.timer);
+    const x = touch.clientX;
+    const y = touch.clientY;
+    const timer = window.setTimeout(() => {
+      readerTouchRef.current = null;
+      selectReaderWordAtPoint(x, y);
+    }, 550);
+    readerTouchRef.current = { x, y, timer };
+  }
+
+  function handleReaderTouchMove(event: TouchEvent<HTMLElement>) {
+    const touch = event.touches[0];
+    const start = readerTouchRef.current;
+    if (!touch || !start) return;
+    if (Math.abs(touch.clientX - start.x) > 10 || Math.abs(touch.clientY - start.y) > 10) {
+      window.clearTimeout(start.timer);
+      readerTouchRef.current = null;
+    }
+  }
+
+  function handleReaderTouchEnd() {
+    if (readerTouchRef.current) window.clearTimeout(readerTouchRef.current.timer);
+    readerTouchRef.current = null;
   }
 
   function cancelComment() {
@@ -808,6 +850,7 @@ export default function CapituloPage() {
     if (looksLikeHtml) {
       return (
         <div
+          ref={(node) => { chapterContentRef.current = node; }}
           className="
             chapter-content
             text-[18px]
@@ -815,12 +858,13 @@ export default function CapituloPage() {
             text-gray-200
             font-serif
           "
-          onMouseUp={
-            handleTextSelection
-          }
-          onTouchEnd={
-            handleTextSelection
-          }
+          onDoubleClick={handleReaderDoubleClick}
+          onTouchStart={handleReaderTouchStart}
+          onTouchMove={handleReaderTouchMove}
+          onTouchEnd={handleReaderTouchEnd}
+          onTouchCancel={handleReaderTouchEnd}
+          onCopy={(event) => event.preventDefault()}
+          onContextMenu={(event) => event.preventDefault()}
           dangerouslySetInnerHTML={{
             __html: body,
           }}
@@ -830,12 +874,14 @@ export default function CapituloPage() {
 
     return (
       <article
-        onMouseUp={
-          handleTextSelection
-        }
-        onTouchEnd={
-          handleTextSelection
-        }
+        ref={(node) => { chapterContentRef.current = node; }}
+        onDoubleClick={handleReaderDoubleClick}
+        onTouchStart={handleReaderTouchStart}
+        onTouchMove={handleReaderTouchMove}
+        onTouchEnd={handleReaderTouchEnd}
+        onTouchCancel={handleReaderTouchEnd}
+        onCopy={(event) => event.preventDefault()}
+        onContextMenu={(event) => event.preventDefault()}
         className="
           chapter-content
           text-[18px]
@@ -938,6 +984,9 @@ export default function CapituloPage() {
           .chapter-content {
             max-width: 100%;
             overflow-wrap: anywhere;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
           }
 
           .chapter-content p {
@@ -1007,6 +1056,7 @@ export default function CapituloPage() {
             border-radius: 1rem;
             margin: 1.5rem auto;
             object-fit: contain;
+            -webkit-user-drag: none;
           }
 
           .chapter-content figure {
@@ -1102,6 +1152,7 @@ export default function CapituloPage() {
           <h1 className="text-3xl font-bold">
             {chapter.title}
           </h1>
+          <div className="mt-2"><ReportContentButton contentType="chapter" contentId={chapter.id} /></div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
@@ -1151,6 +1202,8 @@ export default function CapituloPage() {
             >
               Comentar
             </button>
+
+            {chapter.published && <ChapterFavoriteButton chapterId={chapter.id} />}
           </div>
 
           {error && (
@@ -1162,6 +1215,9 @@ export default function CapituloPage() {
 
         {/* CONTEÚDO */}
 
+        <p className="mb-4 text-xs text-gray-500">
+          Para comentar uma palavra, dê dois cliques nela no computador ou pressione por um instante no celular.
+        </p>
         {renderChapterBody()}
 
         {/* MÍDIAS DO CAPÍTULO */}
@@ -2002,6 +2058,7 @@ export default function CapituloPage() {
                         />
                       </div>
                     )}
+                    <div className="mt-3"><ReportContentButton contentType="comment" contentId={comment.id} compact /></div>
                   </div>
                 )
               )}
@@ -2275,3 +2332,4 @@ export default function CapituloPage() {
     </main>
   );
 }
+

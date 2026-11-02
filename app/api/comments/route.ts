@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
+import { areUsersBlocked } from '@/lib/community/blocks';
 
 const supabase = createClient(
 process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,10 +60,10 @@ if (!chapterId) {
 
 const { data: chapterVisibility } = await supabase
   .from('chapters')
-  .select('story_id')
+  .select('story_id, moderation_hidden_at')
   .eq('id', chapterId)
   .maybeSingle();
-if (!chapterVisibility || !(await isPublicStoryVisible(supabase, chapterVisibility.story_id))) {
+if (!chapterVisibility || chapterVisibility.moderation_hidden_at || !(await isPublicStoryVisible(supabase, chapterVisibility.story_id))) {
   return NextResponse.json({ comments: [] });
 }
 
@@ -89,6 +90,7 @@ const { data: comments, error } = await supabase
     )
   `)
   .eq('chapter_id', chapterId)
+  .is('moderation_hidden_at', null)
   .order('created_at', {
     ascending: true,
   });
@@ -102,9 +104,22 @@ if (error) {
   );
 }
 
-return NextResponse.json({
-  comments: comments || [],
-});
+const viewerId = await getUserId(request);
+let visibleComments = comments || [];
+if (viewerId) {
+  const [blocked, blockers] = await Promise.all([
+    supabase.from('user_blocks').select('blocked_id').eq('blocker_id', viewerId),
+    supabase.from('user_blocks').select('blocker_id').eq('blocked_id', viewerId),
+  ]);
+  if (blocked.error || blockers.error) throw blocked.error || blockers.error;
+  const hiddenIds = new Set([
+    ...(blocked.data || []).map((row) => row.blocked_id),
+    ...(blockers.data || []).map((row) => row.blocker_id),
+  ]);
+  visibleComments = visibleComments.filter((comment) => !hiddenIds.has(comment.user_id));
+}
+
+return NextResponse.json({ comments: visibleComments });
 
 } catch {
 return NextResponse.json(
@@ -169,9 +184,10 @@ if (
 
 const { data: chapter } = await supabase
   .from('chapters')
-  .select('id')
+  .select('id, moderation_hidden_at')
   .eq('id', chapterId)
   .eq('published', true)
+  .is('moderation_hidden_at', null)
   .maybeSingle();
 
 if (!chapter) {
@@ -186,6 +202,22 @@ if (!chapter) {
 const { data: chapterStory } = await supabase.from('chapters').select('story_id').eq('id', chapterId).maybeSingle();
 if (!chapterStory || !(await isPublicStoryVisible(supabase, chapterStory.story_id))) {
   return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404 });
+}
+
+const { data: storyOwner, error: storyOwnerError } = await supabase
+  .from('stories').select('author_id').eq('id', chapterStory.story_id).maybeSingle();
+if (storyOwnerError) throw storyOwnerError;
+if (storyOwner && await areUsersBlocked(supabase, userId, storyOwner.author_id)) {
+  return NextResponse.json({ error: 'Esta interação não está disponível.' }, { status: 403 });
+}
+
+if (typeof body.parent_comment_id === 'string') {
+  const { data: parent, error: parentError } = await supabase.from('comments')
+    .select('user_id').eq('id', body.parent_comment_id).eq('chapter_id', chapterId).is('moderation_hidden_at', null).maybeSingle();
+  if (parentError) throw parentError;
+  if (parent && await areUsersBlocked(supabase, userId, parent.user_id)) {
+    return NextResponse.json({ error: 'Esta interação não está disponível.' }, { status: 403 });
+  }
 }
 
 let sticker = null;

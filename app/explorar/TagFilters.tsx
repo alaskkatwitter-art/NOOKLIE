@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { storyRatings } from '@/lib/stories/rating';
 
 type Category = { id: string; name: string; slug: string };
 type CatalogTag = {
@@ -17,14 +18,7 @@ type CurrentUser = { id: string; username: string } | null;
 
 type Props = { currentUser: CurrentUser };
 
-const ratings = [
-  { value: 'Livre', label: 'Livre' },
-  { value: '10', label: '10 anos' },
-  { value: '12', label: '12 anos' },
-  { value: '14', label: '14 anos' },
-  { value: '16', label: '16 anos' },
-  { value: '18', label: '18 anos' },
-];
+const ratings = storyRatings.map((value) => ({ value, label: value === 'Livre' ? 'Livre' : `${value} anos` }));
 
 function filterClass() {
   return 'rounded-xl border border-white/10 bg-[#100b12] px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#ff78b9]/50';

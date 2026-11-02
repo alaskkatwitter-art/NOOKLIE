@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isStoryRating } from '@/lib/stories/rating';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -158,17 +159,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const allowedRatings = [
-      '',
-      'Livre',
-      '10',
-      '12',
-      '14',
-      '16',
-      '18',
-    ];
-
-    if (!allowedRatings.includes(rating)) {
+    if (rating && !isStoryRating(rating)) {
       return NextResponse.json(
         {
           error:

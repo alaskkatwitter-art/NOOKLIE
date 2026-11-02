@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { isStoryRating } from '@/lib/stories/rating';
+import { getStoryEditAccess } from '@/lib/stories/access';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -121,7 +123,8 @@ async function publishDueScheduledChapters(
       .select(`
         id,
         story_id,
-        published
+        published,
+        moderation_hidden_at
       `)
       .eq(
         'id',
@@ -149,6 +152,7 @@ async function publishDueScheduledChapters(
 
       continue;
     }
+    if (chapter.moderation_hidden_at) continue;
 
     if (
       chapter.story_id !==
@@ -265,7 +269,8 @@ export async function GET(
         rating,
         created_at,
         updated_at,
-        moderation_hidden_at
+        moderation_hidden_at,
+        is_anonymous
       `)
       .eq(
         'id',
@@ -302,6 +307,10 @@ export async function GET(
         }
       );
     }
+
+    const editAccess = currentUserId
+      ? await getStoryEditAccess(supabase, id, currentUserId)
+      : { canEdit: false, isOwner: false };
 
     /*
      * ==================================================
@@ -389,7 +398,7 @@ export async function GET(
         chaptersQuery.eq(
           'published',
           true
-        );
+        ).is('moderation_hidden_at', null);
     }
 
     const {
@@ -645,9 +654,11 @@ export async function GET(
       {
         story: {
           ...story,
-
-          author:
-            author || null,
+          can_edit: editAccess.canEdit,
+          can_manage_anonymity: currentUserId === story.author_id,
+          author_id: story.is_anonymous && currentUserId !== story.author_id ? null : story.author_id,
+          author_label: story.is_anonymous ? 'Autor anônimo' : null,
+          author: story.is_anonymous && currentUserId !== story.author_id ? null : author || null,
 
           tags,
 
@@ -805,10 +816,8 @@ export async function PUT(
       );
     }
 
-    if (
-      existingStory.author_id !==
-      userId
-    ) {
+    const editAccess = await getStoryEditAccess(supabase, id, userId);
+    if (!editAccess.canEdit) {
       return NextResponse.json(
         {
           error:
@@ -924,22 +933,7 @@ export async function PUT(
       );
     }
 
-    const allowedRatings =
-      [
-        '',
-        'Livre',
-        '10',
-        '12',
-        '14',
-        '16',
-        '18',
-      ];
-
-    if (
-      !allowedRatings.includes(
-        rating
-      )
-    ) {
+    if (rating && !isStoryRating(rating)) {
       return NextResponse.json(
         {
           error:
@@ -1093,6 +1087,15 @@ export async function PUT(
      * ATUALIZA HISTÓRIA
      * ==================================================
      */
+
+    const { error: historyError } = await supabase.from('story_edit_history').insert({
+      story_id: id,
+      actor_id: userId,
+      entity_type: 'story',
+      entity_id: id,
+      snapshot: existingStory,
+    });
+    if (historyError) throw historyError;
 
     const {
       data: updatedStory,

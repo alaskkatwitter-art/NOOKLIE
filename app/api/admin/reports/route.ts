@@ -29,7 +29,7 @@ export async function GET() {
     const departmentIds = await moderationDepartments(staff);
     if (!staff.isPlatformAdmin && !departmentIds.length) return NextResponse.json({ reports: [] }, { headers: noStore });
     let query = supabase.from('moderation_reports')
-      .select('id, reporter_id, target_user_id, department_id, content_type, content_id, reason, details, status, internal_notes, reviewer_id, reviewed_at, created_at')
+      .select('id, reporter_id, target_user_id, department_id, content_type, content_id, reason, details, evidence_urls, evidence_paths, status, internal_notes, reviewer_id, reviewed_at, created_at')
       .order('created_at', { ascending: false })
       .limit(300);
     if (!staff.isPlatformAdmin) query = query.in('department_id', departmentIds);
@@ -42,12 +42,19 @@ export async function GET() {
     if (profilesError) throw profilesError;
     const storyIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'story').map((item) => item.content_id)));
     const postIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'post').map((item) => item.content_id)));
-    const [storiesResult, postsResult] = await Promise.all([
+    const chapterIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'chapter').map((item) => item.content_id)));
+    const commentIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'comment').map((item) => item.content_id)));
+    const reviewIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'review').map((item) => item.content_id)));
+    const reviewCommentIds = Array.from(new Set((reports || []).filter((item) => item.content_type === 'review_comment').map((item) => item.content_id)));
+    const [storiesResult, postsResult, chaptersResult, commentsResult, reviewsResult, reviewCommentsResult] = await Promise.all([
       storyIds.length ? supabase.from('stories').select('id, title, moderation_hidden_at').in('id', storyIds) : Promise.resolve({ data: [], error: null }),
       postIds.length ? supabase.from('nook_posts').select('id, body, moderation_hidden_at').in('id', postIds) : Promise.resolve({ data: [], error: null }),
+      chapterIds.length ? supabase.from('chapters').select('id, title, body, moderation_hidden_at').in('id', chapterIds) : Promise.resolve({ data: [], error: null }),
+      commentIds.length ? supabase.from('comments').select('id, body, moderation_hidden_at').in('id', commentIds) : Promise.resolve({ data: [], error: null }),
+      reviewIds.length ? supabase.from('story_reviews').select('id, body, rating, contains_spoilers, moderation_hidden_at').in('id', reviewIds) : Promise.resolve({ data: [], error: null }),
+      reviewCommentIds.length ? supabase.from('review_comments').select('id, body, moderation_hidden_at').in('id', reviewCommentIds) : Promise.resolve({ data: [], error: null }),
     ]);
-    if (storiesResult.error) throw storiesResult.error;
-    if (postsResult.error) throw postsResult.error;
+    for (const result of [storiesResult, postsResult, chaptersResult, commentsResult, reviewsResult, reviewCommentsResult]) if (result.error) throw result.error;
     return NextResponse.json({
       reports: (reports || []).map((report) => ({
         ...report,
@@ -57,12 +64,28 @@ export async function GET() {
           ? Boolean((profiles || []).find((profile) => profile.user_id === report.target_user_id)?.moderation_hidden_at)
           : report.content_type === 'story'
             ? Boolean((storiesResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
-            : Boolean((postsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at),
+            : report.content_type === 'post'
+              ? Boolean((postsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
+              : report.content_type === 'chapter'
+                ? Boolean((chaptersResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
+                : report.content_type === 'comment'
+                  ? Boolean((commentsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
+                  : report.content_type === 'review'
+                    ? Boolean((reviewsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at)
+                    : Boolean((reviewCommentsResult.data || []).find((item) => item.id === report.content_id)?.moderation_hidden_at),
         content: report.content_type === 'story'
           ? (storiesResult.data || []).find((item) => item.id === report.content_id) || null
           : report.content_type === 'post'
             ? (postsResult.data || []).find((item) => item.id === report.content_id) || null
-            : null,
+            : report.content_type === 'chapter'
+              ? (chaptersResult.data || []).find((item) => item.id === report.content_id) || null
+              : report.content_type === 'comment'
+                ? (commentsResult.data || []).find((item) => item.id === report.content_id) || null
+                : report.content_type === 'review'
+                  ? (reviewsResult.data || []).find((item) => item.id === report.content_id) || null
+                  : report.content_type === 'review_comment'
+                    ? (reviewCommentsResult.data || []).find((item) => item.id === report.content_id) || null
+                    : null,
       })),
     }, { headers: noStore });
   } catch (error) {

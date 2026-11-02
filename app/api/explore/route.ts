@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { isStoryRating } from '@/lib/stories/rating';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabase = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY!);
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Página inválida.' }, { status: 400 });
     }
 
-    if (rating && !['Livre', '10', '12', '14', '16', '18'].includes(rating)) {
+    if (rating && !isStoryRating(rating)) {
       return NextResponse.json({ error: 'Classificação inválida.' }, { status: 400 });
     }
     if (storyStatus && !['Em andamento', 'Concluída'].includes(storyStatus)) {
@@ -210,6 +211,12 @@ export async function GET(request: Request) {
     }
 
     const storyRows = (stories || []) as StoryRow[];
+    const storyIds = storyRows.map((story) => story.id);
+    const { data: privacyRows, error: privacyError } = storyIds.length
+      ? await supabase.from('stories').select('id, is_anonymous').in('id', storyIds)
+      : { data: [], error: null };
+    if (privacyError) throw privacyError;
+    const anonymousStoryIds = new Set((privacyRows || []).filter((story) => story.is_anonymous).map((story) => story.id));
 
     /*
      * =========================================================
@@ -220,6 +227,7 @@ export async function GET(request: Request) {
     const authorIds = Array.from(
       new Set(
         storyRows
+          .filter((story) => !anonymousStoryIds.has(story.id))
           .map((story) => story.author_id)
           .filter(Boolean)
       )
@@ -267,10 +275,6 @@ export async function GET(request: Request) {
      * =========================================================
      */
 
-    const storyIds = storyRows.map(
-      (story) => story.id
-    );
-
     let publishedStoryIds = new Set<string>();
 
     if (storyIds.length > 0) {
@@ -281,7 +285,8 @@ export async function GET(request: Request) {
         .from('chapters')
         .select('story_id')
         .in('story_id', storyIds)
-        .eq('published', true);
+        .eq('published', true)
+        .is('moderation_hidden_at', null);
 
       if (chaptersError) {
         console.error(
@@ -390,7 +395,8 @@ export async function GET(request: Request) {
         status: story.status,
         rating: story.rating,
         tags: tagsByStory.get(story.id) || [],
-        author: story.author_id
+        author_label: anonymousStoryIds.has(story.id) ? 'Autor anônimo' : null,
+        author: !anonymousStoryIds.has(story.id) && story.author_id
           ? authorMap.get(story.author_id) || null
           : null,
         is_saved: savedStoryIds.has(story.id),

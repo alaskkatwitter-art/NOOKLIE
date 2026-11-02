@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { getStoryEditAccess } from '@/lib/stories/access';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
@@ -71,6 +72,14 @@ async function getAuthenticatedUser(request: Request) {
   ) {
     return null;
   }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('deactivated_at')
+    .eq('user_id', session.user_id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile || profile.deactivated_at) return null;
 
   return session.user_id;
 }
@@ -309,7 +318,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (story.author_id !== userId) {
+    const editAccess = await getStoryEditAccess(supabase, storyId, userId);
+    if (!editAccess.canEdit) {
       return NextResponse.json(
         {
           error:
