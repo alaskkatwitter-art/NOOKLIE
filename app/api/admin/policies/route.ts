@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getStaffContext, hasStaffPermission, staffPermissionErrorResponse } from '@/lib/admin/authorization';
+import { policyPublicationIssues } from '@/lib/policies/publication';
 
 const supabase = createClient(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!);
 const noStore = { 'Cache-Control': 'no-store' };
@@ -27,7 +28,7 @@ export async function GET() {
       .select('id, slug, version, title, content_md, status, requires_reacceptance, published_at, created_at, created_by')
       .order('created_at', { ascending: false }).limit(300);
     if (error) return dbError(error);
-    return NextResponse.json({ policies: data || [] }, { headers: noStore });
+    return NextResponse.json({ policies: (data || []).map((policy) => ({ ...policy, publication_issues: policyPublicationIssues(policy.content_md) })) }, { headers: noStore });
   } catch (error) {
     console.error('GET /api/admin/policies:', error);
     return NextResponse.json({ error: 'Não foi possível carregar os documentos.' }, { status: 500, headers: noStore });
@@ -77,11 +78,13 @@ export async function POST(request: NextRequest) {
     if (action === 'publish' || action === 'archive') {
       const id = typeof body.policy_id === 'string' ? body.policy_id : '';
       if (!id) return NextResponse.json({ error: 'Documento não informado.' }, { status: 400, headers: noStore });
-      const { data: policy, error: findError } = await supabase.from('policy_documents').select('id, slug, version, status').eq('id', id).maybeSingle();
+      const { data: policy, error: findError } = await supabase.from('policy_documents').select('id, slug, version, status, content_md').eq('id', id).maybeSingle();
       if (findError) return dbError(findError);
       if (!policy) return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: noStore });
       if (action === 'publish') {
         if (policy.status !== 'draft') return NextResponse.json({ error: 'Somente minutas podem ser publicadas como nova versão.' }, { status: 409, headers: noStore });
+        const issues = policyPublicationIssues(policy.content_md);
+        if (issues.length) return NextResponse.json({ error: 'Complete os dados indicados no documento antes de publicar.', issues }, { status: 422, headers: noStore });
         const now = new Date().toISOString();
         const { error } = await supabase.from('policy_documents').update({ status: 'published', published_at: now }).eq('id', id).eq('status', 'draft');
         if (error) return dbError(error);

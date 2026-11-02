@@ -247,109 +247,118 @@ on conflict (code) do nothing;
 insert into public.policy_documents (slug, version, title, content_md, status, requires_reacceptance)
 values
 ('terms', '0.1.0', 'Termos de Uso', $policy$
-> MINUTA EM REVISÃO — não publicar antes de revisão jurídica e aprovação administrativa.
+## O serviço
+O Nooklie é uma plataforma independente e gratuita para ler e compartilhar histórias originais e fanfictions, incluindo universos alternativos, crossovers e personagens originais. Não há anúncios, assinaturas, venda de obras ou cobrança pelo uso.
 
-## O que é o Nooklie
-Plataforma independente, gratuita e não comercial para leitura, criação e compartilhamento de histórias. O projeto não oferece anúncios, assinaturas, planos pagos nem venda de histórias.
+## Sua conta
+Use nome de usuário e senha. Guarde sua chave de recuperação em local seguro: não exigimos e-mail, telefone, nome civil ou data de nascimento no cadastro. Não compartilhe senha nem chave. Contas múltiplas e pseudônimos são permitidos, mas não podem ser usados para perseguir pessoas, manipular interações ou contornar medidas de moderação.
 
-## Conteúdo e autoria
-Quem publica mantém a autoria e os direitos sobre as próprias contribuições. A publicação concede ao Nooklie apenas a permissão técnica necessária para hospedar, armazenar, processar e exibir o conteúdo nos recursos escolhidos pela pessoa. O Nooklie não reivindica coautoria, propriedade ou uso para treinamento de IA sem autorização específica.
+## Publicação e direitos
+Você mantém os direitos sobre suas contribuições e concede uma licença não exclusiva e gratuita, limitada a hospedar, processar e exibir o que publicar nas funções escolhidas. Isso não transfere sua autoria nem autoriza venda ou treinamento de inteligência artificial. Direitos de terceiros continuam protegidos. Leia a Política de Direitos Autorais antes de publicar fanfictions, traduções ou imagens.
 
-## Responsabilidade e convivência
-Autores escolhem classificações e avisos de conteúdo e devem respeitar as regras da comunidade. Críticas a obras são permitidas; ataques, assédio, exposição de dados pessoais e conteúdo vedado pelas regras serão analisados pela moderação.
+## Regras e funcionamento
+Escolha a classificação e os avisos adequados. As Diretrizes da Comunidade, a Política de Conteúdo e a Política de Moderação explicam as restrições e os recursos contra decisões. O serviço pode sofrer interrupções; mantenha cópias das suas obras. Não prometemos disponibilidade contínua ou proteção absoluta contra cópia.
 
-## Revisão necessária
-Confirmar identidade e contato do controlador, regras para menores, limitações do serviço, retenção, encerramento da conta, notificações legais e procedimentos de contestação. Esta minuta não é aconselhamento jurídico.
+## Encerramento e alterações
+As configurações oferecem exportação, desativação e solicitação de exclusão. Solicitar exclusão não apaga imediatamente a conta; a análise considera direitos de terceiros e obrigações de preservação. Mudanças materiais nas obrigações, licença, direitos ou medidas de moderação serão destacadas e poderão exigir novo aceite. Correções de redação sem mudança de sentido não exigem novo aceite. Não presumimos concordância pelo silêncio e não aplicamos novas permissões retroativamente.
 $policy$, 'draft', true),
 ('privacy', '0.1.0', 'Política de Privacidade', $policy$
-> MINUTA EM REVISÃO — completar com o responsável pelo tratamento e revisar juridicamente antes de publicar.
+## Responsável e contato
+Controlador: [PREENCHER IDENTIFICAÇÃO DO RESPONSÁVEL]. Canal para privacidade e direitos: [PREENCHER CANAL PÚBLICO DE CONTATO]. Esses dados precisam ser informados antes da publicação deste documento. A identificação pública do responsável pelo serviço não exige que os usuários exponham suas identidades.
 
-## Dados usados no serviço
-O cadastro deve continuar usando nome de usuário e senha, sem exigir e-mail, nome civil, telefone, endereço ou data de nascimento. A plataforma processa dados de conta e sessão, perfil, histórias, comentários, interações, preferências e registros de segurança necessários ao serviço.
+## Dados e finalidades
+O cadastro usa nome de usuário, senha e chave de recuperação, sem exigir e-mail, telefone, nome civil, endereço ou data de nascimento. Processamos perfil, conteúdo publicado, interações, preferências e informações necessárias à autenticação. Senhas, chaves e tokens de sessão são armazenados em formato protegido. O cookie de sessão permite manter o acesso à conta; ele não é autorização para publicidade.
 
-## Segurança e acesso
-Senhas não devem ser retornadas ao navegador; sessões usam tokens armazenados como hash no banco. Acesso a dados privados passa por rotas autenticadas e controles de acesso no Supabase.
+Contas e publicações são tratadas para executar o serviço solicitado. Segurança, prevenção de abuso e análise de denúncias usam informações estritamente necessárias, com avaliação de necessidade e dos direitos das pessoas envolvidas. Obrigações legais e ordens válidas podem exigir preservação ou divulgação específica. Não tratamos o aceite deste documento como consentimento genérico para qualquer finalidade.
 
-## Controles da pessoa
-O site oferece exportação dos dados, desativação temporária e solicitação de exclusão. A conclusão da exclusão pode exigir análise de coautoria, segurança e retenção legítima; informar prazos, dados removidos e dados eventualmente retidos antes de publicar.
+## Visibilidade e fornecedores
+Publicações e partes do perfil podem ser públicas. Publicação anônima oculta a autoria na apresentação pública da história; não impede a identificação interna necessária à segurança. Não publique dados sensíveis próprios ou de terceiros. O serviço utiliza Supabase para banco e armazenamento, com o projeto na região us-east-2 (Estados Unidos), e Vercel para hospedagem. [PREENCHER LOCALIZAÇÃO E TRANSFERÊNCIAS DA VERCEL E SALVAGUARDAS CONTRATUAIS CONFIRMADAS DOS FORNECEDORES].
 
-## Revisão necessária
-Definir controlador, finalidade e base legal por atividade, prazos, operadores, transferências, canal para direitos, resposta a incidentes e tratamento de dados de crianças/adolescentes. Não coletar nem usar idade autodeclarada como prova de maioridade.
-$policy$, 'draft', true),
+## Acesso, conservação e exclusão
+A equipe recebe acesso por função, com registros de ações. Moderadores não têm acesso irrestrito a conversas privadas. [PREENCHER PRAZOS E CRITÉRIOS DE RETENÇÃO PARA CONTAS, DENÚNCIAS, REGISTROS TÉCNICOS E BACKUPS]. Não prometemos apagamento imediato de cópias de segurança ou informações cuja preservação seja legalmente exigida. Restrições precisam ser justificadas à pessoa solicitante.
+
+## Seus direitos
+Você pode pedir confirmação, acesso, correção, informações de compartilhamento, oposição nos casos cabíveis e exclusão, bloqueio ou anonimização conforme a LGPD. Use o canal acima; não publique documentos pessoais em comentários. Há exportação e solicitação de exclusão nas configurações. Confirmação e acesso simplificado devem receber resposta imediata ou declaração completa em até 15 dias, conforme o caso; os demais pedidos seguem os prazos aplicáveis. Você também pode recorrer à ANPD.
+
+## Crianças e adolescentes
+O tratamento deve observar o melhor interesse e as salvaguardas aplicáveis. Não usamos data de nascimento autodeclarada como prova de maioridade. [PREENCHER MEDIDAS EFETIVAMENTE IMPLANTADAS DE AFERIÇÃO ETÁRIA E SUPERVISÃO, ANTES DE AFIRMAR CONFORMIDADE]. Mudanças de finalidade ou coleta exigem informação específica e base legal adequada, não apenas novo aceite desta política.
+$policy$, 'draft', false),
 ('community', '0.1.0', 'Diretrizes da Comunidade', $policy$
-> MINUTA EM REVISÃO — publicar após revisão de segurança e moderação.
+## Convivência
+Críticas positivas ou negativas às obras são permitidas. Ataques pessoais, humilhação, ameaças, perseguição, assédio sexual, LGBTfobia, racismo, capacitismo e outras formas de discriminação são proibidos. Discordar não autoriza ataques coordenados ou mobilização para perseguir outra pessoa.
 
-## Crítica e respeito
-Críticas literárias positivas ou negativas são permitidas. Ataques pessoais, humilhação, perseguição, intimidação e ataques coordenados não são.
+## Ficção e contexto
+Histórias podem retratar violência e preconceito com contexto narrativo ou crítico e avisos adequados. A ficção não pode ser usada para promover ódio, incitar violência, aliciar pessoas ou divulgar instruções de exploração. Uma denúncia será avaliada considerando contexto e evidências, sem presumir culpa pelo número de denúncias.
 
-## Ficção e discriminação
-Obras podem retratar preconceito com contexto narrativo ou crítico; não podem usar a ficção para promover ódio, desumanizar grupos protegidos ou incitar violência.
+## Privacidade
+Não divulgue dados pessoais, documentos, localização ou identidade real de alguém sem autorização. Não exponha conversas privadas para constranger ou perseguir. Pseudônimos, contas múltiplas e publicação anônima são permitidos dentro das regras. Não tente descobrir ou divulgar a identidade de autores anônimos.
 
-## Segurança e privacidade
-Não divulgue dados pessoais sem autorização, não tente descobrir a identidade real de escritores e não exponha conversas privadas para perseguir alguém. Denuncie ameaças, doxxing e exploração de pessoas vulneráveis.
+## Publicações e interações
+Evite spam, plágio, personificação enganosa e manipulação de avaliações. Marque spoilers e respeite os avisos de conteúdo. Não ofereça serviços ou materiais ilegais. Imagens, capas, textos e traduções precisam respeitar os direitos de seus titulares.
 
-## Conteúdo e avisos
-Use a classificação e os avisos adequados. Temas sensíveis podem ser tratados ficcionalmente com avisos claros; conteúdo sexual explícito envolvendo menores de 18 anos é proibido no serviço.
+## Ajuda e proteção
+Relatar sofrimento ou pedir ajuda não é motivo, por si só, para punição. Incentivar violência, automutilação, exploração ou abuso é proibido. Não publique imagens íntimas nem material de abuso como evidência pública. Use o botão de denúncia do conteúdo ou perfil e os controles de bloqueio. A equipe pode adotar proteção imediata em situações graves, com registro e possibilidade de revisão quando cabível.
 $policy$, 'draft', true),
 ('content-rating', '0.1.0', 'Política de Conteúdo e Classificação', $policy$
-> MINUTA EM REVISÃO — não habilitar acesso a conteúdo 18+ até revisão jurídica e definição de verificação adequada.
+## Classificação e avisos
+Cada história deve indicar Livre, 12, 14, 16 ou 18 anos. A classificação escolhida pelo autor é uma orientação do Nooklie, não uma certificação oficial. Considere a intensidade, a frequência e o contexto dos temas. Avise sobre violência, abuso, discriminação, morte, saúde mental e outros assuntos sensíveis. Classificação e avisos não autorizam conteúdo proibido.
 
-## Classificações previstas
-Livre, 12, 14, 16 e 18 anos. O autor seleciona a classificação e informa avisos de conteúdo; estes dados devem aparecer na obra, na descoberta e na leitura.
+## Conteúdo permitido e proibido
+Romance adolescente e temas difíceis podem ser tratados de forma contextualizada, respeitando as demais regras. Conteúdo sexual explícito envolvendo pessoas ou personagens menores de 18 anos, ou representações sexualizadas com aparência infantil, é proibido. Alterar somente a idade declarada não torna adulta uma representação infantil. São proibidos exploração sexual, aliciamento, intimidade real divulgada sem autorização, incitação à violência e materiais ilegais.
 
-## Conteúdo envolvendo menores
-Romance adolescente e temas narrativos podem ser permitidos dentro das regras. Conteúdo sexual explícito envolvendo pessoas ou personagens apresentados como menores de 18 anos não é permitido. Alterar apenas a idade no texto não transforma uma representação infantil ou adolescente em adulta.
+## Acesso adulto
+Classificar uma obra como 18+ não comprova a idade de quem a acessa. Caixa de confirmação, login e data autodeclarada não equivalem, isoladamente, a verificação confiável. [PREENCHER MECANISMO DE AFERIÇÃO E RESTRIÇÃO REALMENTE IMPLANTADO]. Enquanto esse mecanismo não estiver definido e validado, este documento não deve anunciar que o site impede o acesso de menores a obras adultas.
 
-## Acesso 18+
-A classificação 18+ deve ser identificada e restringida conforme mecanismo juridicamente validado. Uma caixa de confirmação ou idade autodeclarada, isoladamente, não será apresentada como verificação de maioridade. O mecanismo de acesso permanece pendente de revisão jurídica e técnica.
-
-## Referências para revisão profissional
-Estatuto da Criança e do Adolescente e Lei nº 15.211/2025 (proteção em ambientes digitais). Avaliar também regulamentos e orientações vigentes antes da publicação.
+## Correções
+A equipe pode solicitar ajustes de classificação ou avisos, informar o motivo e indicar um prazo. O autor pode corrigir e responder à solicitação. O vencimento não remove a história automaticamente: a equipe analisa a resposta e pode restringir ou remover conteúdo que permaneça irregular. Casos graves podem exigir medida imediata. A pessoa afetada pode apresentar recurso pelo fluxo de moderação.
 $policy$, 'draft', true),
 ('copyright', '0.1.0', 'Política de Direitos Autorais', $policy$
-> MINUTA EM REVISÃO — obter revisão jurídica antes de publicar procedimentos de notificação ou remoção.
+## Autoria e licença
+Você mantém os direitos sobre suas criações e deve publicar apenas conteúdo que tenha direito de utilizar. A licença ao Nooklie é não exclusiva, gratuita e limitada às operações necessárias ao serviço. Não autoriza venda, transferência da obra ou treinamento de inteligência artificial. Créditos não substituem permissão de uso.
 
-## Obras e fanfiction
-Autores mantêm os direitos sobre obras originais e contribuições criativas próprias. Publicar não transfere a titularidade ao Nooklie. Fanfiction não concede ao escritor direitos sobre personagens ou universos de terceiros. Traduções devem ter autorização ou outra base legal aplicável.
+## Fanfiction e traduções
+Fanfictions podem usar universos, personagens e elementos de terceiros; os direitos desses titulares permanecem preservados. Gratuidade, aviso de ausência de vínculo e atribuição não tornam automaticamente qualquer uso permitido. Não oferecemos garantia geral de “uso justo” baseada em regras estrangeiras. A licitude depende da legislação, de autorizações e das circunstâncias. Traduções devem ter autorização do titular ou outra base legal aplicável, como domínio público quando efetivamente cabível.
 
-## Uso pela plataforma
-O uso de conteúdo pelo Nooklie fica limitado ao necessário para hospedar, armazenar, processar, exibir e operar as funções escolhidas. Não vender histórias nem usá-las para treinar IA sem autorização específica.
+## Capas e imagens
+Use imagens próprias, licenciadas ou autorizadas. Informe os créditos exigidos pela licença. As medidas de interface podem dificultar cópias casuais, mas não impedem capturas de tela nem o acesso técnico a imagens já exibidas. Não prometemos impedir downloads de conteúdo público.
 
-## Créditos e coautoria
-Créditos de designers e colaboradores só aparecem após aceitação explícita. Crédito não transfere direitos. Coautoria registra permissões de edição e histórico, mas não substitui acordo entre participantes.
+## Reclamações
+Quem alegar violação deve indicar o conteúdo e seu endereço, a obra original ou a titularidade alegada e uma explicação objetiva. Não divulgue documentos ou dados pessoais na denúncia pública. A equipe poderá solicitar comprovação por canal reservado, limitada ao necessário, e analisar medidas e preservação de evidências. O autor afetado pode apresentar explicação ou autorização e pedir revisão. A retirada de crédito, o pseudônimo ou a exclusão de uma conta não extinguem os direitos dos demais participantes.
 
-## Referências para revisão profissional
-Lei nº 9.610/1998 e regras aplicáveis a conteúdo de terceiros, fanfiction, traduções, notificações e contranotificações.
+## Encaminhamento
+Use os botões de denúncia disponíveis na história ou no perfil para iniciar a análise. [PREENCHER CANAL EXTERNO PARA TITULARES SEM CONTA E NOTIFICAÇÕES FORMAIS]. Solicitações e ordens válidas seguem a legislação brasileira aplicável; não usamos automaticamente procedimentos estrangeiros de notificação e contranotificação.
 $policy$, 'draft', true),
 ('collaboration', '0.1.0', 'Política de Colaboração e Coautoria', $policy$
-> MINUTA EM REVISÃO — revisar fluxos de consentimento, direitos e conflitos antes da publicação.
+## Convites e créditos
+Coautores, designers, revisores, leitores beta e tradutores precisam aceitar o convite antes da exibição do vínculo correspondente. Silêncio não significa aceite. O convite informa a função e suas permissões. Crédito reconhece uma contribuição, mas não transfere direitos nem constitui autorização para usar material de terceiros.
 
-## Créditos
-Convites para designer, revisor, beta reader ou tradutor exigem aceite do convidado. Silêncio não significa autorização. A pessoa creditada pode retirar o aceite e controlar a exibição do portfólio.
+## Edição
+Coautores aceitos podem editar nos limites indicados pelo serviço. O histórico registra a pessoa responsável pelas alterações. Nenhum coautor pode transferir ou excluir unilateralmente os direitos dos demais. Combine decisões editoriais, uso de materiais e responsabilidades antes de aceitar. Mantenha cópias das suas contribuições.
 
-## Coautoria
-Coautores aceitos têm permissões técnicas definidas no produto, e cada alteração registra o responsável. Nenhum coautor pode remover unilateralmente os demais ou transferir seus direitos.
+## Saída e portfólio
+A pessoa colaboradora pode sair voluntariamente da função e retirar a exibição do próprio crédito ou controlar o portfólio. A retirada do vínculo técnico não apaga o histórico de contribuições nem resolve, por si só, controvérsias de autoria. A administração pode analisar abuso ou conflito documentado, preservando os direitos envolvidos.
 
-## Exclusão de história em coautoria
-Solicitações de exclusão exigem a aprovação de todos os coautores ativos; recusas mantêm a obra publicada. A administração poderá intervir diante de segurança, violação ou ordem válida, após análise e registro.
+## Exclusão de obras
+A exclusão solicitada por coautor exige aprovação de todos os coautores ativos. O solicitante registra seu voto favorável; os demais recebem a solicitação e decidem. Enquanto houver voto pendente, a obra permanece. Uma recusa encerra o pedido sem exclusão. A unanimidade aprova a exclusão, mantendo o registro da decisão. Medidas de segurança, violação das regras e ordens válidas podem exigir intervenção administrativa distinta desse fluxo.
 
-## Acordos
-Antes de aceitar, cada pessoa confirma leitura de aviso sobre responsabilidades, direitos, créditos e decisões editoriais. O registro do Nooklie não substitui contratos ou aconselhamento jurídico.
+## Acordos entre participantes
+O registro de convite, aceite e edição facilita a gestão do projeto, mas não substitui um acordo específico sobre direitos e uso das contribuições. Alterações materiais nessas permissões exigem comunicação e novo aceite; não serão atribuídas retroativamente por silêncio.
 $policy$, 'draft', true),
 ('moderation', '0.1.0', 'Política de Moderação e Denúncias', $policy$
-> MINUTA EM REVISÃO — validar prazos, notificações, recursos e procedimentos de emergência.
+## Como denunciar
+Use o botão de denúncia de uma história, capítulo, comentário, resenha, publicação ou perfil. Explique o problema e forneça somente as evidências necessárias. São aceitos até três links HTTP/HTTPS ou imagens JPG, PNG e WEBP, com até 1 MB por arquivo e 3 MB somados. Não envie senhas, documentos desnecessários, imagens íntimas ou material de exploração sexual como anexo.
 
-## Denúncias e análise
-Denúncias podem tratar de histórias, capítulos, comentários, resenhas, publicações e perfis. O número de denúncias não determina culpa. A equipe faz análise humana, registra evidências necessárias e protege a identidade do denunciante.
+## Análise e privacidade
+O volume de denúncias não determina culpa. A equipe avalia contexto, gravidade, evidências e risco. Anexos de denúncia são privados e acessíveis apenas por pessoas autorizadas; a identidade do denunciante não é exposta à pessoa denunciada. Os links não são buscados automaticamente pelo servidor. Controles automáticos podem apoiar a segurança, mas não são apresentados como análise humana.
 
-## Medidas e recurso
-Medidas previstas: advertência, suspensão temporária, suspensão mais longa e banimento. Casos graves podem exigir ação imediata. A pessoa afetada recebe informações suficientes e pode pedir revisão, respeitando a segurança das pessoas envolvidas.
+## Medidas
+Conforme a gravidade, podem ocorrer orientação, advertência, correção de avisos ou classificação, ocultação de conteúdo, suspensão temporária ou banimento. A progressão não impede proteção imediata em risco grave. Pedidos de ajuda e relatos de sofrimento não são infrações por si só. A decisão deve indicar o motivo e informações suficientes para contestação, resguardando pessoas e evidências.
 
-## Acesso da equipe
-Permissões são vinculadas a identidades internas e verificadas no servidor. Moderadores acessam somente os dados necessários à função, não veem senhas e não alteram as próprias permissões. Ações ficam em histórico de auditoria.
+## Recurso
+A pessoa afetada pode pedir revisão na área de recursos da conta, explicar sua discordância e apresentar informações pertinentes. O pedido não garante reversão automática. A equipe registra a decisão, a justificativa e o resultado. A ausência de resposta imediata não significa aceite ou rejeição.
 
-## Referências para revisão profissional
-Definir protocolo para ameaças, exposição de dados, segurança de crianças/adolescentes, preservação de evidências, retenção, recurso e atendimento a requisições válidas.
+## Equipe e casos graves
+Permissões são verificadas no servidor e limitadas à função. Moderadores não veem senhas, não mudam suas próprias permissões e não têm acesso irrestrito a conversas privadas. Ações ficam em auditoria. Exploração de menores, ameaças e outras situações graves exigem protocolo reservado de proteção, remoção quando cabível, preservação proporcional de evidências e comunicação às autoridades nos casos previstos em lei. [PREENCHER CANAL EXTERNO PARA DENÚNCIAS SEM CONTA].
 $policy$, 'draft', true)
 on conflict (slug, version) do nothing;
 

@@ -7,7 +7,7 @@ type Context = { params: Promise<{ slug: string }> };
 export async function GET(_request: NextRequest, context: Context) {
   try {
     const { slug } = await context.params;
-    const { data, error } = await supabase.from('policy_documents').select('slug, version, title, content_md, requires_reacceptance, published_at')
+    const { data, error } = await supabase.from('policy_documents').select('id, slug, version, title, content_md, requires_reacceptance, published_at')
       .eq('slug', slug).eq('status', 'published').order('published_at', { ascending: false }).limit(1).maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404 });

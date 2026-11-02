@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { account: null, sessions: [], chapters: [], collaborators: [], storyCredits: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { policies: [], policyAcceptances: [], isAdmin: false, account: null, sessions: [], chapters: [], collaborators: [], storyCredits: [], deactivatedAt: null, anonymousStoryIds: [], reviews: [], reviewLikes: [], reviewComments: [], blocks: [], notifications: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -105,6 +105,30 @@ before(async () => {
   supabaseMock = createHttpServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
+
+    if (path === 'policy_documents' && request.method === 'GET') {
+      let rows = [...state.policies];
+      for (const field of ['id', 'slug', 'status']) {
+        const filter = url.searchParams.get(field);
+        if (filter?.startsWith('eq.')) rows = rows.filter((row) => row[field] === filter.slice(3));
+      }
+      rows.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''));
+      return respondRows(request, response, rows.slice(0, Number(url.searchParams.get('limit') || 100)));
+    }
+    if (path === 'policy_acceptances') {
+      if (request.method === 'GET') {
+        const profileId = (url.searchParams.get('profile_id') || '').replace(/^eq\./, '');
+        return respondRows(request, response, state.policyAcceptances.filter((row) => row.profile_id === profileId));
+      }
+      if (request.method === 'POST') {
+        let body = ''; for await (const chunk of request) body += chunk;
+        const row = JSON.parse(body);
+        if (!state.policyAcceptances.some((item) => item.policy_document_id === row.policy_document_id && item.profile_id === row.profile_id)) state.policyAcceptances.push(row);
+        response.writeHead(201); return response.end();
+      }
+    }
+    if (path === 'platform_admins') return respondRows(request, response, state.isAdmin ? [{ user_id: userId }] : []);
+    if (['team_memberships', 'permissions'].includes(path)) return respondRows(request, response, []);
 
     if (path === 'rpc/consume_auth_rate_limit' && request.method === 'POST') {
       let body = '';
@@ -755,4 +779,54 @@ test('story discovery can continue to the next page', async () => {
 test('story discovery rejects unsupported age ratings', async () => {
   const invalidFilter = await fetch(`${baseUrl}/api/explore?rating=10`);
   assert.equal(invalidFilter.status, 400);
+});
+
+
+test('policy acceptance records only the exact published version the reader viewed', async () => {
+  state.policies = [
+    { id: 'policy-current', slug: 'terms', version: '1.0.0', title: 'Termos', content_md: '## Regras\nTexto.', status: 'published', requires_reacceptance: true, published_at: '2026-11-02T12:00:00Z' },
+    { id: 'policy-draft', slug: 'privacy', version: '2.0.0', title: 'Privacidade', content_md: '[PREENCHER CANAL]', status: 'draft', requires_reacceptance: false, published_at: null },
+  ];
+  const token = 'policy-reader-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60000).toISOString() });
+  const headers = { Cookie: `toriland_session=${token}`, 'Content-Type': 'application/json' };
+  const details = await fetch(`${baseUrl}/api/policies/terms`);
+  assert.equal((await details.json()).policy.id, 'policy-current');
+  const list = await fetch(`${baseUrl}/api/policies`);
+  assert.deepEqual((await list.json()).policies.map((row) => row.id), ['policy-current']);
+  const accept = (body, authenticated = true) => fetch(`${baseUrl}/api/policies/terms/accept`, { method: 'POST', headers: authenticated ? headers : { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' }, false)).status, 401);
+  assert.equal((await accept({})).status, 400);
+  assert.equal((await accept({ policy_id: 'policy-old', version: '0.1.0' })).status, 409);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '0.1.0' })).status, 409);
+  assert.equal(state.policyAcceptances.length, 0);
+  let status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required.length, 1);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 200);
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 200);
+  assert.equal(state.policyAcceptances.length, 1);
+  status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required.length, 0);
+  state.policies[0].status = 'archived';
+  state.policies.push({ ...state.policies[0], id: 'policy-new', version: '1.1.0', status: 'published', published_at: '2026-11-03T12:00:00Z' });
+  assert.equal((await accept({ policy_id: 'policy-current', version: '1.0.0' })).status, 409);
+  status = await fetch(`${baseUrl}/api/policies/status`, { headers });
+  assert.equal((await status.json()).required[0].id, 'policy-new');
+});
+
+test('publication reports missing service details and denies incomplete documents', async () => {
+  const token = 'policy-admin-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60000).toISOString() });
+  const headers = { Cookie: `toriland_session=${token}`, 'Content-Type': 'application/json' };
+  const publish = () => fetch(`${baseUrl}/api/admin/policies`, { method: 'POST', headers, body: JSON.stringify({ action: 'publish', policy_id: 'policy-draft' }) });
+  state.isAdmin = false;
+  assert.equal((await publish()).status, 403);
+  state.isAdmin = true;
+  try {
+    const response = await publish();
+    assert.equal(response.status, 422);
+    assert.deepEqual((await response.json()).issues, ['CANAL']);
+    const list = await fetch(`${baseUrl}/api/admin/policies`, { headers });
+    assert.deepEqual((await list.json()).policies.find((row) => row.id === 'policy-draft').publication_issues, ['CANAL']);
+  } finally { state.isAdmin = false; }
 });
