@@ -67,12 +67,17 @@ Elas criam estruturas usadas por avaliações, colaboração, políticas, denún
 - **Descoberta:** `tags`, `tag_categories`, `story_tags`, `user_stickers`, `fic_clubs`, `fic_club_members`.
 - **Administração/moderação:** `platform_admins`, `permissions`, `departments`, `team_roles`, `team_role_permissions`, `team_memberships`, `admin_audit_log`, `user_notifications`, `opportunities`, `applications`, `moderation_reports`.
 
-## Próxima validação segura
+## Validação concluída em 02/11/2026
 
-1. Carregar o fixture sem dados em PostgreSQL local descartável, executar as três migrações pendentes e rodar cada verificação SQL/RLS listada no CI.
-2. Corrigir falhas de compatibilidade entre as migrações pendentes, permissões e os fluxos da aplicação, repetindo a validação local.
-3. Tratar a reconstrução histórica completa como trabalho separado: o fixture representa o estado atual aplicado, não prova a reprodução das 25 migrações desde uma instalação vazia.
-4. Manter a produção sem alterações até que a cadeia aplicável esteja validada e exista autorização explícita.
+O [CI do commit `1249f534`](https://github.com/alaskkatwitter-art/NOOKLIE/actions/runs/41456533905) passou: o snapshot sem dados foi carregado no banco descartável, as três migrações pendentes foram executadas e todas as nove verificações SQL passaram, incluindo RLS, administração, moderação, recursos e consenso para exclusão de histórias. Lint, build e os 15 testes da aplicação também passaram; o lint ainda emite avisos preexistentes.
+
+A falha final era a inicialização dos votos de exclusão: outros coautores recebiam `false`, mas a função de decisão aceita apenas votos ainda `NULL`. Agora somente o solicitante começa com aprovação; os demais ficam sem decisão e sem data de voto. A regressão verifica esses estados, a preservação da obra antes do consenso, a exclusão após unanimidade e a preservação da obra em caso de recusa. A migração corrigida continua pendente na produção.
+
+## Próximos passos
+
+1. Concluir os testes visuais e funcionais em celular e computador.
+2. Tratar a reconstrução histórica completa como trabalho separado: o fixture representa o estado atual aplicado, não prova a reprodução das 25 migrações desde uma instalação vazia.
+3. Manter a produção sem alterações até existir autorização explícita para aplicar as migrações e publicar.
 
 ## Descoberta e recursos em implementação
 
