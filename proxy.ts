@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server';
 const PRODUCTION_HOST = 'toriland.vercel.app';
 
 export function proxy(request: NextRequest) {
+  // Preview deployments must remain on their own host so new routes can be tested.
+  if (process.env.VERCEL_ENV !== 'production') return NextResponse.next();
   const hostname = request.headers.get('host')?.split(':')[0] || '';
 
   // Já está no domínio oficial.

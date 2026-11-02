@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -457,10 +458,9 @@ export default function LoginPage() {
 
           <div className="mt-7 border-t border-white/5 pt-5 text-center">
             <p className="text-xs leading-5 text-white/25">
-              O Nooklie não precisa do seu e-mail, nome real,
-              telefone ou qualquer outro dado pessoal para criar
-              uma conta.
+              Seu cadastro utiliza username e senha. Não pedimos e-mail, nome real ou telefone.
             </p>
+            <Link href="/politicas" className="mt-2 inline-block min-h-11 rounded-lg px-3 py-3 text-sm text-[#ff9aca] hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff78b9]">Políticas do Nooklie</Link>
           </div>
         </section>
       </div>
