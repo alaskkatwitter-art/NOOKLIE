@@ -1,6 +1,6 @@
 # Verificação visual — 02/11/2026
 
-Status: **bloqueada; não validada em desktop nem Android/celular**.
+Status: **verificação parcial em desktop; fluxo completo de políticas e Android/celular ainda não validados**.
 
 ## Tentativas e evidências
 
@@ -9,6 +9,35 @@ Status: **bloqueada; não validada em desktop nem Android/celular**.
 3. A revisão automática recusou criar um link temporário de 10 minutos, por ampliar acesso a uma prévia protegida sem autorização específica para essa mudança. Nenhum link foi criado; a proteção não foi alterada.
 
 A página de login da Vercel não é evidência visual do Nooklie. Build, TypeScript e testes HTTP não substituem inspeção visual, teste de toque ou Android real.
+
+## Retomada após autorização explícita
+
+A proprietária autorizou em conversa um link temporário de 10 minutos para a prévia. O primeiro link foi criado com TTL de 600 segundos e revelou que `proxy.ts` redirecionava todo host Vercel para a produção. `/politicas` terminava em 404 na versão pública, em vez de testar a rota nova.
+
+A correção `bc6331f` restringe o redirecionamento canônico a `VERCEL_ENV=production`. A nova prévia foi testada no navegador no mesmo host de preview, sem redirecionamento para produção. O link anterior foi revogado, e o link usado na prévia corrigida também foi revogado ao encerrar os testes. Nenhum token de acesso deve ser registrado neste arquivo.
+
+O [CI da correção](https://github.com/alaskkatwitter-art/NOOKLIE/actions/runs/41460919679) passou: build, lint sem erros, 18 testes e verificações SQL. O novo teste envia um host `.vercel.app` a uma instância em ambiente preview e verifica que a rota nova responde 200 sem cabeçalho de redirecionamento.
+
+### Inspeção no navegador
+
+Prévia inspecionada: `toriland-dcix5m24u-toriland.vercel.app`, commit `bc6331fa15460e0d1e6de718fb898c84336a27b3`.
+
+| Tela/fluxo | Resultado observado |
+| --- | --- |
+| `/politicas` | Layout, título, margens e estado de erro visíveis. A API não carrega os documentos; não aprovado o catálogo com dados nem o aceite. |
+| `/login` | Formulário e alternância entre cadastro e entrada visíveis; destaque da aba corresponde ao modo após a transição. Não foi criada nem autenticada conta real. |
+| `/conta/privacidade` sem sessão | Exibe mensagem para entrar na conta, sem controles de alteração de dados privados. |
+| `/admin/politicas` sem sessão | Redireciona para o login do Nooklie, mantendo o host da prévia. |
+| Celular/Android | Não verificado. O navegador não ofereceu controle documentado de viewport e os atalhos de modo de dispositivo não produziram viewport móvel. Não inferir responsividade aprovada de uma captura desktop. |
+
+Consulta somente de leitura ao projeto conectado confirmou que `public.policy_documents` e `public.policy_acceptances` ainda não existem. As migrações continuam pendentes; nenhum SQL de escrita foi executado na produção para viabilizar testes.
+
+Capturas sem credenciais ou dados de usuários:
+
+- [Tela de entrada — desktop](screenshots/login-desktop.jpg).
+- [Políticas — estado de erro por backend pendente](screenshots/policies-backend-pending.jpg).
+
+Para concluir o teste visual com dados, é necessário um ambiente de teste com as migrações e contas sintéticas, além de acesso a viewport móvel/Android. Não aprovar esse fluxo apenas pela compilação e pelos testes HTTP.
 
 ## Correções preparadas a partir da revisão de código
 
