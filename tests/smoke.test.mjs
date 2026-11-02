@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { notifications: [], discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -106,6 +106,17 @@ before(async () => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
 
+    if (path === 'user_notifications') {
+      const owner=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+      let rows=state.notifications.filter(row=>row.user_id===owner);
+      if(request.method==='GET')return respondRows(request,response,rows);
+      if(request.method==='PATCH'){
+        let body='';for await(const chunk of request)body+=chunk;const update=JSON.parse(body);
+        const id=(url.searchParams.get('id')||'').replace(/^eq\./,'');
+        rows=rows.filter(row=>!row.read_at&&(!id||row.id===id));rows.forEach(row=>row.read_at=update.read_at);
+        response.writeHead(204);return response.end();
+      }
+    }
     if (path === 'rpc/discovery_fandom_catalog') return sendJson(response, ['Harry Potter','Marvel']);
     if (path === 'discovery_preferences') {
       if (request.method === 'GET') { const id=(url.searchParams.get('user_id')||'').replace(/^eq\./,''); return respondRows(request,response,state.discoveryPreferences.has(id)?[{favorite_fandoms:state.discoveryPreferences.get(id)}]:[]); }
@@ -559,4 +570,19 @@ test('fandom preferences round-trip with account ownership, reject injected owne
   const data=await response.json();assert.deepEqual(data.favorite_fandoms,['Harry Potter']);assert.equal(data.account_id,userId);assert.equal(state.discoveryPreferences.has(otherUserId),false);
   const invalid=await fetch(baseUrl+'/api/reading-progress',{method:'PUT',headers,body:JSON.stringify({chapter_id:'invalid',story_id:'invalid',percent:200})});assert.equal(invalid.status,400);
   state.account.account_status='suspended';try{assert.equal((await save({favorite_fandoms:['Marvel']})).status,401);}finally{state.account.account_status='active';}
+});
+
+
+test('notifications route renders an inbox and reads only the signed-in account notifications', async () => {
+  const page=await fetch(baseUrl+'/notificacoes');assert.equal(page.status,200);const html=await page.text();
+  assert.match(html,/<h1\b[^>]*>Notificações<\/h1>/);assert.match(html,/Carregando suas notificações/);
+  assert.doesNotMatch(html,/Olá, Alaska|Entre Dois Mundos|Depois da Meia-Noite|12,4 mil|Acabaram de chegar ao Toriland/);
+  assert.equal((await fetch(baseUrl+'/api/notifications')).status,401);
+  const token='notification-inbox-session';state.sessions.push({user_id:userId,token_hash:hash(token),expires_at:new Date(Date.now()+60000).toISOString()});
+  const headers={Cookie:'toriland_session='+token,'Content-Type':'application/json'};
+  state.notifications=[{id:'notification-own',user_id:userId,title:'Atualização da sua conta',body:'Mensagem real',href:'/inicio',created_at:new Date().toISOString(),read_at:null},{id:'notification-other',user_id:otherUserId,title:'Privada',body:'Outra conta',created_at:new Date().toISOString(),read_at:null}];
+  const inbox=await fetch(baseUrl+'/api/notifications?user_id='+otherUserId,{headers});const data=await inbox.json();assert.deepEqual(data.notifications.map(item=>item.id),['notification-own']);assert.equal(data.unread_count,1);
+  const foreign=await fetch(baseUrl+'/api/notifications',{method:'PATCH',headers,body:JSON.stringify({id:'notification-other'})});assert.equal(foreign.status,200);assert.equal(state.notifications[1].read_at,null);
+  assert.equal((await fetch(baseUrl+'/api/notifications',{method:'PATCH',headers,body:JSON.stringify({all:true})})).status,200);
+  const refreshed=await (await fetch(baseUrl+'/api/notifications',{headers})).json();assert.equal(refreshed.unread_count,0);assert.equal(state.notifications[1].read_at,null);
 });
