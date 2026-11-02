@@ -713,7 +713,7 @@ function StoriesRow({
         </div>
 
         <Link
-          href="/stories"
+          href="#stories"
           className="text-[10px] font-bold text-white/30 transition hover:text-[#ff78b9]"
         >
           Ver todos
@@ -3922,7 +3922,7 @@ export default function FeedPage() {
               TOP BAR
           ================================================= */}
 
-          <header className="mb-8 flex items-center justify-between gap-4">
+          <header className="relative mb-5 flex min-h-16 items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -3937,19 +3937,7 @@ export default function FeedPage() {
                 <MenuIcon />
               </button>
 
-              <div className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9] sm:flex">
-                <CloudIcon />
-              </div>
-
-              <div className="min-w-0">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70 font-nooklie-logo">
-                  Nooklie
-                </p>
-
-                <h1 className="mt-1 truncate text-xl font-black tracking-tight text-white sm:text-2xl">
-                  Oi, {greetingName}
-                </h1>
-              </div>
+              <Link href="/" aria-label="Nooklie — voltar ao início" className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 text-[#ff78b9]"><CloudIcon filled className="h-10 w-12" /><span className="hidden text-lg font-black tracking-widest xl:inline">NOOKLIE</span></Link>
             </div>
 
             <div className="flex items-center gap-2">
@@ -4009,23 +3997,18 @@ export default function FeedPage() {
               HERO / BOAS-VINDAS
           ================================================= */}
 
-          <section className="mb-7 overflow-hidden rounded-[30px] border border-[#ff78b9]/10 bg-gradient-to-br from-[#ff78b9]/[0.09] via-[#100c11]/90 to-[#c63dff]/[0.05] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] sm:p-8">
+          <section className="mb-5 overflow-hidden rounded-[30px] border border-[#ff78b9]/10 bg-gradient-to-br from-[#ff78b9]/[0.09] via-[#100c11]/90 to-[#c63dff]/[0.05] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] sm:p-8">
             <div className="max-w-3xl">
               <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#ff78b9]">
                 Seu espaço
               </p>
 
               <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
-                Um lugar para escrever,
-                ler e encontrar gente
-                que entende você.
+                Seu Feed, suas conexões.
               </h2>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40 sm:text-[15px]">
-                Acompanhe seus escritores,
-                descubra histórias novas e
-                compartilhe o que está passando
-                pela sua cabeça.
+                Acompanhe publicações da comunidade. Stories ficam na faixa abaixo; conversas e avisos aparecem no mural.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -4053,13 +4036,13 @@ export default function FeedPage() {
               STORIES
           ================================================= */}
 
-          <StoriesRow
+          <div id="stories" className="scroll-mt-24"><StoriesRow
             stories={stories}
             onOpen={setActiveStory}
             onCreateStory={() =>
               setStoryComposerOpen(true)
             }
-          />
+          /></div>
 
           {/* =================================================
               LAYOUT
@@ -4108,7 +4091,7 @@ export default function FeedPage() {
 
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-black text-white sm:text-lg">
-                        Compartilhe alguma coisa
+                        Escreva um aviso ou publicação
                       </p>
 
                       <p className="mt-1 text-sm leading-5 text-white/40">
@@ -4166,7 +4149,7 @@ export default function FeedPage() {
                   </p>
 
                   <h2 className="mt-1 text-xl font-black text-white">
-                    O que está acontecendo
+                    Publicações da comunidade
                   </h2>
                 </div>
 
@@ -4243,7 +4226,7 @@ export default function FeedPage() {
             ================================================= */}
 
             <div className="hidden w-[270px] shrink-0 xl:block">
-              <div className="sticky top-6 space-y-5">
+              <div className="sticky top-24 space-y-5">
                 {/* MINI STORIES */}
 
                 <aside className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
@@ -4259,7 +4242,7 @@ export default function FeedPage() {
                     </div>
 
                     <Link
-                      href="/stories"
+                      href="#stories"
                       className="text-[9px] font-bold text-white/25 hover:text-[#ff78b9]"
                     >
                       Ver todos

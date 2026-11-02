@@ -5,12 +5,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type CSSProperties,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import ReaderSettings from '@/app/components/ReaderSettings';
-import { useReaderPreferences } from '@/lib/reader/use-reader-preferences';
-import { readerFontFamily } from '@/lib/reader/preferences';
 
 type Chapter = {
   id: string;
@@ -76,7 +72,6 @@ export default function CapituloPage() {
   const router = useRouter();
 
   const id = String(params.id);
-  const reader = useReaderPreferences();
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
@@ -1167,15 +1162,7 @@ export default function CapituloPage() {
 
         {/* CONTEÚDO */}
 
-        <ReaderSettings value={reader.preferences} onChange={reader.update} ready={reader.ready} status={reader.status} />
-        <section className="reader-surface" data-reader-theme={reader.preferences.theme} aria-label="Texto do capítulo" style={{
-          '--reader-font': readerFontFamily(reader.preferences),
-          '--reader-size': `${reader.preferences.fontSize / 16}rem`,
-          '--reader-line-height': reader.preferences.lineHeight,
-          '--reader-margin': `${reader.preferences.margin / 16}rem`,
-        } as CSSProperties}>
-          {renderChapterBody()}
-        </section>
+        {renderChapterBody()}
 
         {/* MÍDIAS DO CAPÍTULO */}
 

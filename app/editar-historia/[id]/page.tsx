@@ -1,4 +1,7 @@
 'use client';
+import StoryMetadataFields from '@/components/StoryMetadataFields';
+import WritingPanel from '@/components/WritingPanel';
+import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
 
 import React, {
   ChangeEvent,
@@ -34,6 +37,12 @@ type StoryChapter = {
 };
 
 type Story = {
+  has_content_warnings?: boolean;
+  fandom?: string;
+  work_has_ai?: boolean;
+  cover_has_ai?: boolean;
+  content_warnings?: string;
+  accepts_translation?: boolean;
   id: string;
   title: string;
   description: string;
@@ -237,6 +246,7 @@ export default function EditarHistoriaPage() {
   const [title, setTitle] =
     useState('');
 
+  const [storyMetadata, setStoryMetadata] = useState<StoryMetadata>(emptyStoryMetadata);
   const [description, setDescription] =
     useState('');
 
@@ -436,6 +446,7 @@ export default function EditarHistoriaPage() {
         setDescription(
           normalizedStory.description || ''
         );
+        setStoryMetadata({ fandom: normalizedStory.fandom ?? "", work_has_ai: normalizedStory.work_has_ai ?? false, cover_has_ai: normalizedStory.cover_has_ai ?? false, has_content_warnings: normalizedStory.has_content_warnings ?? false, content_warnings: normalizedStory.content_warnings ?? "", accepts_translation: normalizedStory.accepts_translation ?? false });
 
         setStatus(
           normalizedStory.status || ''
@@ -883,6 +894,7 @@ export default function EditarHistoriaPage() {
     try {
       const formData =
         new FormData();
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
       formData.append(
         'cover',
@@ -1051,6 +1063,7 @@ export default function EditarHistoriaPage() {
     try {
       const formData =
         new FormData();
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
       formData.append(
         'title',
@@ -1713,6 +1726,7 @@ export default function EditarHistoriaPage() {
 
       const formData =
         new FormData();
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
       formData.append(
         'title',
@@ -2366,19 +2380,7 @@ export default function EditarHistoriaPage() {
                       Sinopse
                     </label>
 
-                    <textarea
-                      value={
-                        description
-                      }
-                      onChange={(event) =>
-                        setDescription(
-                          event.target.value
-                        )
-                      }
-                      maxLength={5000}
-                      rows={8}
-                      className="w-full resize-y rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-600 focus:border-pink-400/40"
-                    />
+                    <WritingPanel value={description} onChange={setDescription} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
                       {description.length}/5000

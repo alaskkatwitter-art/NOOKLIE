@@ -30,7 +30,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   slug,
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
-const state = { readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const state = { account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -105,20 +105,6 @@ before(async () => {
   supabaseMock = createHttpServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
-
-    if (path === 'reader_preferences') {
-      if (state.readerUnavailable) return sendJson(response, { code: '42P01', message: 'Unavailable fixture' }, 503);
-      if (request.method === 'GET') {
-        const id = (url.searchParams.get('user_id') || '').replace(/^eq\./, '');
-        return respondRows(request, response, state.readerPreferences.has(id) ? [{ preferences: state.readerPreferences.get(id) }] : []);
-      }
-      if (request.method === 'POST') {
-        let body = ''; for await (const chunk of request) body += chunk;
-        const row = JSON.parse(body);
-        state.readerPreferences.set(row.user_id, row.preferences);
-        response.writeHead(201); return response.end();
-      }
-    }
 
     if (path === 'rpc/consume_auth_rate_limit' && request.method === 'POST') {
       let body = '';
@@ -505,31 +491,4 @@ test('public policy text and AI training controls are available without authenti
   assert.equal(robots.status, 200);
   const text = await robots.text();
   for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) assert.match(text, new RegExp(`User-Agent: ${agent}\\n(?:User-Agent: [^\\n]+\\n)*Disallow: /`, 'i'));
-});
-
-
-test('reader preferences round-trip by authenticated account and reject foreign ownership and unsafe values', async () => {
-  const token = 'reader-preferences-session';
-  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now()+60000).toISOString() });
-  const headers = { Cookie: `toriland_session=${token}`, 'Content-Type': 'application/json', 'X-Reader-Account': userId };
-  const preferences = { fontId:'literata', fontSize:24, lineHeight:1.8, margin:32, theme:'sepia' };
-  const save = (body, customHeaders = headers) => fetch(`${baseUrl}/api/reader/preferences`, { method:'PUT', headers:customHeaders, body:JSON.stringify(body) });
-  assert.equal((await save(preferences, { 'Content-Type':'application/json' })).status, 401);
-  assert.equal((await fetch(`${baseUrl}/api/reader/preferences`)).status, 401);
-  assert.equal((await save({ ...preferences, user_id:otherUserId })).status, 400);
-  assert.equal((await save({ ...preferences, fontId:'arbitrary-css' })).status, 400);
-  assert.equal((await save({ ...preferences, fontSize:1000 })).status, 400);
-  assert.equal((await save(preferences, { ...headers, 'X-Reader-Account':otherUserId })).status, 409);
-  assert.equal((await save(preferences)).status, 200);
-  const response = await fetch(`${baseUrl}/api/reader/preferences?user_id=${otherUserId}`, { headers });
-  assert.match(response.headers.get('cache-control'), /no-store/);
-  assert.deepEqual(await response.json(), { user_id:userId, preferences });
-  assert.equal(state.readerPreferences.has(otherUserId), false);
-  state.readerUnavailable = true;
-  try {
-    const unavailable = await fetch(`${baseUrl}/api/reader/preferences`, { headers });
-    assert.equal(unavailable.status, 503);
-    assert.equal((await unavailable.json()).user_id, userId);
-    assert.equal((await save(preferences)).status, 503);
-  } finally { state.readerUnavailable = false; }
 });

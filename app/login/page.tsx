@@ -212,7 +212,7 @@ export default function LoginPage() {
             >
               <CloudLogo />
 
-              <span className="mt-1 text-2xl font-black tracking-[0.18em] text-[#ff78b9] font-nooklie-logo">
+              <span className="mt-1 text-2xl font-black tracking-[0.18em] text-[#ff78b9]">
                 NOOKLIE
               </span>
             </button>

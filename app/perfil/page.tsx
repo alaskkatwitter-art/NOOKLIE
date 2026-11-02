@@ -3034,7 +3034,9 @@ export default function PerfilPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-3xl border border-white/10 bg-[#100b12] p-4 sm:p-5">
+                      <div className="rounded-3xl border border-[#ff78b9]/25 bg-gradient-to-br from-[#291522] to-[#100b12] p-4 sm:p-5">
+                        <div className="mb-4"><p className="text-xs font-bold uppercase tracking-widest text-[#ff9bca]">Converse com seus leitores</p><h3 className="mt-2 text-xl font-bold">Escreva um novo aviso</h3><p className="mt-2 text-sm leading-6 text-white/60">Uma atualização, uma pausa ou uma ideia: esse espaço é seu.</p></div>
+                        <div className="mb-4 flex flex-wrap gap-2">{[['Novo capítulo', 'Novo capítulo disponível!\n\n'], ['Aviso de pausa', 'Uma pausa na escrita\n\n']].map(([label, text]) => <button key={label} type="button" onClick={() => setNewPost(current => (current + (current ? '\n\n' : '') + text).slice(0, 5000))} className="min-h-11 rounded-full border border-[#ff78b9]/25 px-4 text-sm text-[#ffb9da] hover:bg-[#ff78b9]/10">{label}</button>)}</div>
                         <textarea
                           value={newPost}
                           onChange={(event) =>
@@ -3044,9 +3046,10 @@ export default function PerfilPage() {
                             )
                           }
                           maxLength={5000}
-                          rows={4}
-                          placeholder="O que está passando pela sua cabeça?"
-                          className="w-full resize-none bg-transparent text-sm leading-7 text-white outline-none placeholder:text-white/20"
+                          rows={10}
+                          aria-label="Texto do novo aviso"
+                          placeholder="Comece pelo que seus leitores precisam saber…"
+                          className="w-full resize-y rounded-xl border border-white/10 bg-[#100b12] p-4 text-base leading-8 text-white outline-none placeholder:text-white/20"
                         />
 
                         {mediaPreviews.length >
@@ -3169,7 +3172,7 @@ export default function PerfilPage() {
                               )}
                             </select>
 
-                            <span className="hidden shrink-0 text-xs text-white/25 sm:block">
+                            <span className="shrink-0 text-xs text-white/60">
                               {newPost.length}/5000
                             </span>
                           </div>

@@ -106,3 +106,5 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .reader-surface { scroll-behavior: auto; }
 }
+
+.site-navigation{position:sticky;top:0;z-index:60;display:flex;justify-content:center;gap:4px;padding:8px max(8px,env(safe-area-inset-left));background:#100b12f5;border-bottom:1px solid #ff78b933;backdrop-filter:blur(16px);color:#ffb9da}.site-navigation a,.site-navigation button{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border-radius:12px;font-size:14px;white-space:nowrap}.site-navigation [aria-current=page]{background:#ff78b9;color:#180d15;font-weight:700}.site-navigation a:hover,.site-navigation button:hover{background:#ff78b933}.site-navigation :focus-visible{outline:2px solid #ff78b9;outline-offset:2px}@media(max-width:480px){.site-navigation{gap:0}.site-navigation a,.site-navigation button{padding:8px;font-size:12px;flex:1}}

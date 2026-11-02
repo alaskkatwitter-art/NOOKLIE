@@ -280,21 +280,21 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-5 py-10 text-sm text-white/35">
           <div className="flex items-center gap-6">
             <Link
-              href="/"
+              href="/sobre"
               className="transition hover:text-[#ff9bca]"
             >
               Sobre
             </Link>
 
             <Link
-              href="/"
+              href="/termos"
               className="transition hover:text-[#ff9bca]"
             >
               Termos
             </Link>
 
             <Link
-              href="/"
+              href="/privacidade"
               className="transition hover:text-[#ff9bca]"
             >
               Privacidade
