@@ -907,7 +907,7 @@ export default function PublicProfilePage() {
               ))}
               {!isSelf && <ReportProfileButton profileId={user.id} />}
 
-              <div hidden={restricted} className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div style={restricted?{display:"none"}:undefined} className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>
                   <span className="text-lg font-black text-white">
                     {followersCount}

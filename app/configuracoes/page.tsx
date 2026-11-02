@@ -194,6 +194,8 @@ export default function ConfiguracoesPage() {
     useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
 
+  const [preferencesReady,setPreferencesReady]=useState(false);
+  const [preferencesError,setPreferencesError]=useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -217,8 +219,9 @@ export default function ConfiguracoesPage() {
       }
 
       setProfile(data.user);
-      const prefs=await fetch('/api/profile/privacy',{cache:'no-store'});if(!prefs.ok)throw new Error('Preferências indisponíveis');const savedPrefs=await prefs.json();setPrivateProfile(savedPrefs.is_private);setChapterNotifications(savedPrefs.chapter_notifications);setSocialNotifications(savedPrefs.social_notifications);
+      const prefs=await fetch('/api/profile/privacy',{cache:'no-store'});if(!prefs.ok)throw new Error('Preferências indisponíveis');const savedPrefs=await prefs.json();setPrivateProfile(savedPrefs.is_private);setChapterNotifications(savedPrefs.chapter_notifications);setSocialNotifications(savedPrefs.social_notifications);setPreferencesReady(true);
     } catch (error) {
+      setPreferencesError('Não foi possível carregar suas preferências. Recarregue a página antes de salvar.');
       console.error('Erro ao carregar configurações:', error);
     } finally {
       setLoading(false);
@@ -226,6 +229,7 @@ export default function ConfiguracoesPage() {
   }
 
   async function handleSave() {
+    if(!preferencesReady)return;
     setSaving(true);
     setSaved(false);
 
@@ -305,6 +309,7 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="space-y-5">
+            {preferencesError&&<p role="alert"className="mb-4 text-sm text-rose-200">{preferencesError}</p>}
             <section className="overflow-hidden rounded-[2rem] border border-white/8 bg-white/[0.025]">
               <div className="flex items-center gap-3 border-b border-white/8 px-6 py-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ff78b9]/10 text-[#ff78b9]">
@@ -493,7 +498,7 @@ export default function ConfiguracoesPage() {
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving||!preferencesReady}
                   className="w-full rounded-2xl bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-6 py-3.5 text-sm font-black text-[#180b12] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving
