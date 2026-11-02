@@ -3,7 +3,7 @@
 do $$
 declare
   root_id uuid;
-  coauthor_id uuid;
+  v_coauthor_id uuid;
   approved_story uuid;
   rejected_story uuid;
   approved_request uuid;
@@ -15,19 +15,30 @@ begin
   WHERE account.username='astriddy';
   IF root_id IS NULL THEN RAISE EXCEPTION 'Primary admin fixture is unavailable'; END IF;
 
-  select id into coauthor_id from public.profiles
+  select id into v_coauthor_id from public.profiles
   where not exists (select 1 from public.platform_admins where user_id = profiles.user_id)
   order by created_at limit 1;
-  if coauthor_id is null then raise exception 'A non-admin coauthor fixture is unavailable'; end if;
+  if v_coauthor_id is null then raise exception 'A non-admin coauthor fixture is unavailable'; end if;
 
   begin
     insert into public.auth_sessions(id, user_id, token_hash, expires_at)
     values (gen_random_uuid(), root_id, repeat('x',64), now()+interval '5 minutes'),
-           (gen_random_uuid(), coauthor_id, repeat('y',64), now()+interval '5 minutes');
+           (gen_random_uuid(), v_coauthor_id, repeat('y',64), now()+interval '5 minutes');
     insert into public.stories(author_id, title) values (root_id, '__deletion_consensus_approved') returning id into approved_story;
     insert into public.story_collaborators(story_id, profile_id, role, status, invited_by, accepted_at)
-    values (approved_story, coauthor_id, 'coauthor', 'active', root_id, now());
+    values (approved_story, v_coauthor_id, 'coauthor', 'active', root_id, now());
     approved_request := public.request_story_deletion(repeat('x',64), approved_story);
+    if not exists (select 1 from public.story_deletion_votes
+      where request_id=approved_request and coauthor_id=root_id and approved is true and decided_at is not null) then
+      raise exception 'The requester must start with an approved vote';
+    end if;
+    if not exists (select 1 from public.story_deletion_votes
+      where request_id=approved_request and coauthor_id=v_coauthor_id and approved is null and decided_at is null) then
+      raise exception 'Other coauthors must start with an undecided vote';
+    end if;
+    if not exists (select 1 from public.stories where id=approved_story) then
+      raise exception 'The story was deleted before unanimous approval';
+    end if;
     perform public.decide_story_deletion(repeat('y',64), approved_request, true);
     if exists (select 1 from public.stories where id=approved_story) then raise exception 'Unanimous approval did not delete the story'; end if;
     if not exists (select 1 from public.story_deletion_requests where id=approved_request and story_id is null and status='approved') then
@@ -36,7 +47,7 @@ begin
 
     insert into public.stories(author_id, title) values (root_id, '__deletion_consensus_rejected') returning id into rejected_story;
     insert into public.story_collaborators(story_id, profile_id, role, status, invited_by, accepted_at)
-    values (rejected_story, coauthor_id, 'coauthor', 'active', root_id, now());
+    values (rejected_story, v_coauthor_id, 'coauthor', 'active', root_id, now());
     rejected_request := public.request_story_deletion(repeat('x',64), rejected_story);
     perform public.decide_story_deletion(repeat('y',64), rejected_request, false);
     if not exists (select 1 from public.stories where id=rejected_story) then raise exception 'A rejection did not keep the story'; end if;

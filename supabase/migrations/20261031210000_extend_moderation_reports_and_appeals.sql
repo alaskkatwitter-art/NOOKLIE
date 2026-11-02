@@ -459,7 +459,8 @@ begin
   insert into public.story_deletion_requests(story_id, requested_by)
   values (p_story_id, v_actor) returning id into v_request;
   insert into public.story_deletion_votes(request_id, coauthor_id, approved, decided_at)
-  select v_request, participant.profile_id, participant.profile_id = v_actor,
+  select v_request, participant.profile_id,
+    case when participant.profile_id = v_actor then true else null end,
     case when participant.profile_id = v_actor then now() else null end
   from (
     select v_owner as profile_id
