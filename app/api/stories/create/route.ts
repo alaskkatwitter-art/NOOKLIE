@@ -1,3 +1,4 @@
+import { parseStoryMetadata } from '@/lib/stories/metadata';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    let storyMetadata;
+    try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
 
     const titleValue = formData.get('title');
     const descriptionValue = formData.get('description');
@@ -259,6 +262,7 @@ export async function POST(request: Request) {
       await supabase
         .from('stories')
         .insert({
+          ...storyMetadata,
           author_id: session.user_id,
           title,
           description: description || null,

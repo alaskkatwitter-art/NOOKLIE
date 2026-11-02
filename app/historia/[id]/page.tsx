@@ -1,5 +1,6 @@
 "use client";
 
+import FormattedSynopsis from '@/components/FormattedSynopsis';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -28,6 +29,7 @@ type Chapter = {
 };
 
 type Story = {
+  has_content_warnings?: boolean; fandom?: string; work_has_ai?: boolean; cover_has_ai?: boolean; content_warnings?: string; accepts_translation?: boolean;
   id: string;
   author_id: string;
   title: string;
@@ -337,9 +339,9 @@ export default function HistoriaPage() {
             )}
 
             {story.description && (
-              <p className="mb-7 max-w-3xl whitespace-pre-wrap text-base leading-7 text-white/60">
-                {story.description}
-              </p>
+              <div className="mb-7 max-w-3xl text-base leading-7 text-white/60">
+                <FormattedSynopsis text={story.description} />
+              </div>
             )}
 
             {story.tags &&
@@ -422,7 +424,13 @@ export default function HistoriaPage() {
           </div>
         </div>
 
-        <section className="mt-16">
+        <section aria-label="Informações e avisos da obra" className="mt-8 space-y-3 rounded-2xl border border-pink-400/20 bg-pink-400/5 p-5 text-sm leading-7">
+{story.fandom && <p><strong>Fandom:</strong> {story.fandom}</p>}
+{story.work_has_ai && <p className="text-pink-200">✦ Esta obra tem IA</p>}
+{story.cover_has_ai && <p className="text-pink-200">✦ Esta capa tem IA</p>}
+{(story.has_content_warnings || story.content_warnings) && <div className="rounded-xl border border-amber-300/30 bg-amber-300/5 p-4"><h2 className="font-bold text-amber-200">Avisos de conteúdo e gatilhos</h2><p className="whitespace-pre-wrap">{story.content_warnings || 'O autor sinalizou temas sensíveis sem detalhar os avisos.'}</p></div>}
+<p>{story.accepts_translation ? 'O autor aceita propostas de tradução. Solicite autorização antes de publicar.' : 'Traduções não autorizadas. Consulte o autor antes de traduzir.'}</p>
+</section><section className="mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-pink-300/60">

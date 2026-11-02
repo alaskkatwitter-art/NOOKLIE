@@ -1,4 +1,7 @@
 'use client';
+import StoryMetadataFields from '@/components/StoryMetadataFields';
+import WritingPanel from '@/components/WritingPanel';
+import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,6 +11,7 @@ export default function CriarPage() {
 
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [storyMetadata, setStoryMetadata] = useState<StoryMetadata>(emptyStoryMetadata);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Em andamento');
@@ -161,6 +165,7 @@ export default function CriarPage() {
 
     try {
       const formData = new FormData();
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
       formData.append('title', title);
       formData.append(
@@ -199,7 +204,7 @@ export default function CriarPage() {
         return;
       }
 
-      router.push('/perfil');
+      router.push(`/editar-historia/${data.story.id}`);
       router.refresh();
     } catch {
       setError(
@@ -234,7 +239,7 @@ export default function CriarPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-5 py-10">
+      <div className="mx-auto max-w-6xl px-5 py-10">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
             Nova história
@@ -308,18 +313,7 @@ export default function CriarPage() {
                   </span>
                 </div>
 
-                <textarea
-                  value={description}
-                  onChange={(event) =>
-                    setDescription(
-                      event.target.value
-                    )
-                  }
-                  maxLength={2000}
-                  rows={7}
-                  placeholder="Sobre o que é sua história?"
-                  className="w-full resize-none rounded-2xl border border-white/10 bg-[#100b12] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/20 focus:border-[#ff78b9]/60"
-                />
+                <WritingPanel value={description} onChange={setDescription} />
               </div>
 
               {/* STATUS */}
@@ -596,6 +590,7 @@ export default function CriarPage() {
           {/* ERRO */}
           {/* ================================================= */}
 
+          <StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
           {error && (
             <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-5 py-4 text-sm text-red-300">
               {error}

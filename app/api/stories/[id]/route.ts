@@ -1,3 +1,4 @@
+import { parseStoryMetadata } from '@/lib/stories/metadata';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -263,6 +264,7 @@ export async function GET(
         cover_url,
         status,
         rating,
+        has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
         created_at,
         updated_at,
         moderation_hidden_at
@@ -828,6 +830,8 @@ export async function PUT(
 
     const formData =
       await request.formData();
+    let storyMetadata;
+    try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
 
     const title =
       String(
@@ -1100,6 +1104,7 @@ export async function PUT(
     } = await supabase
       .from('stories')
       .update({
+        ...storyMetadata,
         title,
 
         description:
@@ -1136,6 +1141,7 @@ export async function PUT(
         cover_url,
         status,
         rating,
+        has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
         created_at,
         updated_at
       `)
