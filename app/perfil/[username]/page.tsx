@@ -1,4 +1,8 @@
 'use client';
+import {contentMediaUrl} from '@/lib/security/content-media';
+import MessageProfileButton from '@/components/MessageProfileButton';
+import LinkedStoryCard from '@/components/LinkedStoryCard';
+
 
 import {
   useEffect,
@@ -92,6 +96,7 @@ type FicClub = {
 };
 
 type ProfileResponse = {
+ restricted?:boolean;
   user?: User;
   stories?: Story[];
   posts?: NookPost[];
@@ -101,6 +106,7 @@ type ProfileResponse = {
 };
 
 type FollowResponse = {
+ requested?:boolean;
   followers_count?: number;
   following_count?: number;
   is_following?: boolean;
@@ -231,7 +237,7 @@ function StoryCard({
           {story.cover_url ? (
             <img
               src={
-                story.cover_url
+                contentMediaUrl(story.cover_url)
               }
               alt=""
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -351,6 +357,8 @@ export default function PublicProfilePage() {
         ? usernameParam[0]
         : undefined;
 
+  const [restricted,setRestricted]=useState(false);
+  const [requested,setRequested]=useState(false);
   const [user, setUser] =
     useState<User | null>(
       null
@@ -470,7 +478,7 @@ export default function PublicProfilePage() {
           return;
         }
 
-        setUser(data.user);
+        setUser(data.user);setRestricted(Boolean(data.restricted));
 
         setStories(
           Array.isArray(
@@ -532,6 +540,7 @@ export default function PublicProfilePage() {
                 0
             );
 
+            setRequested(Boolean(followData.requested));
             setIsFollowing(
               !!followData.is_following
             );
@@ -578,7 +587,7 @@ export default function PublicProfilePage() {
 
     try {
       const method =
-        isFollowing
+        (isFollowing||requested)
           ? 'DELETE'
           : 'POST';
 
@@ -610,6 +619,7 @@ export default function PublicProfilePage() {
         );
       }
 
+      setRequested(Boolean(data.requested));
       setIsFollowing(
         data.following ??
           !isFollowing
@@ -794,7 +804,7 @@ export default function PublicProfilePage() {
             {user.cover_url ? (
               <img
                 src={
-                  user.cover_url
+                  contentMediaUrl(user.cover_url)
                 }
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
@@ -812,7 +822,7 @@ export default function PublicProfilePage() {
                 {user.avatar_url ? (
                   <img
                     src={
-                      user.avatar_url
+                      contentMediaUrl(user.avatar_url)
                     }
                     alt={getDisplayName(
                       user
@@ -849,7 +859,7 @@ export default function PublicProfilePage() {
                     ? '...'
                     : isFollowing
                       ? 'Seguindo'
-                      : 'Seguir'}
+                      : requested ? 'Solicitado · cancelar' : 'Seguir'}
                 </button>
               )}
 
@@ -897,7 +907,7 @@ export default function PublicProfilePage() {
               ))}
               {!isSelf && <ReportProfileButton profileId={user.id} />}
 
-              <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div style={restricted?{display:"none"}:undefined} className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>
                   <span className="text-lg font-black text-white">
                     {followersCount}
@@ -932,6 +942,9 @@ export default function PublicProfilePage() {
           </div>
         </section>
 
+        {!isSelf && <div className="mt-4"><MessageProfileButton profileId={user.id}/></div>}
+        {restricted && <p role="status" className="mt-6 rounded-3xl border border-pink-300/20 bg-pink-300/5 p-8 text-sm text-white/60">essa conta é privada, apenas seguidores de {user.username} podem ter acesso ao restante do perfil</p>}
+        {!restricted && <>
         {/* ABAS */}
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
@@ -1055,7 +1068,7 @@ export default function PublicProfilePage() {
                             {user.avatar_url ? (
                               <img
                                 src={
-                                  user.avatar_url
+                                  contentMediaUrl(user.avatar_url)
                                 }
                                 alt=""
                                 className="h-11 w-11 rounded-full object-cover"
@@ -1101,7 +1114,7 @@ export default function PublicProfilePage() {
                             )}
                           </div>
 
-                          {post.body && (
+                          {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}{post.body && (
                             <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
                               {
                                 post.body
@@ -1113,7 +1126,7 @@ export default function PublicProfilePage() {
                             <div className="mt-5 overflow-hidden rounded-2xl border border-white/10">
                               <img
                                 src={
-                                  post.image_url
+                                  contentMediaUrl(post.image_url)
                                 }
                                 alt=""
                                 className="max-h-[600px] w-full object-cover"
@@ -1150,7 +1163,7 @@ export default function PublicProfilePage() {
                                       >
                                         <img
                                           src={
-                                            media.media_url
+                                            contentMediaUrl(media.media_url)
                                           }
                                           alt=""
                                           className="max-h-[500px] min-h-[180px] w-full object-cover"
@@ -1249,7 +1262,7 @@ export default function PublicProfilePage() {
                                       {story.cover_url ? (
                                         <img
                                           src={
-                                            story.cover_url
+                                            contentMediaUrl(story.cover_url)
                                           }
                                           alt=""
                                           className="h-full w-full object-cover"
@@ -1367,9 +1380,9 @@ export default function PublicProfilePage() {
                                   .cover_url ? (
                                   <img
                                     src={
-                                      club
+                                      contentMediaUrl(club
                                         .story
-                                        .cover_url
+                                        .cover_url)
                                     }
                                     alt=""
                                     className="h-full w-full object-cover"
@@ -1416,6 +1429,7 @@ export default function PublicProfilePage() {
             </section>
           </div>
         </div>
+        </>}
       </div>
     </main>
   );

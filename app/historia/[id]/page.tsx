@@ -1,5 +1,6 @@
 "use client";
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import FormattedSynopsis from '@/components/FormattedSynopsis';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -57,7 +58,7 @@ export default function HistoriaPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [liking, setLiking] = useState(false);
+
 
   useEffect(() => {
     if (!id) return;
@@ -126,54 +127,6 @@ export default function HistoriaPage() {
     loadCurrentUser();
   }, []);
 
-  async function handleLike() {
-    if (!story || liking) return;
-
-    try {
-      setLiking(true);
-
-      const response = await fetch(
-        `/api/stories/${story.id}/like`,
-        {
-          method: "POST",
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            "Não foi possível curtir a história."
-        );
-      }
-
-      setStory((previous) => {
-        if (!previous) return previous;
-
-        return {
-          ...previous,
-          liked:
-            typeof data.liked === "boolean"
-              ? data.liked
-              : !previous.liked,
-          likes:
-            typeof data.likes === "number"
-              ? data.likes
-              : previous.liked
-                ? Math.max(0, previous.likes - 1)
-                : previous.likes + 1,
-        };
-      });
-    } catch (err) {
-      console.error(
-        "Erro ao curtir história:",
-        err
-      );
-    } finally {
-      setLiking(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -261,7 +214,7 @@ export default function HistoriaPage() {
             <div className="aspect-[2/3] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-pink-500/20 via-purple-500/10 to-[#120b16] shadow-2xl">
               {story.cover_url ? (
                 <img
-                  src={story.cover_url}
+                  src={contentMediaUrl(story.cover_url)}
                   alt={`Capa de ${story.title}`}
                   className="h-full w-full object-cover"
                 />
@@ -314,7 +267,7 @@ export default function HistoriaPage() {
               >
                 {story.author.avatar_url ? (
                   <img
-                    src={story.author.avatar_url}
+                    src={contentMediaUrl(story.author.avatar_url)}
                     alt={story.author.username}
                     className="h-10 w-10 rounded-full object-cover"
                   />
@@ -373,24 +326,6 @@ export default function HistoriaPage() {
                   Começar a ler
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={handleLike}
-                disabled={liking}
-                className={`rounded-xl border px-5 py-3 text-sm font-medium transition ${
-                  story.liked
-                    ? "border-pink-400/40 bg-pink-500/15 text-pink-300"
-                    : "border-white/10 bg-white/5 text-white/70 hover:border-pink-400/30 hover:text-white"
-                }`}
-              >
-                {story.liked
-                  ? "♥ Curtido"
-                  : "♡ Curtir"}{" "}
-                <span className="ml-1 text-white/40">
-                  {story.likes || 0}
-                </span>
-              </button>
 
               {isOwner && (
                 <button

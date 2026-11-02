@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useEffect,
   useRef,
@@ -8,6 +9,8 @@ import {
   type CSSProperties,
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ChapterEngagement from '@/components/ChapterEngagement';
+import InlineCommentMarkers from '@/components/InlineCommentMarkers';
 import ReadingProgressTracker from '@/components/ReadingProgressTracker';
 import ReaderSettings from '@/app/components/ReaderSettings';
 import { useReaderPreferences } from '@/lib/reader/use-reader-preferences';
@@ -934,7 +937,7 @@ export default function CapituloPage() {
         (b.position || 0)
     );
 
-  const commentGroups =
+  const _commentGroups =
     getCommentGroups();
 
   return (
@@ -1110,56 +1113,6 @@ export default function CapituloPage() {
             {chapter.title}
           </h1>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleLike}
-              disabled={liking}
-              className={`
-                rounded-xl
-                border
-                px-4
-                py-2
-                text-sm
-                font-semibold
-                transition
-                ${
-                  liked
-                    ? 'border-[#ff4f9a]/60 bg-[#ff4f9a]/10 text-[#ff4f9a]'
-                    : 'border-white/10 bg-white/5 text-white hover:border-[#ff4f9a]/50'
-                }
-                disabled:opacity-50
-              `}
-            >
-              {liked
-                ? 'Curtido'
-                : 'Curtir'}{' '}
-              · {likes}
-            </button>
-
-            <button
-              type="button"
-              onClick={
-                openGeneralComment
-              }
-              className="
-                rounded-xl
-                border
-                border-white/10
-                bg-white/5
-                px-4
-                py-2
-                text-sm
-                font-semibold
-                text-white
-                hover:border-[#ff4f9a]/50
-                transition
-              "
-            >
-              Comentar
-            </button>
-          </div>
-
           {error && (
             <p className="mt-4 text-sm text-red-400">
               {error}
@@ -1176,7 +1129,7 @@ export default function CapituloPage() {
           '--reader-line-height': reader.preferences.lineHeight,
           '--reader-margin': `${reader.preferences.margin / 16}rem`,
         } as CSSProperties}>
-          {renderChapterBody()}
+          <InlineCommentMarkers comments={comments} onOpen={setActiveCommentGroup}>{renderChapterBody()}</InlineCommentMarkers>
         </section>
 
         {/* MÍDIAS DO CAPÍTULO */}
@@ -1198,7 +1151,7 @@ export default function CapituloPage() {
                     className="flex justify-center"
                   >
                     <img
-                      src={url}
+                      src={contentMediaUrl(url)}
                       alt=""
                       className="
                         max-w-[560px]
@@ -1216,6 +1169,7 @@ export default function CapituloPage() {
           </section>
         )}
 
+        <ChapterEngagement chapterId={id} onLike={handleLike} liked={liked} likes={likes} liking={liking} onPosted={()=>{void fetch('/api/comments?chapter_id='+id,{cache:'no-store'}).then(r=>r.json()).then(d=>setComments(d.comments||[]));}}/>
         {/* MODAL DE COMENTÁRIO */}
 
         {showCommentBox && (
@@ -1478,7 +1432,7 @@ export default function CapituloPage() {
                             >
                               <img
                                 src={
-                                  sticker.image_url
+                                  contentMediaUrl(sticker.image_url)
                                 }
                                 alt="Figurinha"
                                 className="
@@ -1548,7 +1502,7 @@ export default function CapituloPage() {
                   <div className="flex justify-center">
                     <img
                       src={
-                        selectedSticker.image_url
+                        contentMediaUrl(selectedSticker.image_url)
                       }
                       alt="Figurinha selecionada"
                       className="
@@ -1728,9 +1682,9 @@ export default function CapituloPage() {
                           ?.avatar_url ? (
                           <img
                             src={
-                              comment
+                              contentMediaUrl(comment
                                 .profiles
-                                .avatar_url
+                                .avatar_url)
                             }
                             alt=""
                             className="
@@ -1802,9 +1756,9 @@ export default function CapituloPage() {
                         <div className="mt-3">
                           <img
                             src={
-                              comment
+                              contentMediaUrl(comment
                                 .user_stickers
-                                .image_url
+                                .image_url)
                             }
                             alt="Figurinha"
                             className="
@@ -1931,8 +1885,8 @@ export default function CapituloPage() {
                         ?.avatar_url ? (
                         <img
                           src={
-                            comment.profiles
-                              .avatar_url
+                            contentMediaUrl(comment.profiles
+                              .avatar_url)
                           }
                           alt=""
                           className="
@@ -2003,9 +1957,9 @@ export default function CapituloPage() {
                       <div className="mt-3">
                         <img
                           src={
-                            comment
+                            contentMediaUrl(comment
                               .user_stickers
-                              .image_url
+                              .image_url)
                           }
                           alt="Figurinha"
                           className="

@@ -1,5 +1,7 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
+import LinkedStoryCard from '@/components/LinkedStoryCard';
 import React, {
   ChangeEvent,
   TouchEvent,
@@ -242,7 +244,7 @@ function SpotifyPreview({
     >
       {preview.thumbnail_url && (
         <img
-          src={preview.thumbnail_url}
+          src={contentMediaUrl(preview.thumbnail_url)}
           alt=""
           className="h-20 w-20 shrink-0 object-cover"
         />
@@ -1756,7 +1758,7 @@ export default function PerfilPage() {
               }`}
             >
               <img
-                src={item.media_url}
+                src={contentMediaUrl(item.media_url)}
                 alt=""
                 className="h-full w-full object-cover"
               />
@@ -2197,7 +2199,7 @@ export default function PerfilPage() {
             {author?.avatar_url ? (
               <img
                 src={
-                  author.avatar_url
+                  contentMediaUrl(author.avatar_url)
                 }
                 alt=""
                 className="h-full w-full object-cover"
@@ -2517,7 +2519,7 @@ export default function PerfilPage() {
           >
             {user.cover_url && (
               <img
-                src={user.cover_url}
+                src={contentMediaUrl(user.cover_url)}
                 alt="Capa do perfil"
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -2583,7 +2585,7 @@ export default function PerfilPage() {
                     {user.avatar_url ? (
                       <img
                         src={
-                          user.avatar_url
+                          contentMediaUrl(user.avatar_url)
                         }
                         alt={`Foto de perfil de ${displayName}`}
                         className="h-full w-full object-cover"
@@ -2912,7 +2914,7 @@ export default function PerfilPage() {
                               {story.cover_url ? (
                                 <img
                                   src={
-                                    story.cover_url
+                                    contentMediaUrl(story.cover_url)
                                   }
                                   alt={`Capa de ${story.title}`}
                                   className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -3075,7 +3077,7 @@ export default function PerfilPage() {
                                 >
                                   <img
                                     src={
-                                      preview
+                                      contentMediaUrl(preview)
                                     }
                                     alt={`Prévia ${
                                       index + 1
@@ -3277,7 +3279,7 @@ export default function PerfilPage() {
                                         {user.avatar_url ? (
                                           <img
                                             src={
-                                              user.avatar_url
+                                              contentMediaUrl(user.avatar_url)
                                             }
                                             alt=""
                                             className="h-full w-full object-cover"
@@ -3501,7 +3503,7 @@ export default function PerfilPage() {
                                       </div>
                                     ) : (
                                       <>
-                                        {post.body &&
+                                        {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}{post.body &&
                                           renderPostBody(
                                             post.body
                                           )}
@@ -3826,7 +3828,7 @@ export default function PerfilPage() {
                                             {story.cover_url ? (
                                               <img
                                                 src={
-                                                  story.cover_url
+                                                  contentMediaUrl(story.cover_url)
                                                 }
                                                 alt=""
                                                 className="h-full w-full object-cover"
@@ -3966,7 +3968,7 @@ export default function PerfilPage() {
                                   {club.story.cover_url ? (
                                     <img
                                       src={
-                                        club.story.cover_url
+                                        contentMediaUrl(club.story.cover_url)
                                       }
                                       alt=""
                                       className="h-full w-full object-cover"

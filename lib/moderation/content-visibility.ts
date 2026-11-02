@@ -1,21 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAuthenticatedUserContext } from '@/lib/auth/session';
 
 type VisibilityClient = SupabaseClient;
 
+export async function currentViewerProfileId(supabase:VisibilityClient):Promise<string|null>{
+ const auth=await getAuthenticatedUserContext();if(!auth)return null;
+ const account=await supabase.from('auth_accounts').select('account_status').eq('id',auth.userId).maybeSingle();if(account.error)throw account.error;if(!account.data||account.data.account_status==='suspended')return null;
+ const {data,error}=await supabase.from('profiles').select('id').eq('user_id',auth.userId).maybeSingle();if(error)throw error;return data?.id||null;
+}
+
 export async function isPublicProfileVisible(
   supabase: VisibilityClient,
-  profileOrUserId: string
+  profileOrUserId: string,
+  viewerId?: string|null,
+  basicOnly=false
 ): Promise<boolean> {
   let { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, user_id, moderation_hidden_at')
+    .select('id, user_id, moderation_hidden_at, is_private')
     .eq('id', profileOrUserId)
     .maybeSingle();
   if (error) throw error;
   if (!profile) {
     const fallback = await supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, is_private')
       .eq('user_id', profileOrUserId)
       .maybeSingle();
     if (fallback.error) throw fallback.error;
@@ -29,8 +38,14 @@ export async function isPublicProfileVisible(
     .eq('id', profile.user_id)
     .maybeSingle();
   if (accountError) throw accountError;
-  return account?.account_status !== 'suspended';
+  if(account?.account_status==='suspended')return false;
+  if(basicOnly||!profile.is_private)return true;
+  const viewer=viewerId===undefined?await currentViewerProfileId(supabase):viewerId;
+  if(viewer===profile.id)return true;if(!viewer)return false;
+  const follow=await supabase.from('follows').select('follower_id').eq('follower_id',viewer).eq('following_id',profile.id).maybeSingle();if(follow.error)throw follow.error;return Boolean(follow.data);
 }
+
+export async function isAccountVisible(supabase:VisibilityClient,id:string){return isPublicProfileVisible(supabase,id,null,true);}
 
 export async function getPublicProfileIds(
   supabase: VisibilityClient,
@@ -42,11 +57,11 @@ export async function getPublicProfileIds(
   const [profilesById, profilesByUserId] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, is_private')
       .in('id', identifiers),
     supabase
       .from('profiles')
-      .select('id, user_id, moderation_hidden_at')
+      .select('id, user_id, moderation_hidden_at, is_private')
       .in('user_id', identifiers),
   ]);
 
@@ -76,9 +91,12 @@ export async function getPublicProfileIds(
       .map((account) => account.id)
   );
 
+  const privateIds=profiles.filter(p=>p.is_private).map(p=>p.id);
+  let viewer:string|null=null;const followed=new Set<string>();
+  if(privateIds.length){viewer=await currentViewerProfileId(supabase);if(viewer){const follows=await supabase.from('follows').select('following_id').eq('follower_id',viewer).in('following_id',privateIds);if(follows.error)throw follows.error;for(const f of follows.data||[])followed.add(f.following_id);}}
   return new Set(
     profiles
-      .filter((profile) => !suspendedUserIds.has(profile.user_id))
+      .filter((profile) => !suspendedUserIds.has(profile.user_id)&&(!profile.is_private||profile.id===viewer||followed.has(profile.id)))
       .flatMap((profile) => [profile.id, profile.user_id])
   );
 }

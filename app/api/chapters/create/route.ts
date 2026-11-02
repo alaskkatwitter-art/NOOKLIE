@@ -1,3 +1,4 @@
+import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -406,7 +407,7 @@ export async function POST(request: Request) {
         story_id: storyId,
         chapter_number: chapterNumber,
         title,
-        body: chapterBody,
+        body: safeChapterHtml(chapterBody),
         published: isPublished,
         publication_status: publicationStatus,
         author_notes: authorNotes || null,

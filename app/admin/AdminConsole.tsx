@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import ModerationPanel from './ModerationPanel';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
@@ -499,7 +500,7 @@ export default function AdminConsole({
             <div className="grid gap-3 sm:grid-cols-2">
               {adminUsers.map((item) => (
                 <article key={item.user_id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#191219] p-4">
-                  {item.avatar_url ? <img src={item.avatar_url} alt="" className="h-11 w-11 rounded-full object-cover" /> : <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">✦</span>}
+                  {item.avatar_url ? <img src={contentMediaUrl(item.avatar_url)} alt="" className="h-11 w-11 rounded-full object-cover" /> : <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">✦</span>}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">{item.display_name || item.username}</p>
                     <p className="truncate text-xs text-white/45">@{item.username}</p>
@@ -616,7 +617,7 @@ export default function AdminConsole({
               <h2 className="text-xl font-bold">Nomear integrante</h2><p className="mb-4 mt-1 text-sm text-white/45">Busque pelo nome de usuário. A nomeação envia uma notificação e fica no histórico.</p>
               <div className="flex flex-col gap-2 sm:flex-row"><input className={inputClass} minLength={2} maxLength={40} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar usuário" /><button className={secondaryButton} disabled={busy || search.trim().length < 2}>Buscar</button></div>
               {candidates.length > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <button key={candidate.user_id} type="button" onClick={() => setSelectedCandidate(candidate)} className={selectedCandidate?.user_id === candidate.user_id ? 'flex items-center gap-3 rounded-xl border border-[#ff78b9]/60 bg-[#ff78b9]/10 p-3 text-left' : 'flex items-center gap-3 rounded-xl border border-white/10 p-3 text-left'}>
-                {candidate.avatar_url ? <img src={candidate.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">✦</span>}
+                {candidate.avatar_url ? <img src={contentMediaUrl(candidate.avatar_url)} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">✦</span>}
                 <span><span className="block text-sm font-bold">{candidate.display_name || candidate.username}</span><span className="block text-xs text-white/40">@{candidate.username}</span></span>
               </button>)}</div>}
               {selectedCandidate && <div className="mt-4 flex flex-col gap-2 sm:flex-row"><select required className={inputClass} value={selectedRoleId} onChange={(event) => setSelectedRoleId(event.target.value)}><option value="">Selecione o cargo</option>{roles.filter((role) => role.status === 'active' && (isPlatformAdmin || manageableDepartmentIds.includes(role.department_id))).map((role) => <option key={role.id} value={role.id}>{role.name} · {departments.find((item) => item.id === role.department_id)?.name || ''}</option>)}</select><button type="button" disabled={busy || !selectedRoleId} className={primaryButton} onClick={() => { if (selectedCandidate && selectedRoleId) void appointMember(); }}>Confirmar nomeação</button></div>}
@@ -626,7 +627,7 @@ export default function AdminConsole({
               <div className="space-y-3">
                 {members.map((member) => <article key={member.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-[#100b12] p-4">
                   <div className="flex min-w-0 items-center gap-3">
-                    {member.profile?.avatar_url ? <img src={member.profile.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">✦</span>}
+                    {member.profile?.avatar_url ? <img src={contentMediaUrl(member.profile.avatar_url)} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">✦</span>}
                     <div className="min-w-0"><p className="truncate text-sm font-bold">{member.profile?.display_name || member.profile?.username || 'Conta'}{member.profile?.username ? <span className="ml-1 text-xs font-normal text-white/35">@{member.profile.username}</span> : null}</p>
                       <p className="mt-1 text-xs text-[#ff9aca]">{member.role?.badge_title || member.role?.name} · {member.department?.name}</p>
                       <p className="mt-1 text-[10px] text-white/35">Desde {dateLabel(member.assigned_at)}{member.removed_at ? ' · removido ' + dateLabel(member.removed_at) : ''}{member.removal_reason ? ' · ' + member.removal_reason : ''}</p>

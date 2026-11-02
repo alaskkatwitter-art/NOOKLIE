@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -187,13 +188,14 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  const [emailNotifications, setEmailNotifications] = useState(true);
   const [chapterNotifications, setChapterNotifications] =
     useState(true);
   const [socialNotifications, setSocialNotifications] =
     useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
 
+  const [preferencesReady,setPreferencesReady]=useState(false);
+  const [preferencesError,setPreferencesError]=useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -217,7 +219,9 @@ export default function ConfiguracoesPage() {
       }
 
       setProfile(data.user);
+      const prefs=await fetch('/api/profile/privacy',{cache:'no-store'});if(!prefs.ok)throw new Error('Preferências indisponíveis');const savedPrefs=await prefs.json();setPrivateProfile(savedPrefs.is_private);setChapterNotifications(savedPrefs.chapter_notifications);setSocialNotifications(savedPrefs.social_notifications);setPreferencesReady(true);
     } catch (error) {
+      setPreferencesError('Não foi possível carregar suas preferências. Recarregue a página antes de salvar.');
       console.error('Erro ao carregar configurações:', error);
     } finally {
       setLoading(false);
@@ -225,22 +229,11 @@ export default function ConfiguracoesPage() {
   }
 
   async function handleSave() {
+    if(!preferencesReady)return;
     setSaving(true);
     setSaved(false);
 
-    /*
-     * As preferências ainda não possuem uma tabela própria.
-     * Mantemos o estado funcionando na interface sem enviar
-     * dados para endpoints que ainda não existem.
-     */
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setSaving(false);
-    setSaved(true);
-
-    setTimeout(() => {
-      setSaved(false);
-    }, 2500);
+    try{const response=await fetch('/api/profile/privacy',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_private:privateProfile,social_notifications:socialNotifications,chapter_notifications:chapterNotifications})});if(!response.ok)throw new Error();setSaved(true);}catch{window.alert('Não foi possível salvar. Tente novamente.');}finally{setSaving(false);}
   }
 
   async function handleLogout() {
@@ -316,6 +309,7 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="space-y-5">
+            {preferencesError&&<p role="alert"className="mb-4 text-sm text-rose-200">{preferencesError}</p>}
             <section className="overflow-hidden rounded-[2rem] border border-white/8 bg-white/[0.025]">
               <div className="flex items-center gap-3 border-b border-white/8 px-6 py-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ff78b9]/10 text-[#ff78b9]">
@@ -334,7 +328,7 @@ export default function ConfiguracoesPage() {
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                   {profile?.avatar_url ? (
                     <img
-                      src={profile.avatar_url}
+                      src={contentMediaUrl(profile.avatar_url)}
                       alt=""
                       className="h-20 w-20 rounded-full object-cover"
                     />
@@ -388,25 +382,6 @@ export default function ConfiguracoesPage() {
               </div>
 
               <div className="divide-y divide-white/6">
-                <div className="flex items-center justify-between gap-5 px-6 py-5">
-                  <div>
-                    <h3 className="text-sm font-semibold">
-                      Notificações gerais
-                    </h3>
-
-                    <p className="mt-1 text-xs leading-5 text-white/35">
-                      Receba avisos sobre atividades importantes da sua conta.
-                    </p>
-                  </div>
-
-                  <Toggle
-                    enabled={emailNotifications}
-                    onChange={() =>
-                      setEmailNotifications((value) => !value)
-                    }
-                  />
-                </div>
-
                 <div className="flex items-center justify-between gap-5 px-6 py-5">
                   <div>
                     <h3 className="text-sm font-semibold">
@@ -523,7 +498,7 @@ export default function ConfiguracoesPage() {
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving||!preferencesReady}
                   className="w-full rounded-2xl bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] px-6 py-3.5 text-sm font-black text-[#180b12] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving

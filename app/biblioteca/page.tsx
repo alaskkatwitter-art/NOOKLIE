@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useCallback,
   useEffect,
@@ -647,7 +648,7 @@ export default function BibliotecaPage() {
 
                         <img
                           src={
-                            item.story_cover_url
+                            contentMediaUrl(item.story_cover_url)
                           }
                           alt=""
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"

@@ -1,3 +1,4 @@
+import {contentMediaUrl} from '@/lib/security/content-media';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { discoveryDb, uuid } from '@/lib/discovery/server';
@@ -13,11 +14,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       discoveryDb.from('chapters').select('id').eq('story_id',id).eq('published',true).limit(1),
     ]);
     if (story.error || chapter.error) throw story.error || chapter.error;
-    if (!story.data || !chapter.data?.length || !(await isPublicProfileVisible(discoveryDb,story.data.author_id))) return unavailable;
+    if (!story.data || !chapter.data?.length || !(await isPublicProfileVisible(discoveryDb,story.data.author_id,null))) return unavailable;
     const title=`${story.data.title} | Nooklie`;
     const description=(story.data.description || 'Leia esta história no Nooklie.').replace(/<[^>]+>|[*#]/g,'').slice(0,180);
     const url=`https://toriland.vercel.app/historia/${id}`;
-    return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName:'Nooklie', type:'article', ...(story.data.cover_url ? {images:[story.data.cover_url]} : {}) } };
+    return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName:'Nooklie', type:'article', ...(story.data.cover_url ? {images:[new URL(contentMediaUrl(story.data.cover_url)!,url).href]} : {}) } };
   } catch { return unavailable; }
 }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getPublicStaffBadges } from "@/lib/admin/public-badges";
-import { getPublicProfileIds, isPublicProfileVisible } from '@/lib/moderation/content-visibility';
+import { getPublicProfileIds, isAccountVisible, currentViewerProfileId, isPublicProfileVisible } from '@/lib/moderation/content-visibility';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
@@ -57,6 +57,7 @@ export async function GET(
           cover_url,
           verified,
           is_official,
+          is_private,
           moderation_hidden_at
           `
         )
@@ -82,10 +83,12 @@ export async function GET(
       );
     }
 
-    if (!(await isPublicProfileVisible(supabase, profile.id))) {
+    if (!(await isAccountVisible(supabase, profile.id))) {
       return NextResponse.json({ error: "Perfil não encontrado." }, { status: 404 });
     }
 
+    const viewerId=await currentViewerProfileId(supabase);
+    if(profile.is_private && !(await isPublicProfileVisible(supabase,profile.id,viewerId))){return NextResponse.json({user:{id:profile.id,username:profile.username,display_name:profile.display_name,bio:profile.bio,avatar_url:profile.avatar_url,cover_url:profile.cover_url,is_private:true},restricted:true,stories:[],posts:[],reading_lists:[],fic_clubs:[]},{headers:{'Cache-Control':'no-store, private',Vary:'Cookie'}});}
     const { data: accountIdentity, error: identityError } = await supabase
       .from("profiles")
       .select("user_id")
@@ -533,13 +536,14 @@ export async function GET(
     // =========================================================
 
     return NextResponse.json({
+      restricted:false,
       user: { ...profile, staff_badges: staffBadges },
       stories: stories || [],
       posts: postsWithMedia,
       reading_lists:
         readingListsWithItems,
       fic_clubs: ficClubs,
-    });
+    },{headers:{'Cache-Control':'no-store, private',Vary:'Cookie'}});
   } catch (error) {
     console.error(
       "Erro inesperado no perfil público:",

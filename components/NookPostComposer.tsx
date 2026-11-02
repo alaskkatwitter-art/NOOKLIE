@@ -1,5 +1,6 @@
 'use client';
 
+import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useMemo, useState } from 'react';
 
 type Story = {
@@ -381,7 +382,7 @@ export default function NookPostComposer({
                   className="group relative aspect-square overflow-hidden rounded-2xl border border-white/[0.08] bg-black/30"
                 >
                   <img
-                    src={preview}
+                    src={contentMediaUrl(preview)}
                     alt=""
                     className="h-full w-full object-cover"
                   />
