@@ -2518,7 +2518,7 @@ function SideMenu({
             </div>
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70">
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70 font-nooklie-logo">
                 Nooklie
               </p>
 
@@ -2704,7 +2704,7 @@ function MobileDrawer({
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#ff78b9]/70 font-nooklie-logo">
                   Nooklie
                 </p>
 
@@ -3942,7 +3942,7 @@ export default function FeedPage() {
               </div>
 
               <div className="min-w-0">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70">
+                <p className="truncate text-[10px] font-black uppercase tracking-[0.28em] text-[#ff78b9]/70 font-nooklie-logo">
                   Nooklie
                 </p>
 

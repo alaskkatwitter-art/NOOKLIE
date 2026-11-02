@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --font-nooklie-logo: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
   --bg: #120b16;
   --panel: #1b101f;
   --panel2: #24132a;
@@ -23,12 +24,13 @@ body {
   margin: 0;
   background: radial-gradient(circle at 50% -10%, #3b173f 0, #120b16 42%);
   color: var(--text);
-  font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+  font-family: var(--font-nooklie-body), ui-sans-serif, system-ui, sans-serif;
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -36,4 +38,71 @@ textarea {
   background: rgba(27, 16, 31, 0.86);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 155, 208, 0.14);
+}
+
+
+@theme inline {
+  --font-sans: var(--font-nooklie-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+:where(h1, h2, h3, h4, h5, h6, .font-heading) {
+  font-family: var(--font-nooklie-heading), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-nooklie-logo {
+  font-family: var(--font-nooklie-logo);
+}
+
+/* Reader preferences have priority within chapter text only. UI and logos stay separate. */
+.reader-surface {
+  --reader-background: #0d0d0d;
+  --reader-foreground: #e5e7eb;
+  --reader-link: #ff9aca;
+  background: var(--reader-background);
+  color: var(--reader-foreground);
+  padding-inline: clamp(0rem, 8vw, var(--reader-margin));
+  padding-block: 1rem;
+  border-radius: 1rem;
+}
+.reader-surface[data-reader-theme="light"] {
+  --reader-background: #fff;
+  --reader-foreground: #202124;
+  --reader-link: #98194f;
+}
+.reader-surface[data-reader-theme="sepia"] {
+  --reader-background: #f4ead5;
+  --reader-foreground: #352a20;
+  --reader-link: #812047;
+}
+@media (prefers-color-scheme: light) {
+  .reader-surface[data-reader-theme="system"] {
+    --reader-background: #fff;
+    --reader-foreground: #202124;
+    --reader-link: #98194f;
+  }
+}
+.reader-surface .chapter-content {
+  font-family: var(--reader-font) !important;
+  font-size: var(--reader-size) !important;
+  line-height: var(--reader-line-height) !important;
+  color: var(--reader-foreground) !important;
+}
+.reader-surface .chapter-content :where(p, span, div, li, blockquote, h1, h2, h3, h4, h5, h6) {
+  font-family: inherit !important;
+  color: inherit !important;
+}
+.reader-surface .chapter-content :where(p, span, div, li, blockquote) {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+.reader-surface .chapter-content a { color: var(--reader-link) !important; }
+@media (forced-colors: active) {
+  .reader-surface, .reader-surface .chapter-content, .reader-surface .chapter-content * {
+    background-color: Canvas !important;
+    color: CanvasText !important;
+  }
+  .reader-surface .chapter-content a { color: LinkText !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reader-surface { scroll-behavior: auto; }
 }
