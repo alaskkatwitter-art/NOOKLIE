@@ -1,3 +1,6 @@
+import bcrypt from 'bcryptjs';
+import {chatActor,uuid,sameOrigin,privateHeaders} from '@/lib/chat/server';
+import {rateLimitKey} from '@/lib/security/rate-key';
 import { parseStoryMetadata } from '@/lib/stories/metadata';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -76,144 +79,9 @@ async function getSessionUserId() {
  * ======================================================
  */
 
-async function publishDueScheduledChapters(
-  storyId: string
-) {
-  const now =
-    new Date().toISOString();
-
-  const {
-    data: schedules,
-    error: scheduleError,
-  } = await supabase
-    .from('scheduled_chapters')
-    .select(`
-      id,
-      chapter_id,
-      scheduled_for
-    `)
-    .lte(
-      'scheduled_for',
-      now
-    );
-
-  if (scheduleError) {
-    console.error(
-      'Erro ao buscar capítulos agendados:',
-      scheduleError
-    );
-
-    return;
-  }
-
-  if (
-    !schedules ||
-    schedules.length === 0
-  ) {
-    return;
-  }
-
-  for (const schedule of schedules) {
-    const {
-      data: chapter,
-      error: chapterError,
-    } = await supabase
-      .from('chapters')
-      .select(`
-        id,
-        story_id,
-        published
-      `)
-      .eq(
-        'id',
-        schedule.chapter_id
-      )
-      .maybeSingle();
-
-    if (chapterError) {
-      console.error(
-        'Erro ao verificar capítulo agendado:',
-        chapterError
-      );
-
-      continue;
-    }
-
-    if (!chapter) {
-      await supabase
-        .from('scheduled_chapters')
-        .delete()
-        .eq(
-          'id',
-          schedule.id
-        );
-
-      continue;
-    }
-
-    if (
-      chapter.story_id !==
-      storyId
-    ) {
-      continue;
-    }
-
-    if (chapter.published) {
-      await supabase
-        .from('scheduled_chapters')
-        .delete()
-        .eq(
-          'id',
-          schedule.id
-        );
-
-      continue;
-    }
-
-    const {
-      error: publishError,
-    } = await supabase
-      .from('chapters')
-      .update({
-        published: true,
-        publication_status:
-          'published',
-      })
-      .eq(
-        'id',
-        chapter.id
-      )
-      .eq(
-        'story_id',
-        storyId
-      );
-
-    if (publishError) {
-      console.error(
-        'Erro ao publicar capítulo agendado:',
-        publishError
-      );
-
-      continue;
-    }
-
-    const {
-      error: deleteScheduleError,
-    } = await supabase
-      .from('scheduled_chapters')
-      .delete()
-      .eq(
-        'id',
-        schedule.id
-      );
-
-    if (deleteScheduleError) {
-      console.error(
-        'Erro ao remover agendamento:',
-        deleteScheduleError
-      );
-    }
-  }
+async function publishDueScheduledChapters(_storyId: string) {
+ const result=await supabase.rpc('publish_scheduled_chapters');
+ if(result.error)console.error('Erro ao liberar agendamentos:',result.error);
 }
 
 /*
@@ -1559,4 +1427,21 @@ export async function PUT(
       }
     );
   }
+}
+
+export async function DELETE(request:Request,{params}:RouteContext){
+  try{
+    if(!sameOrigin(request))return new NextResponse(null,{status:403});
+    const actor=await chatActor();if(!actor)return NextResponse.json({error:'Entre na sua conta.'},{status:401,headers:privateHeaders});
+    const {id}=await params;if(!uuid.test(id))return new NextResponse(null,{status:400});
+    const raw=await request.text();if(raw.length>1000)return new NextResponse(null,{status:400});const body=JSON.parse(raw);
+    if(typeof body.password!=='string'||!body.password||body.password.length>200)return NextResponse.json({error:'Digite sua senha.'},{status:400,headers:privateHeaders});
+    const limit=await supabase.rpc('consume_auth_rate_limit',{p_key_hash:rateLimitKey('delete-story',actor.userId),p_limit:5,p_window_seconds:900});if(limit.error||!limit.data)return NextResponse.json({error:'Aguarde alguns minutos antes de tentar novamente.'},{status:429,headers:privateHeaders});
+    const [story,account]=await Promise.all([supabase.from('stories').select('id,author_id').eq('id',id).maybeSingle(),supabase.from('auth_accounts').select('password_hash').eq('id',actor.userId).single()]);
+    if(story.error||account.error)throw story.error||account.error;
+    if(!story.data||story.data.author_id!==actor.profileId)return NextResponse.json({error:'História não encontrada.'},{status:404,headers:privateHeaders});
+    if(!await bcrypt.compare(body.password,account.data.password_hash))return NextResponse.json({error:'Senha incorreta. A história foi mantida.'},{status:403,headers:privateHeaders});
+    const {error}=await supabase.from('stories').delete().eq('id',id).eq('author_id',actor.profileId);if(error)throw error;
+    return NextResponse.json({deleted:true},{headers:privateHeaders});
+  }catch(error){console.error('DELETE story:',error);return NextResponse.json({error:'Não foi possível excluir a história.'},{status:503,headers:privateHeaders});}
 }

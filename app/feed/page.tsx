@@ -1,9 +1,11 @@
 'use client';
+import RepostActions from '@/components/RepostActions';
 
 import {contentMediaUrl} from '@/lib/security/content-media';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 import {
   useCallback,
+  useRef,
   useEffect,
   useMemo,
   useState,
@@ -63,6 +65,7 @@ type Comment = {
 };
 
 type Post = {
+  repost?: {id:string;comment:string|null;created_at:string;author:Profile};
   id: string;
   user_id: string;
   body: string | null;
@@ -1721,8 +1724,10 @@ function CommentItem({
 function FeedPost({
   post,
   onPostUpdated,
+  expanded=false,
 }: {
   post: Post;
+  expanded?:boolean;
   onPostUpdated: (
     postId: string,
     changes: Partial<Post>
@@ -1731,7 +1736,7 @@ function FeedPost({
   const [
     commentsOpen,
     setCommentsOpen,
-  ] = useState(false);
+  ] = useState(expanded);
 
   const [
     comments,
@@ -1768,10 +1773,6 @@ function FeedPost({
     setSaving,
   ] = useState(false);
 
-  const [
-    shareMessage,
-    setShareMessage,
-  ] = useState('');
 
   const liked =
     post.user_reactions.includes(
@@ -1997,67 +1998,6 @@ function FeedPost({
     }
   }
 
-  async function sharePost() {
-    const url =
-      `${window.location.origin}/feed?post=${post.id}`;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title:
-            post.author?.display_name ||
-            post.author?.username ||
-            'Post no Nooklie',
-          text:
-            post.body?.slice(
-              0,
-              120
-            ) ||
-            'Confira este post no Nooklie.',
-          url,
-        });
-
-        setShareMessage(
-          'Compartilhado!'
-        );
-      } else {
-        await navigator.clipboard.writeText(
-          url
-        );
-
-        setShareMessage(
-          'Link copiado!'
-        );
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name ===
-          'AbortError'
-      ) {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(
-          url
-        );
-
-        setShareMessage(
-          'Link copiado!'
-        );
-      } catch {
-        setShareMessage(
-          'Não foi possível compartilhar.'
-        );
-      }
-    }
-
-    setTimeout(() => {
-      setShareMessage('');
-    }, 2200);
-  }
-
   async function submitComment() {
     const content =
       commentText.trim();
@@ -2163,7 +2103,8 @@ function FeedPost({
     commentsByParent.get(null) || [];
 
   return (
-    <article className="feed-post">
+    <article id={'post-'+post.id} className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
+      {post.repost&&<div className="border-b border-white/10 px-5 py-4"><p className="text-xs text-[#ffb9da]">Nooklado por <Link href={'/perfil/'+encodeURIComponent(post.repost.author.username)} className="font-bold hover:underline">{post.repost.author.display_name||post.repost.author.username}</Link></p>{post.repost.comment&&<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{post.repost.comment}</p>}</div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Link
@@ -2220,11 +2161,11 @@ function FeedPost({
                 </Link>
               </div>
 
-              <span className="shrink-0 text-[10px] text-white/30 sm:text-xs">
+              <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
                 {formatPostDateTime(
                   post.created_at
                 )}
-              </span>
+              </a>
             </div>
           </div>
         </div>
@@ -2275,20 +2216,7 @@ function FeedPost({
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={sharePost}
-            aria-label="Compartilhar publicação"
-            className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
-          >
-            <ShareIcon />
-
-            {shareMessage && (
-              <span className="absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#ff78b9] px-3 py-1.5 text-[10px] font-bold text-[#190d16]">
-                {shareMessage}
-              </span>
-            )}
-          </button>
+          <RepostActions postId={post.id}/>
 
           <button
             type="button"
@@ -3135,6 +3063,21 @@ function FeedSearchModal({
 ========================================================= */
 
 export default function FeedPage() {
+  const detailDialog=useRef<HTMLDialogElement>(null);
+  const [detailPost,setDetailPost]=useState<Post|null>(null);
+  const [detailError,setDetailError]=useState('');
+  const [detailLoading,setDetailLoading]=useState(false);
+  useEffect(()=>{
+    let controller:AbortController|undefined;
+    async function open(id:string){controller?.abort();controller=new AbortController();setDetailLoading(true);setDetailError('');setDetailPost(null);detailDialog.current?.showModal();
+      try{const response=await fetch('/api/nook-posts/detail?id='+encodeURIComponent(id),{cache:'no-store',signal:controller.signal});const data=await response.json();if(!response.ok)throw Error(data.error||'Publicação indisponível.');setDetailPost(data.post);const url=new URL(window.location.href);url.searchParams.set('post',id);window.history.replaceState(null,'',url);}
+      catch(error){if(!controller.signal.aborted)setDetailError(error instanceof Error?error.message:'Não foi possível abrir.');}finally{if(!controller.signal.aborted)setDetailLoading(false);}}
+    const handler=(event:Event)=>void open((event as CustomEvent<string>).detail);
+    window.addEventListener('nooklie:open-post',handler);
+    const url=new URL(window.location.href);const initial=url.searchParams.get('post')||url.hash.match(/^#post-(.+)$/)?.[1];if(initial)void open(initial);
+    return()=>{controller?.abort();window.removeEventListener('nooklie:open-post',handler);};
+  },[]);
+
   const [posts, setPosts] =
     useState<Post[]>([]);
 
@@ -3735,6 +3678,7 @@ export default function FeedPage() {
     loadStories,
   ]);
 
+  useEffect(()=>{const refresh=()=>void loadFeed(true);window.addEventListener('nooklie:reposts-changed',refresh);return()=>window.removeEventListener('nooklie:reposts-changed',refresh);},[loadFeed]);
   function updatePost(
     postId: string,
     changes: Partial<Post>
@@ -3938,7 +3882,7 @@ export default function FeedPage() {
                   {posts.map(
                     (post) => (
                       <FeedPost
-                        key={post.id}
+                        key={post.repost?.id||post.id}
                         post={post}
                         onPostUpdated={
                           updatePost
@@ -4074,6 +4018,11 @@ export default function FeedPage() {
           loadStories();
         }}
       />
+
+      <dialog ref={detailDialog} className="nook-dialog" style={{width:'min(96vw,48rem)'}} aria-label="Publicação" onClose={()=>{const url=new URL(window.location.href);url.searchParams.delete('post');url.hash='';window.history.replaceState(null,'',url);}} onClick={e=>{if(e.target===e.currentTarget)detailDialog.current?.close();}}>
+        <button type="button" onClick={()=>detailDialog.current?.close()} className="mb-4 min-h-11 rounded-full border border-white/15 px-5 text-sm">Fechar publicação</button>
+        {detailLoading&&<p role="status">Carregando publicação…</p>}{detailError&&<p role="alert">{detailError}</p>}{detailPost&&<FeedPost key={detailPost.id} expanded post={detailPost} onPostUpdated={(id,changes)=>{setDetailPost(old=>old?{...old,...changes}:old);updatePost(id,changes);}}/>}
+      </dialog>
     </main>
   );
 }

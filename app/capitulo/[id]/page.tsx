@@ -22,6 +22,7 @@ type Chapter = {
   chapter_number: number;
   title: string;
   body?: string;
+  banner_url?:string|null;
   published?: boolean;
   created_at?: string;
   author_notes?: string | null;
@@ -916,7 +917,7 @@ export default function CapituloPage() {
       .slice(0, 12);
 
   const sortedMedia =
-    [...media].sort(
+    [...media].filter(item=>!chapter?.body?.includes(item.id)&&!chapter?.body?.includes(getMediaUrl(item))).sort(
       (a, b) =>
         (a.position || 0) -
         (b.position || 0)
@@ -1039,30 +1040,13 @@ export default function CapituloPage() {
         `}
       </style>
 
-      <div className="max-w-3xl mx-auto px-5 py-8">
+      <div className="chapter-reading-shell max-w-3xl mx-auto px-5 py-8 sm:py-12">
 
         {chapter.story_id && chapter.published && <ReadingProgressTracker chapterId={id} storyId={chapter.story_id} />}
         {/* TOPO */}
 
-        <div className="flex items-center justify-between gap-4 mb-8">
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                '/historia/' +
-                  (chapter.story_id ||
-                    '')
-              )
-            }
-            className="
-              text-sm
-              text-gray-400
-              hover:text-white
-              transition
-            "
-          >
-            ← Voltar para a história
-          </button>
+        <div className="flex items-center justify-end gap-4 mb-8">
+
 
           <button
             type="button"
@@ -1073,9 +1057,9 @@ export default function CapituloPage() {
               px-4
               py-2
               rounded-xl
-              bg-white/5
-              border
-              border-white/10
+              bg-gradient-to-r from-[#ff78b9] to-[#e7a2ed]
+              text-[#25121e]
+              shadow-[0_6px_24px_#ff78b930]
               text-sm
               font-semibold
               hover:border-[#ff4f9a]/50
@@ -1088,7 +1072,8 @@ export default function CapituloPage() {
 
         {/* CABEÇALHO */}
 
-        <header className="mb-10">
+        {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="mb-8 max-h-96 w-full rounded-3xl object-cover"/>}
+        <header className="chapter-heading mb-10 border-b border-[#ff9bca]/15 pb-8 text-center">
           <p className="text-sm text-[#ff4f9a] mb-2">
             Capítulo{' '}
             {chapter.chapter_number}
@@ -1778,26 +1763,7 @@ export default function CapituloPage() {
               Comentários
             </h2>
 
-            <button
-              type="button"
-              onClick={
-                openGeneralComment
-              }
-              className="
-                rounded-xl
-                border
-                border-white/10
-                bg-white/5
-                px-4
-                py-2
-                text-sm
-                font-semibold
-                hover:border-[#ff4f9a]/50
-                transition
-              "
-            >
-              Comentar capítulo
-            </button>
+
           </div>
 
           {comments.length === 0 ? (

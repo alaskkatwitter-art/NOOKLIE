@@ -1,4 +1,6 @@
 'use client';
+import ChapterBannerEditor from '@/components/ChapterBannerEditor';
+import DeleteStoryButton from '@/components/DeleteStoryButton';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import StoryMetadataFields from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
@@ -20,6 +22,7 @@ import {
 } from 'next/navigation';
 
 type ChapterStatus =
+  | 'scheduled'
   | 'draft'
   | 'published'
   | 'unpublished';
@@ -68,6 +71,8 @@ type Chapter = {
   chapter_number: number;
   title: string;
   body: string;
+  banner_url?: string|null;
+  scheduled_for?: string|null;
   published: boolean;
   created_at: string;
   updated_at?: string | null;
@@ -126,6 +131,7 @@ function getStatusLabel(
     return 'PUBLICADO';
   }
 
+  if (status === 'scheduled') return 'AGENDADO';
   if (status === 'unpublished') {
     return 'FORA DO AR';
   }
@@ -281,6 +287,7 @@ export default function EditarHistoriaPage() {
   const [chapterStatus, setChapterStatus] =
     useState<ChapterStatus>('draft');
 
+  const [scheduledFor,setScheduledFor]=useState('');
   const [chapterMedia, setChapterMedia] =
     useState<EditorMedia[]>([]);
 
@@ -548,8 +555,9 @@ export default function EditarHistoriaPage() {
 
         if (cancelled) return;
 
-        const loadedChapter =
-          data.chapter;
+        const loadedChapter = data.chapter;
+        const scheduled=(data as ChapterResponse & {scheduled_for?:string|null}).scheduled_for;
+        if(scheduled){const date=new Date(scheduled);setScheduledFor(new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16));}else setScheduledFor('');
 
         const normalizedChapter: Chapter =
           {
@@ -1506,8 +1514,8 @@ export default function EditarHistoriaPage() {
       targetStatus ||
       chapterStatus;
 
-    const body =
-      syncEditorBody();
+    if(finalStatus==='scheduled'&&(!scheduledFor||!Number.isFinite(new Date(scheduledFor).getTime())||new Date(scheduledFor).getTime()<=Date.now())){setError('Escolha uma data e um horário no futuro.');return;}
+    const body = syncEditorBody();
 
     const sanitizedBody =
       sanitizeHtml(body);
@@ -1615,7 +1623,7 @@ export default function EditarHistoriaPage() {
 
         uploadData.append(
           'publication_status',
-          finalStatus
+          'draft'
         );
 
         existing.forEach(
@@ -1749,6 +1757,8 @@ export default function EditarHistoriaPage() {
         finalStatus
       );
 
+      if(finalStatus==='scheduled')formData.set('scheduled_for',new Date(scheduledFor).toISOString());
+
       finalMediaIds.forEach(
         (mediaId) => {
           formData.append(
@@ -1856,6 +1866,8 @@ export default function EditarHistoriaPage() {
         setSuccess(
           'Capítulo retirado do ar.'
         );
+      } else if(finalStatus==='scheduled'){
+        setSuccess('Capítulo agendado para '+new Date(scheduledFor).toLocaleString('pt-BR')+'.');
       } else {
         setSuccess(
           'Rascunho salvo com sucesso.'
@@ -2329,6 +2341,7 @@ export default function EditarHistoriaPage() {
                   <br />
                   até 10 MB
                 </p>
+                <DeleteStoryButton storyId={story.id} title={story.title}/>
               </div>
             </aside>
 
@@ -2682,45 +2695,8 @@ export default function EditarHistoriaPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
-                  {coverPreview ? (
-                    <img
-                      src={contentMediaUrl(coverPreview)}
-                      alt={`Capa de ${story.title}`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-sm text-gray-600">
-                      Sem capa
-                    </div>
-                  )}
-                </div>
-
-                <label className="mt-4 block cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition">
-                  ALTERAR A CAPA
-
-                  <input
-                    ref={coverInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={
-                      handleCoverChange
-                    }
-                    className="hidden"
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={
-                    clearChapterSelection
-                  }
-                  className="mt-2 w-full rounded-xl border border-white/10 px-4 py-3 text-sm text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
-                >
-                  Voltar para a obra
-                </button>
-              </div>
+              <ChapterBannerEditor key={chapter.id} chapterId={chapter.id} value={chapter.banner_url||null} onChange={banner=>setChapter(old=>old?{...old,banner_url:banner}:old)}/>
+              <button type="button" onClick={clearChapterSelection} className="nook-choice w-full">Editar informações da obra</button>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -2896,7 +2872,9 @@ export default function EditarHistoriaPage() {
                     </div>
                   </div>
 
+                  <details className="mb-5 rounded-2xl border border-[#ff9bca]/20 bg-[#ff9bca]/[.04] p-4" open={chapterStatus==='scheduled'||undefined}><summary className="min-h-9 cursor-pointer text-sm font-semibold text-[#ffb9da]">Agendar atualização</summary><div className="mt-4 flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 text-xs text-white/65">Dia e horário de publicação<input type="datetime-local" value={scheduledFor} onChange={e=>setScheduledFor(e.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-[#171018] px-3 text-sm text-white [color-scheme:dark]"/></label><button type="button" disabled={savingChapter||mediaUploading||!scheduledFor} onClick={()=>void saveChapter('scheduled')} className="nook-primary">Agendar capítulo</button></div><p className="mt-3 text-xs leading-6 text-white/50">Horário do seu dispositivo. A atualização fica visível no calendário de quem segue você e é liberada automaticamente no minuto marcado.</p>{chapterStatus==='scheduled'&&<button type="button" disabled={savingChapter} onClick={()=>void saveChapter('draft')} className="mt-2 min-h-11 text-xs text-rose-200">Cancelar agendamento e salvar como rascunho</button>}</details>
                   <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
+                    {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="max-h-80 w-full object-cover"/>}
                     <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
                       <input
                         value={
@@ -3419,6 +3397,7 @@ export default function EditarHistoriaPage() {
                           Rascunho privado
                         </option>
 
+                        <option value="scheduled">Agendado</option>
                         <option value="published">
                           Publicar agora
                         </option>

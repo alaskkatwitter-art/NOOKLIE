@@ -1,4 +1,6 @@
 'use client';
+import ProfileStats from '@/components/ProfileStats';
+import Republicados from '@/components/Republicados';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import MuralActions from '@/components/MuralActions';
 import {Pin,BookOpen,MessageCircle} from 'lucide-react';
@@ -885,27 +887,7 @@ export default function PublicProfilePage() {
               ))}
 
 
-              <div style={restricted?{display:"none"}:undefined} className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-                <div>
-                  <span className="text-lg font-black text-white">
-                    {followersCount}
-                  </span>
-
-                  <span className="ml-2 text-xs font-semibold text-white/40">
-                    seguidores
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-lg font-black text-white">
-                    {followingCount}
-                  </span>
-
-                  <span className="ml-2 text-xs font-semibold text-white/40">
-                    seguindo
-                  </span>
-                </div>
-              </div>
+              {!restricted && <ProfileStats profileId={user.id} stories={stories.length}/>}
 
               {user.bio ? (
                 <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
@@ -938,7 +920,7 @@ export default function PublicProfilePage() {
                   lists:
                     'Listas',
                   clubs:
-                    'Clubes',
+                    'Republicados',
                 };
 
                 return (
@@ -1286,125 +1268,7 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            {/* CLUBES */}
-
-            <section className="w-1/4 shrink-0 px-0.5">
-              {ficClubs.length ===
-              0 ? (
-                <EmptyState
-                  icon={<MessageCircle size={28}/>}
-                  title="Nenhum clube ainda"
-                  description={`${getDisplayName(user)} ainda não participa de nenhum Clube de FIC.`}
-                />
-              ) : (
-                <div className="mx-auto w-full max-w-2xl space-y-4">
-                  {ficClubs.map(
-                    (club) => (
-                      <article
-                        key={
-                          club.id
-                        }
-                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
-                      >
-                        <div className="p-5 sm:p-6">
-                          <div className="flex items-start gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff78b9]/20 to-[#b77cff]/20 text-xl">
-                              <MessageCircle size={19}/>
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <h2 className="text-lg font-black">
-                                {
-                                  club.name
-                                }
-                              </h2>
-
-                              <p className="mt-1 text-xs text-[#ff78b9]/70">
-                                Clube de FIC
-                              </p>
-                            </div>
-
-                            <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-black text-white/45">
-                              {
-                                club.member_count
-                              }{' '}
-                              {club.member_count ===
-                              1
-                                ? 'membro'
-                                : 'membros'}
-                            </span>
-                          </div>
-
-                          {club.description && (
-                            <p className="mt-5 text-sm leading-6 text-white/50">
-                              {
-                                club.description
-                              }
-                            </p>
-                          )}
-
-                          {club.story && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                router.push(
-                                  `/historia/${club.story!.id}`
-                                )
-                              }
-                              className="mt-5 flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 text-left transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.04]"
-                            >
-                              <div className="h-16 w-11 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
-                                {club.story
-                                  .cover_url ? (
-                                  <img
-                                    src={
-                                      contentMediaUrl(club
-                                        .story
-                                        .cover_url)
-                                    }
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full items-center justify-center text-lg text-white/20">
-                                    Livro
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#ff78b9]/70">
-                                  Conversando sobre
-                                </p>
-
-                                <p className="mt-1 truncate text-sm font-black text-white">
-                                  {
-                                    club
-                                      .story
-                                      .title
-                                  }
-                                </p>
-
-                                {club.story
-                                  .description && (
-                                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/35">
-                                    {
-                                      club
-                                        .story
-                                        .description
-                                    }
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    )
-                  )}
-                </div>
-              )}
-            </section>
+            <section className="w-1/4 shrink-0 px-0.5"><Republicados profileId={user.id} own={isSelf} active={activeTab==='clubs'}/></section>
           </div>
         </div>
         </>}

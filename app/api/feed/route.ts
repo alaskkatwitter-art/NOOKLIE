@@ -1,3 +1,4 @@
+import { visibleReposts } from '@/lib/social/posts';
 import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -351,9 +352,18 @@ export async function GET(request: Request) {
       }
     );
 
-    return NextResponse.json({
-      posts: enrichedPosts,
-    });
+    const republications=await visibleReposts(undefined,undefined,userId);
+    const reposts=await Promise.all(republications.map(async repost=>{
+      if(hiddenProfiles.has(repost.user_id))return null;
+      const original=enrichedPosts.find(p=>p.id===repost.post_id);
+      if(!original||hiddenProfiles.has(original.user_id))return null;
+      return {...original,repost};
+    }));
+    const timeline=[
+      ...enrichedPosts.map(post=>({post,time:post.created_at})),
+      ...reposts.filter((p):p is NonNullable<typeof p>=>p!==null).map(post=>({post,time:post.repost.created_at})),
+    ].sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).map(entry=>entry.post);
+    return NextResponse.json({posts:timeline}, {headers:{'Cache-Control':'no-store, private'}});
   } catch (error) {
     console.error(
       'ERRO GERAL NO FEED:',

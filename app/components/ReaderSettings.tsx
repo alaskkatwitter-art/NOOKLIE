@@ -7,8 +7,8 @@ type Props = { value: ReaderPreferences; onChange: (value: ReaderPreferences) =>
 
 export default function ReaderSettings({ value, onChange, ready, status }: Props) {
   const [open, setOpen] = useState(false);
-  return <section className="mb-8 rounded-2xl border border-white/15 bg-[#17121b] p-4 text-white sm:p-5" aria-label="Personalização da leitura">
-    <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="reader-settings" className="min-h-11 w-full rounded-lg text-left text-sm font-semibold text-[#ff9aca] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff9aca]">{open ? 'Fechar opções de leitura' : 'Personalizar leitura'} <span aria-hidden="true">{open ? '−' : '+'}</span></button>
+  return <section className="reader-settings mb-6 text-white" aria-label="Personalização da leitura">
+    <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="reader-settings" className="min-h-11 rounded-full border border-white/10 bg-white/[.03] px-4 text-left text-xs font-semibold text-[#ffb9da] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff9aca]">{open ? 'Fechar opções de leitura' : 'Personalizar leitura'} <span aria-hidden="true">{open ? '−' : '+'}</span></button>
     {open && <div id="reader-settings" className="mt-4 space-y-5">
       <p className="text-sm leading-6 text-white/75">Ajuste a aparência dos capítulos. O texto original e os comentários permanecem preservados.</p>
       <fieldset disabled={!ready} className="space-y-5 disabled:opacity-60">
@@ -17,7 +17,7 @@ export default function ReaderSettings({ value, onChange, ready, status }: Props
           <div className="grid max-h-80 gap-2 overflow-y-auto rounded-xl border border-white/10 p-2 sm:grid-cols-2" role="group" aria-label="Prévia real das fontes">
             {READER_FONTS.map((font) => <label key={font.id} className={`flex min-w-0 cursor-pointer gap-3 rounded-xl border p-3 ${value.fontId === font.id ? 'border-[#ff9aca] bg-[#ff78b9]/10' : 'border-white/15'}`}>
               <input type="radio" name="reader-font" value={font.id} checked={value.fontId === font.id} onChange={() => onChange({ ...value, fontId: font.id })} className="mt-1 size-4 shrink-0 accent-[#ff78b9]" />
-              <span className="min-w-0"><span className="block text-xs font-semibold">{font.name}</span><span className="mt-1 block break-words text-base leading-7" style={{ fontFamily: font.family }} lang="pt-BR">Ação, coração e imaginação — histórias que acolhem.</span></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold">{font.name}</span><span className="mt-1 block break-words text-base leading-7" style={{ fontFamily: font.family }} lang="pt-BR">De escritor para escritor.</span></span>
             </label>)}
           </div>
         </fieldset>
