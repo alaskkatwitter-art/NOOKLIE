@@ -1,11 +1,164 @@
-import{NextResponse}from'next/server';
-import{rateLimitKey}from'@/lib/security/rate-key';
-import{chatActor,chatDb,allowedThread,privateHeaders,uuid,sameOrigin}from'@/lib/chat/server';
-import{moderationStaff}from'@/lib/moderation/staff';
-import{decryptChat}from'@/lib/chat/crypto';
-export async function POST(request:Request){try{if(!sameOrigin(request))return new NextResponse(null,{status:403});const actor=await chatActor();if(!actor)return new NextResponse(null,{status:401});const raw=await request.text();if(raw.length>4000)return new NextResponse(null,{status:400});const b=JSON.parse(raw);if(!uuid.test(b.thread_id||'')||(b.message_id&&!uuid.test(b.message_id))||typeof b.reason!=='string'||b.reason.trim().length<3||b.reason.length>2000)return new NextResponse(null,{status:400});const thread=await allowedThread(actor.profileId,b.thread_id);if(!thread||(b.message_id&&(thread.kind==='group'&&thread.status!=='accepted')))return new NextResponse(null,{status:404});if(b.message_id){const m=await chatDb.from('chat_messages').select('id').eq('id',b.message_id).eq('thread_id',b.thread_id).maybeSingle();if(m.error)throw m.error;if(!m.data)return new NextResponse(null,{status:404});}const rate=await chatDb.rpc('consume_auth_rate_limit',{p_key_hash:rateLimitKey('chat-report',actor.profileId),p_limit:10,p_window_seconds:3600});if(rate.error||!rate.data)return new NextResponse(null,{status:429});const result=await chatDb.from('chat_reports').insert({reporter_id:actor.profileId,thread_id:b.thread_id,message_id:b.message_id||null,reason:b.reason.trim()});if(result.error)throw result.error;return NextResponse.json({reported:true},{status:201,headers:privateHeaders});}catch{return new NextResponse(null,{status:503,headers:privateHeaders});}}
-export async function GET(){try{const actor=await chatActor(),staff=await moderationStaff();if(!actor||!staff)return new NextResponse(null,{status:403,headers:privateHeaders});const reports=await chatDb.from('chat_reports').select('id,reporter_id,thread_id,message_id,reason,created_at,status').order('created_at',{ascending:false}).limit(100);if(reports.error)throw reports.error;
-// Only the message explicitly selected by its participant is shared. No conversation export.
-const result=[];for(const report of reports.data||[]){let evidence=null;if(report.message_id){const m=await chatDb.from('chat_messages').select('id,thread_id,body_cipher,sender_id,media_type,created_at').eq('id',report.message_id).eq('thread_id',report.thread_id).maybeSingle();if(m.error)throw m.error;if(m.data){const v=m.data;evidence={id:v.id,sender_id:v.sender_id,body:decryptChat(Buffer.from(v.body_cipher,'base64'),`${v.thread_id}:${v.id}:body`).toString('utf8'),has_attachment:Boolean(v.media_type),created_at:v.created_at};}}result.push({...report,evidence});}
-const audit=await chatDb.from('chat_audit_access').insert({admin_user_id:staff.userId,report_ids:result.map(r=>r.id)});if(audit.error)throw audit.error;return NextResponse.json({reports:result},{headers:privateHeaders});}catch{return new NextResponse(null,{status:503,headers:privateHeaders});}}
-export async function PATCH(request:Request){try{if(!sameOrigin(request))return new NextResponse(null,{status:403});const actor=await chatActor(),staff=await moderationStaff('moderation.manage');if(!actor||!staff)return new NextResponse(null,{status:403});const raw=await request.text();if(raw.length>100)return new NextResponse(null,{status:400});const b=JSON.parse(raw);if(!uuid.test(b.id||''))return new NextResponse(null,{status:400});const r=await chatDb.from('chat_reports').update({status:'reviewed'}).eq('id',b.id);if(r.error)throw r.error;return NextResponse.json({reviewed:true},{headers:privateHeaders});}catch{return new NextResponse(null,{status:503});}}
+import { NextResponse } from "next/server";
+import { rateLimitKey } from "@/lib/security/rate-key";
+import {
+  chatActor,
+  chatDb,
+  allowedThread,
+  privateHeaders,
+  uuid,
+  sameOrigin,
+} from "@/lib/chat/server";
+import { moderationStaff } from "@/lib/moderation/staff";
+import { decryptChat } from "@/lib/chat/crypto";
+export async function POST(request: Request) {
+  try {
+    if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
+    const actor = await chatActor();
+    if (!actor) return new NextResponse(null, { status: 401 });
+    const raw = await request.text();
+    if (raw.length > 4000) return new NextResponse(null, { status: 400 });
+    const b = JSON.parse(raw);
+    if (
+      !uuid.test(b.thread_id || "") ||
+      (b.message_id && !uuid.test(b.message_id)) ||
+      typeof b.reason !== "string" ||
+      b.reason.trim().length < 3 ||
+      b.reason.length > 2000
+    )
+      return new NextResponse(null, { status: 400 });
+    const thread = await allowedThread(actor.profileId, b.thread_id);
+    if (
+      !thread ||
+      (b.message_id && thread.kind === "group" && thread.status !== "accepted")
+    )
+      return new NextResponse(null, { status: 404 });
+    if (b.message_id) {
+      const m = await chatDb
+        .from("chat_messages")
+        .select("id")
+        .eq("id", b.message_id)
+        .eq("thread_id", b.thread_id)
+        .maybeSingle();
+      if (m.error) throw m.error;
+      if (!m.data) return new NextResponse(null, { status: 404 });
+    }
+    const rate = await chatDb.rpc("consume_auth_rate_limit", {
+      p_key_hash: rateLimitKey("chat-report", actor.profileId),
+      p_limit: 10,
+      p_window_seconds: 3600,
+    });
+    if (rate.error || !rate.data)
+      return new NextResponse(null, { status: 429 });
+    const result = await chatDb
+      .from("chat_reports")
+      .insert({
+        reporter_id: actor.profileId,
+        thread_id: b.thread_id,
+        message_id: b.message_id || null,
+        reason: b.reason.trim(),
+      });
+    if (result.error) throw result.error;
+    return NextResponse.json(
+      { reported: true },
+      { status: 201, headers: privateHeaders },
+    );
+  } catch {
+    return new NextResponse(null, { status: 503, headers: privateHeaders });
+  }
+}
+export async function GET() {
+  try {
+    const actor = await chatActor(),
+      staff = await moderationStaff();
+    if (!actor || !staff)
+      return new NextResponse(null, { status: 403, headers: privateHeaders });
+    const reports = await chatDb
+      .from("chat_reports")
+      .select("id,reporter_id,thread_id,message_id,reason,created_at,status")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (reports.error) throw reports.error;
+    // Only the message explicitly selected by its participant is shared. No conversation export.
+    const result = [];
+    for (const report of reports.data || []) {
+      let evidence = null;
+      if (report.message_id) {
+        const m = await chatDb
+          .from("chat_messages")
+          .select("id,thread_id,body_cipher,sender_id,media_type,created_at")
+          .eq("id", report.message_id)
+          .eq("thread_id", report.thread_id)
+          .maybeSingle();
+        if (m.error) throw m.error;
+        if (m.data) {
+          const v = m.data;
+          evidence = {
+            id: v.id,
+            sender_id: v.sender_id,
+            body: decryptChat(
+              Buffer.from(v.body_cipher, "base64"),
+              `${v.thread_id}:${v.id}:body`,
+            ).toString("utf8"),
+            has_attachment: Boolean(v.media_type),
+            created_at: v.created_at,
+          };
+        }
+      }
+      result.push({ ...report, evidence });
+    }
+    const profileIds = [
+      ...new Set(
+        result
+          .flatMap((r) => [r.reporter_id, r.evidence?.sender_id])
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const identities = profileIds.length
+      ? await chatDb
+          .from("profiles")
+          .select("id,username,display_name")
+          .in("id", profileIds)
+      : { data: [], error: null };
+    if (identities.error) throw identities.error;
+    const identified = result.map((r) => ({
+      ...r,
+      reporter: identities.data?.find((p) => p.id === r.reporter_id) || null,
+      target: r.evidence
+        ? identities.data?.find((p) => p.id === r.evidence?.sender_id) || null
+        : null,
+    }));
+    const audit = await chatDb
+      .from("chat_audit_access")
+      .insert({
+        admin_user_id: staff.userId,
+        report_ids: result.map((r) => r.id),
+      });
+    if (audit.error) throw audit.error;
+    return NextResponse.json(
+      { reports: identified },
+      { headers: privateHeaders },
+    );
+  } catch {
+    return new NextResponse(null, { status: 503, headers: privateHeaders });
+  }
+}
+export async function PATCH(request: Request) {
+  try {
+    if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
+    const actor = await chatActor(),
+      staff = await moderationStaff("moderation.manage");
+    if (!actor || !staff) return new NextResponse(null, { status: 403 });
+    const raw = await request.text();
+    if (raw.length > 100) return new NextResponse(null, { status: 400 });
+    const b = JSON.parse(raw);
+    if (!uuid.test(b.id || "")) return new NextResponse(null, { status: 400 });
+    const r = await chatDb
+      .from("chat_reports")
+      .update({ status: "reviewed" })
+      .eq("id", b.id);
+    if (r.error) throw r.error;
+    return NextResponse.json({ reviewed: true }, { headers: privateHeaders });
+  } catch {
+    return new NextResponse(null, { status: 503 });
+  }
+}

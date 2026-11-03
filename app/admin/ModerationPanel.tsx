@@ -202,7 +202,11 @@ export default function ModerationPanel({ canManage }: { canManage: boolean }) {
             )}
             {canManage && (
               <div className="mt-5 space-y-4">
-                <WarningAction sourceType="report" sourceId={report.id} />
+                <WarningAction
+                  sourceType="report"
+                  sourceId={report.id}
+                  targetName={report.target?.username}
+                />
                 {!["resolved", "dismissed"].includes(report.status) && (
                   <>
                     <label className="nook-field">

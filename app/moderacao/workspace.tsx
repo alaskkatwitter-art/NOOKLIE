@@ -16,6 +16,8 @@ type Ticket = {
   created_at: string;
 };
 type ChatReport = {
+  reporter?: { username: string } | null;
+  target?: { username: string } | null;
   id: string;
   reason: string;
   status: string;
@@ -184,7 +186,11 @@ export default function ModerationWorkspace({
               )}
               {canManage && t.target_user_id && (
                 <div className="mt-3">
-                  <WarningAction sourceType="support" sourceId={t.id} />
+                  <WarningAction
+                    sourceType="support"
+                    sourceId={t.id}
+                    targetName={t.target || undefined}
+                  />
                 </div>
               )}
             </details>
@@ -205,6 +211,10 @@ export default function ModerationWorkspace({
                 {labels[r.status]} ·{" "}
                 {new Date(r.created_at).toLocaleDateString("pt-BR")}
               </p>
+              <p className="nook-muted mt-3 break-words">
+                Relato de @{r.reporter?.username || "conta indisponível"}
+                {r.target ? " · Conta envolvida: @" + r.target.username : ""}
+              </p>
               <p className="mt-3 text-sm whitespace-pre-wrap break-words">
                 {r.reason}
               </p>
@@ -221,7 +231,11 @@ export default function ModerationWorkspace({
               {canManage && (
                 <div className="flex flex-wrap gap-3 mt-5">
                   {r.evidence && (
-                    <WarningAction sourceType="chat" sourceId={r.id} />
+                    <WarningAction
+                      sourceType="chat"
+                      sourceId={r.id}
+                      targetName={r.target?.username}
+                    />
                   )}
                   {r.status === "pending" && (
                     <button

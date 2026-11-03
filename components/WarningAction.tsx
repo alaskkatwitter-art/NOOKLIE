@@ -4,9 +4,11 @@ import { ShieldAlert, X } from "lucide-react";
 export default function WarningAction({
   sourceType,
   sourceId,
+  targetName,
 }: {
   sourceType: "report" | "support" | "chat";
   sourceId: string;
+  targetName?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false),
@@ -63,6 +65,11 @@ export default function WarningAction({
               <X size={20} />
             </button>
           </div>
+          {targetName && (
+            <p className="nook-status break-words">
+              Conta que receberá a advertência: <strong>@{targetName}</strong>
+            </p>
+          )}
           <p className="nook-muted">
             A conta responsável receberá uma notificação com a sua orientação.
             Esta decisão ficará registrada no histórico de moderação.
