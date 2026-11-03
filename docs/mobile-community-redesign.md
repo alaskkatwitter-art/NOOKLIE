@@ -37,3 +37,7 @@ A branch de trabalho tem deploy automático desativado; a branch main mantém a 
 - Capturas em `docs/verification/mobile-redesign/` usam pessoas, mensagens e ocorrências fictícias. Elas não mostram conversas de usuários reais.
 - Limites: nenhum telefone físico/Safari foi usado; gravação com microfone real e gesto de segurar em hardware físico não foram certificados. A inspeção visual usou API simulada, não uma sessão real de produção.
 - O advisor de segurança anterior à publicação apresentou somente informações sobre tabelas internas com RLS e sem políticas públicas, conforme o modelo de sessão próprio. Esse mesmo padrão é intencional nas tabelas novas: [referência do advisor](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+## Conferência após publicação
+
+A API de produção passou por um teste completo com três contas temporárias privadas: criação do grupo, convite sem acesso a mensagens, recusa de envio antes da aceitação, aceitação, envio criptografado e leitura por outra conta, recusa de acesso/envio de não participante, silenciar/restaurar preferências e perda de acesso ao sair. Todas as contas, sessões, mensagens, grupos e notificações sintéticas foram removidos depois. A confirmação de advertências identifica o username envolvido; no chat ele vem exclusivamente do autor da mensagem selecionada no relato.
