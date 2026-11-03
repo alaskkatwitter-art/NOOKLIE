@@ -1,3 +1,4 @@
+import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
 import {getPublicProfileIds} from '@/lib/moderation/content-visibility';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -179,9 +180,10 @@ export async function GET(
       ...followedIds,
     ];
 
+    const hiddenProfiles=await hiddenFeedProfiles();
     const uniqueUserIds =
       Array.from(
-        new Set(userIds)
+        new Set(userIds.filter(id=>!hiddenProfiles.has(id)))
       );
 
     const {

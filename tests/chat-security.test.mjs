@@ -9,3 +9,9 @@ test('chat encryption authenticates message identity, rejects tampering and fail
 test('support hints recognize Portuguese terms without exposing the message or automatically filing a report',()=>{for(const phrase of ['penso em suicídio','vou me matar','atentado contra a vida','tirar minha vida'])assert.equal(safety.needsSupport(phrase),true);assert.equal(safety.needsSupport('Adorei o capítulo!'),false);assert.equal(safety.cvvPhone,'tel:+55188?oai_link_source=model_response_hotline');});
 test('media signature checking rejects HTML and SVG masquerading as images',()=>{for(const v of ['<svg onload=alert(1)>','<html><script>bad()</script>'])assert.equal(safety.detectedMedia(Buffer.from(v)),null);assert.equal(safety.detectedMedia(Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0])),'image/png');});
 test('chapter sanitizer removes executable HTML while preserving prose and safe formatting',()=>{const result=html.safeChapterHtml('<p style="text-align:center" onclick=alert(1)>Oi <strong>leitor</strong></p><script>alert(1)</script><img src=x onerror=alert(1)><a href="javascript:alert(1)">link</a>');assert.ok(result.includes('<strong>leitor</strong>'));assert.ok(result.includes('text-align:center'));assert.ok(!/script|onclick|onerror|<img|javascript:/i.test(result));});
+
+test('animated GIF signatures are accepted without relaxing SVG or executable checks',()=>{
+ assert.equal(safety.detectedMedia(Buffer.from('GIF89a000000000000')),'image/gif');
+ assert.equal(safety.detectedMedia(Buffer.from('GIF87a000000000000')),'image/gif');
+ assert.equal(safety.detectedMedia(Buffer.from('GIF00a000000000000')),null);
+});

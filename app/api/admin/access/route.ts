@@ -11,7 +11,8 @@ export async function GET() {
     const staff = await getStaffContext();
     if (!staff) return NextResponse.json({ allowed: false }, { headers: { 'Cache-Control': 'no-store' } });
     const allowed = await hasStaffPermission(staff, 'admin.view');
-    return NextResponse.json({ allowed }, { headers: { 'Cache-Control': 'no-store' } });
+    const moderation_allowed=await hasStaffPermission(staff,'moderation.view')||await hasStaffPermission(staff,'moderation.manage');
+    return NextResponse.json({ allowed, moderation_allowed }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('GET /api/admin/access:', error);
     return NextResponse.json({ allowed: false }, { status: 500, headers: { 'Cache-Control': 'no-store' } });

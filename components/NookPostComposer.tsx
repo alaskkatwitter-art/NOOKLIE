@@ -335,7 +335,7 @@ export default function NookPostComposer({
             </p>
 
             <h2 className="mt-1 text-lg font-black text-white">
-              Novo aviso ou publicação
+              Nova publicação
             </h2>
           </div>
 
@@ -352,7 +352,6 @@ export default function NookPostComposer({
 
         {/* Conteúdo */}
         <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
-          <div className="mb-5 rounded-2xl border border-[#ff78b9]/20 bg-gradient-to-br from-[#ff78b9]/15 to-transparent p-5"><p className="text-lg font-bold text-[#ff9bca]">Uma novidade para compartilhar?</p><p className="mt-2 text-sm leading-6 text-white/60">Conte sobre o próximo capítulo, uma pausa na escrita ou uma ideia. Você também pode anexar imagens e vincular uma história.</p></div>
           {/* Texto */}
           <textarea
             value={body}
@@ -360,8 +359,8 @@ export default function NookPostComposer({
               setBody(event.target.value.slice(0, MAX_TEXT))
             }
             aria-label="Texto do aviso ou publicação"
-            placeholder="Dê um título ao seu aviso na primeira linha…\n\nDepois, conte os detalhes para seus leitores."
-            rows={10}
+            placeholder="O que você quer compartilhar?"
+            rows={5}
             autoFocus
             className="w-full resize-y rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-[15px] leading-7 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/35"
           />

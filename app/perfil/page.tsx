@@ -1,5 +1,6 @@
 'use client';
 
+import { Cloud, MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from 'lucide-react';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 import React, {
@@ -230,7 +231,7 @@ function SpotifyPreview({
         rel="noreferrer"
         className="mt-3 block rounded-2xl border border-white/10 bg-[#191219] px-4 py-3 text-xs font-semibold text-[#ff78b9] transition hover:border-[#ff78b9]/30"
       >
-        🎵 Ouvir no Spotify
+        <Music2 className="inline" size={16}/> Ouvir no Spotify
       </a>
     );
   }
@@ -1750,7 +1751,7 @@ export default function PerfilPage() {
               key={item.id}
               className={`relative overflow-hidden bg-[#191219] ${
                 count === 1
-                  ? 'max-h-[600px]'
+                  ? 'max-h-[340px]'
                   : count === 3 &&
                       index === 0
                     ? 'row-span-2 aspect-square'
@@ -1760,7 +1761,8 @@ export default function PerfilPage() {
               <img
                 src={contentMediaUrl(item.media_url)}
                 alt=""
-                className="h-full w-full object-cover"
+                className="max-h-[340px] w-full object-contain"
+                loading="lazy"
               />
             </div>
           )
@@ -1784,7 +1786,7 @@ export default function PerfilPage() {
           },
           body: JSON.stringify({
             post_id: postId,
-            reaction: emoji,
+            emoji,
           }),
         }
       );
@@ -1800,12 +1802,14 @@ export default function PerfilPage() {
         return;
       }
 
-      if (data.summary) {
+      const refreshed = await fetch('/api/nook-posts/reactions?post_id='+encodeURIComponent(postId), {cache:'no-store'});
+      const summary = refreshed.ok ? (await refreshed.json()).summary : null;
+      if (summary) {
         setReactionData(
           (current) => ({
             ...current,
             [postId]:
-              data.summary,
+              summary,
           })
         );
       }
@@ -2453,6 +2457,7 @@ export default function PerfilPage() {
 
   return (
     <main
+      data-social-page="profile"
       className="min-h-screen bg-[#100b12] text-white"
       onClick={() => {
         if (menuOpenPostId) {
@@ -2464,43 +2469,6 @@ export default function PerfilPage() {
         }
       }}
     >
-      <header className="border-b border-white/10 bg-[#100b12]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              router.push('/');
-            }}
-            className="flex items-center gap-3"
-          >
-            <CloudLogo
-              color={profileTheme}
-            />
-
-            <span
-              className="text-xl font-bold tracking-[0.15em]"
-              style={{
-                color: profileTheme,
-              }}
-            >
-              NOOKLIE
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              router.push('/');
-            }}
-            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:text-white"
-          >
-            Voltar
-          </button>
-        </div>
-      </header>
-
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         <section
           className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]"
@@ -3121,7 +3089,7 @@ export default function PerfilPage() {
                               }
                               className="shrink-0 rounded-full border border-white/10 px-4 py-2.5 text-xs font-semibold text-white/50 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                             >
-                              🖼️{' '}
+                              <ImageIcon className="inline" size={17}/>{' '}
                               {mediaFiles.length
                                 ? `${mediaFiles.length}/4`
                                 : 'Imagem/GIF'}
@@ -3319,7 +3287,7 @@ export default function PerfilPage() {
                                             profileTheme,
                                         }}
                                       >
-                                        📌 Post fixado
+                                        <Pin className="inline" size={14}/> Post fixado
                                       </div>
                                     )}
 
@@ -3530,7 +3498,7 @@ export default function PerfilPage() {
                                                 profileTheme,
                                             }}
                                           >
-                                            📖{' '}
+                                            <BookOpen className="inline" size={15}/>{' '}
                                             {
                                               storyTitle
                                             }
@@ -3538,69 +3506,8 @@ export default function PerfilPage() {
                                         )}
 
                                         <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
-                                          {REACTIONS.map(
-                                            (emoji) => {
-                                              const count =
-                                                social.counts[
-                                                  emoji
-                                                ] || 0;
-
-                                              const active =
-                                                social.user_reactions.includes(
-                                                  emoji
-                                                );
-
-                                              return (
-                                                <button
-                                                  key={
-                                                    emoji
-                                                  }
-                                                  type="button"
-                                                  onClick={() =>
-                                                    handleReaction(
-                                                      post.id,
-                                                      emoji
-                                                    )
-                                                  }
-                                                  className={`flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs transition ${
-                                                    active
-                                                      ? 'border-white/20 bg-white/[0.06]'
-                                                      : 'border-white/5 bg-white/[0.02] hover:border-white/15'
-                                                  }`}
-                                                >
-                                                  <span>
-                                                    {
-                                                      emoji
-                                                    }
-                                                  </span>
-
-                                                  {count >
-                                                    0 && (
-                                                    <span className="text-[10px] font-bold text-white/50">
-                                                      {
-                                                        count
-                                                      }
-                                                    </span>
-                                                  )}
-                                                </button>
-                                              );
-                                            }
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              toggleComments(
-                                                post.id
-                                              )
-                                            }
-                                            className="ml-auto flex items-center gap-1.5 rounded-full border border-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition hover:border-white/15 hover:text-white"
-                                          >
-                                            💬{' '}
-                                            {
-                                              social.comments_count
-                                            }
-                                          </button>
+                                          <button type="button" aria-label="Curtir publicação" aria-pressed={social.user_reactions.includes('❤️')} onClick={()=>handleReaction(post.id,'❤️')} className="social-action"><Cloud size={20} fill={social.user_reactions.includes('❤️')?'currentColor':'none'}/><span>{social.counts['❤️']||0}</span></button>
+                                          <button type="button" aria-label="Comentários" onClick={()=>toggleComments(post.id)} className="social-action"><MessageCircle size={19}/><span>{social.comments_count}</span></button>
                                         </div>
 
                                         <div className="mt-3 flex items-center justify-between">
@@ -4233,7 +4140,7 @@ function formatPostDateTime(
     {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true,
+      hour12: false,
     }
   )}`;
 }

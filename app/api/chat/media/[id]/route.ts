@@ -3,7 +3,7 @@ import { decryptChat } from '@/lib/chat/crypto';
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{
  const actor=await chatActor();if(!actor)return new Response(null,{status:401,headers:privateHeaders});const {id}=await params;if(!uuid.test(id))return new Response(null,{status:404});
  const {data:message,error}=await chatDb.from('chat_messages').select('id,thread_id,media_path,media_type').eq('id',id).maybeSingle();if(error)throw error;
- if(!message?.media_path)return new Response(null,{status:404});const thread=await allowedThread(actor.profileId,message.thread_id);if(!thread||thread.blocked)return new Response(null,{status:404,headers:privateHeaders});
+ if(!message?.media_path)return new Response(null,{status:404});const thread=await allowedThread(actor.profileId,message.thread_id);if(!thread||thread.blocked||(thread.kind==='group'&&thread.status!=='accepted'))return new Response(null,{status:404,headers:privateHeaders});
  const file=await chatDb.storage.from('private-chat').download(message.media_path);if(file.error||!file.data)throw file.error;
  const bytes=decryptChat(Buffer.from(await file.data.arrayBuffer()),`${message.thread_id}:${message.id}:media`);
  const headers={...privateHeaders,'Content-Type':message.media_type,'X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Accept-Ranges':'bytes','Content-Disposition':'inline'};

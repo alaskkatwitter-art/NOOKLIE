@@ -1,3 +1,4 @@
+import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -103,9 +104,10 @@ export async function GET(request: Request) {
       supabase,
       (rawPosts || []).map((post) => post.user_id)
     );
+    const hiddenProfiles=await hiddenFeedProfiles();
     const posts = (rawPosts || []).filter(
       (post) =>
-        !post.moderation_hidden_at &&
+        !post.moderation_hidden_at && !hiddenProfiles.has(post.user_id) &&
         visibleProfileIds.has(post.user_id)
     );
 

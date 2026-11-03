@@ -9,6 +9,9 @@ import { useRouter } from 'next/navigation';
 
 export default function CriarPage() {
   const router = useRouter();
+  const [step,setStep]=useState(0);
+  const stepTitle=useRef<HTMLHeadingElement>(null);
+  function goToStep(value:number){setStep(value);requestAnimationFrame(()=>{stepTitle.current?.focus();stepTitle.current?.scrollIntoView({block:'start',behavior:'smooth'});});}
 
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -131,6 +134,7 @@ export default function CriarPage() {
     setError('');
 
     if (!title.trim()) {
+      goToStep(0);
       setError(
         'Digite um título para sua história.'
       );
@@ -217,36 +221,14 @@ export default function CriarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#100b12] text-white">
-      <header className="border-b border-white/10 bg-[#100b12]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-3"
-          >
-            <CloudLogo />
-
-            <span className="text-xl font-bold tracking-[0.15em] text-[#ff78b9]">
-              NOOKLIE
-            </span>
-          </button>
-
-          <button
-            onClick={() => router.push('/perfil')}
-            className="rounded-full border border-white/10 px-5 py-2 text-sm font-semibold text-white/60 transition hover:border-[#ff78b9]/40 hover:text-white"
-          >
-            Cancelar
-          </button>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-6xl px-5 py-10">
+    <main data-writing-page className="min-h-screen bg-[#100b12] text-white">
+      <div className="mx-auto max-w-3xl px-4 py-7 sm:px-5 sm:py-10">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#ff78b9]">
             Nova história
           </p>
 
-          <h1 className="mt-2 text-4xl font-black">
+          <h1 ref={stepTitle} tabIndex={-1} className="mt-2 text-3xl font-bold outline-none scroll-mt-20">
             Conte sua história.
           </h1>
 
@@ -256,14 +238,16 @@ export default function CriarPage() {
           </p>
         </div>
 
+        <nav className="writing-steps" aria-label="Etapas da nova história">{['Sua história','Capa e descoberta','Avisos e permissões'].map((name,index)=><button type="button" key={name} aria-current={step===index?'step':undefined} onClick={()=>goToStep(index)}><span>{index+1}</span>{name}</button>)}</nav>
         <form
-          onSubmit={handleSubmit}
+          onSubmit={e=>{if(step<2){e.preventDefault();if(step===0&&!title.trim()){setError('Dê um título para a história.');return;}setError('');goToStep(step+1);}else void handleSubmit(e);}}
           className="space-y-6"
         >
           {/* ================================================= */}
           {/* INFORMAÇÕES PRINCIPAIS */}
           {/* ================================================= */}
 
+          <div hidden={step!==0}>
           <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
             <div className="mb-6">
               <h2 className="text-xl font-black">
@@ -280,7 +264,7 @@ export default function CriarPage() {
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-semibold text-white/80">
+                  <label htmlFor="story-title" className="text-sm font-semibold text-white/80">
                     Título
                   </label>
 
@@ -290,6 +274,7 @@ export default function CriarPage() {
                 </div>
 
                 <input
+                  id="story-title"
                   type="text"
                   value={title}
                   onChange={(event) =>
@@ -320,11 +305,12 @@ export default function CriarPage() {
               {/* STATUS */}
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white/80">
+                <label htmlFor="story-status" className="mb-2 block text-sm font-semibold text-white/80">
                   Status
                 </label>
 
                 <select
+                  id="story-status"
                   value={status}
                   onChange={(event) =>
                     setStatus(event.target.value)
@@ -343,10 +329,12 @@ export default function CriarPage() {
             </div>
           </section>
 
+          </div>
           {/* ================================================= */}
           {/* CAPA */}
           {/* ================================================= */}
 
+          <div hidden={step!==1} className="space-y-5">
           <section className="rounded-3xl border border-white/10 bg-[#191219] p-6 md:p-8">
             <div className="mb-6">
               <h2 className="text-xl font-black">
@@ -425,11 +413,12 @@ export default function CriarPage() {
 
               <div className="grid gap-5 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white/80">
+                  <label htmlFor="story-genre" className="mb-2 block text-sm font-semibold text-white/80">
                     Gênero
                   </label>
 
                   <input
+                    id="story-genre"
                     type="text"
                     value={genre}
                     onChange={(event) =>
@@ -442,11 +431,12 @@ export default function CriarPage() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white/80">
+                  <label htmlFor="story-rating" className="mb-2 block text-sm font-semibold text-white/80">
                     Classificação
                   </label>
 
                   <select
+                    id="story-rating"
                     value={rating}
                     onChange={(event) =>
                       setRating(event.target.value)
@@ -488,7 +478,7 @@ export default function CriarPage() {
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-semibold text-white/80">
+                  <label htmlFor="tag-input" className="text-sm font-semibold text-white/80">
                     Tags
                   </label>
 
@@ -587,11 +577,12 @@ export default function CriarPage() {
             </div>
           </section>
 
+          </div>
           {/* ================================================= */}
           {/* ERRO */}
           {/* ================================================= */}
 
-          <StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
+          <div hidden={step!==2}><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} /></div>
           {error && (
             <div className="rounded-2xl border border-red-400/20 bg-red-400/5 px-5 py-4 text-sm text-red-300">
               {error}
@@ -602,15 +593,7 @@ export default function CriarPage() {
           {/* BOTÃO */}
           {/* ================================================= */}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-full bg-[#ff78b9] px-6 py-4 text-sm font-black text-[#180d15] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-50"
-          >
-            {saving
-              ? 'Criando história...'
-              : 'Criar história'}
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5"><button type="button" className="discovery-secondary" onClick={()=>step>0?goToStep(step-1):router.push('/minhas-historias')}>{step>0?'Etapa anterior':'Cancelar'}</button>{step<2?<button type="button" className="nook-primary" onClick={()=>{if(step===0&&!title.trim()){setError('Dê um título para a história.');return;}setError('');goToStep(step+1);}}>Continuar</button>:<button type="submit" disabled={saving} className="nook-primary">{saving?'Criando…':'Criar história'}</button>}</div>
         </form>
       </div>
     </main>

@@ -6,7 +6,7 @@ export const metadata = { title: 'Políticas do Nooklie', description: 'Regras d
 
 export default function PublicPoliciesPage() {
   return <main className="min-h-screen bg-[#100b12] px-4 py-8 text-white sm:px-6 sm:py-12"><article className="mx-auto max-w-3xl">
-    <Link href="/" className="inline-block min-h-11 py-3 text-sm text-[#ff9aca] hover:underline">← Início</Link>
+
     <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-[#ff9aca]">Nossa comunidade</p>
     <h1 className="mt-3 break-words text-3xl font-black sm:text-4xl">Políticas do Nooklie</h1>
     <p className="mt-4 text-sm leading-7 text-white/75">Liberdade criativa, respeito e cuidado com a autoria. Conheça as regras gerais de publicação e convivência, incluindo a identificação do uso de inteligência artificial.</p>

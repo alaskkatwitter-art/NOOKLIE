@@ -108,7 +108,7 @@ export default function OpportunitiesPage() {
   return (
     <main className="min-h-screen bg-[#100b12] px-4 py-8 text-white sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl">
-        <Link href="/" className="text-sm font-semibold text-[#ff9aca] hover:text-white">← Voltar ao Nooklie</Link>
+
         <header className="mb-8 mt-7 rounded-3xl border border-[#ff78b9]/15 bg-gradient-to-br from-[#281523] to-[#191219] p-6 sm:p-10">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ff78b9]">NOOKLIE • COMUNIDADE</p>
           <h1 className="mt-3 text-3xl font-black sm:text-5xl">Central de oportunidades</h1>

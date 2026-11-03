@@ -480,7 +480,7 @@ export default function MinhasHistoriasPage() {
 
   /* =======================================================
      HISTÓRIAS
-     
+
      IMPORTANTE:
      Esta função NÃO depende de currentUser.
      Isso impede o loop de renderização.
@@ -623,7 +623,7 @@ export default function MinhasHistoriasPage() {
 
   /* =======================================================
      CARREGAMENTO INICIAL
-     
+
      RODA UMA ÚNICA VEZ.
   ======================================================= */
 
@@ -706,13 +706,7 @@ export default function MinhasHistoriasPage() {
       <div className="relative mx-auto min-h-screen w-full max-w-[1180px] px-4 pb-20 pt-5 sm:px-6 lg:px-8 lg:pt-8">
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href="/feed"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/50 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
-              aria-label="Voltar para o Feed"
-            >
-              <ArrowLeftIcon />
-            </Link>
+
 
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
               <CloudIcon />

@@ -39,8 +39,10 @@ export async function isPublicProfileVisible(
     .maybeSingle();
   if (accountError) throw accountError;
   if(account?.account_status==='suspended')return false;
-  if(basicOnly||!profile.is_private)return true;
+  if(basicOnly)return true;
   const viewer=viewerId===undefined?await currentViewerProfileId(supabase):viewerId;
+  if(viewer&&viewer!==profile.id){const blocks=await supabase.from('chat_blocks').select('blocker_id').or(`and(blocker_id.eq.${viewer},blocked_id.eq.${profile.id}),and(blocker_id.eq.${profile.id},blocked_id.eq.${viewer})`).limit(1);if(blocks.error)throw blocks.error;if(blocks.data?.length)return false;}
+  if(!profile.is_private)return true;
   if(viewer===profile.id)return true;if(!viewer)return false;
   const follow=await supabase.from('follows').select('follower_id').eq('follower_id',viewer).eq('following_id',profile.id).maybeSingle();if(follow.error)throw follow.error;return Boolean(follow.data);
 }
@@ -92,11 +94,13 @@ export async function getPublicProfileIds(
   );
 
   const privateIds=profiles.filter(p=>p.is_private).map(p=>p.id);
-  let viewer:string|null=null;const followed=new Set<string>();
-  if(privateIds.length){viewer=await currentViewerProfileId(supabase);if(viewer){const follows=await supabase.from('follows').select('following_id').eq('follower_id',viewer).in('following_id',privateIds);if(follows.error)throw follows.error;for(const f of follows.data||[])followed.add(f.following_id);}}
+  const viewer=await currentViewerProfileId(supabase);const followed=new Set<string>();
+  const blocked=new Set<string>();
+  if(viewer){const blocks=await supabase.from('chat_blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${viewer},blocked_id.eq.${viewer}`);if(blocks.error)throw blocks.error;for(const b of blocks.data||[])blocked.add(b.blocker_id===viewer?b.blocked_id:b.blocker_id);}
+  if(privateIds.length){if(viewer){const follows=await supabase.from('follows').select('following_id').eq('follower_id',viewer).in('following_id',privateIds);if(follows.error)throw follows.error;for(const f of follows.data||[])followed.add(f.following_id);}}
   return new Set(
     profiles
-      .filter((profile) => !suspendedUserIds.has(profile.user_id)&&(!profile.is_private||profile.id===viewer||followed.has(profile.id)))
+      .filter((profile) => !suspendedUserIds.has(profile.user_id)&&!blocked.has(profile.id)&&(!profile.is_private||profile.id===viewer||followed.has(profile.id)))
       .flatMap((profile) => [profile.id, profile.user_id])
   );
 }

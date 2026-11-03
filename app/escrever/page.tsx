@@ -6,41 +6,8 @@ import AuthStatus from "../../components/AuthStatus";
 export default function EscreverPage() {
   return (
     <main className="min-h-screen bg-[#100b12] text-white">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#100b12]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4">
-          <Link
-            href="/"
-            className="flex shrink-0 items-center gap-2"
-          >
-            <CloudLogo />
-
-            <span className="text-xl font-black tracking-[0.18em] text-[#ff78b9]">
-              NOOKLIE
-            </span>
-          </Link>
-
-          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-            <NavLink href="/" label="Início" />
-            <NavLink href="/explorar" label="Explorar" />
-
-            <NavLink
-              href="/escrever"
-              label="Escrever"
-              active
-            />
-
-            <NavLink href="/fandoms" label="Fandoms" />
-            <NavLink href="/noticias" label="Notícias" />
-          </nav>
-
-          <div className="ml-auto">
-            <AuthStatus />
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl px-5 py-12 md:py-20">
-        <section className="relative overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-br from-[#291522] via-[#21131e] to-[#171018] p-8 md:p-14">
+      <div className="mx-auto max-w-7xl px-4 py-7 md:py-12">
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#ff78b9]/15 bg-gradient-to-br from-[#291522] via-[#21131e] to-[#171018] p-6 md:p-10">
           <div className="pointer-events-none absolute -right-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#ff78b9]/10 blur-[120px]" />
 
           <div className="relative max-w-3xl">
@@ -48,7 +15,7 @@ export default function EscreverPage() {
               Área de escrita
             </p>
 
-            <h1 className="mt-4 text-4xl font-black leading-tight md:text-6xl">
+            <h1 className="mt-4 text-3xl font-bold leading-tight md:text-5xl">
               Transforme uma ideia em uma história.
             </h1>
 
@@ -66,10 +33,10 @@ export default function EscreverPage() {
               </Link>
 
               <Link
-                href="/"
+                href="/minhas-historias"
                 className="rounded-full border border-white/10 bg-white/5 px-7 py-3.5 text-center font-bold text-white/70 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/10 hover:text-white"
               >
-                Voltar para o início
+                Minhas histórias
               </Link>
             </div>
           </div>

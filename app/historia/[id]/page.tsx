@@ -162,13 +162,7 @@ export default function HistoriaPage() {
                 "Essa história não existe ou não está disponível."}
             </p>
 
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-pink-400"
-            >
-              Voltar para o início
-            </button>
+
           </div>
         </div>
       </main>
@@ -198,13 +192,7 @@ export default function HistoriaPage() {
             NOOKLIE
           </button>
 
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70 transition hover:border-pink-400/30 hover:text-white"
-          >
-            Voltar
-          </button>
+
         </div>
       </header>
 

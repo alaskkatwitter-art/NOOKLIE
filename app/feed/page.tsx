@@ -577,10 +577,10 @@ function formatPostDateTime(date: string) {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  })} • ${value.toLocaleTimeString('en-US', {
+  })} • ${value.toLocaleTimeString('pt-BR', {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
+    hour12: false,
   })}`;
 }
 
@@ -701,76 +701,8 @@ function StoriesRow({
     return Array.from(map.values());
   }, [stories]);
 
-  return (
-    <section className="mb-7 overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#100c11]/85 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
-            Stories
-          </p>
+  return <section className="feed-stories" aria-label="Stories"><div className="feed-story-strip"><button type="button" onClick={onCreateStory} className="feed-story" aria-label="Criar seu Story"><span className="feed-story-create">+</span><span>Seu Story</span></button>{groupedStories.map(story=><button type="button" key={story.user_id} onClick={()=>onOpen(story)} className="feed-story" aria-label={'Ver Story de @'+story.user.username}><span className="feed-story-ring"><Avatar profile={story.user}/></span><span>@{story.user.username}</span></button>)}</div></section>;
 
-          <h2 className="mt-1 text-sm font-bold text-white">
-            O que estão fazendo por aqui
-          </h2>
-        </div>
-
-        <Link
-          href="#stories"
-          className="text-[10px] font-bold text-white/30 transition hover:text-[#ff78b9]"
-        >
-          Ver todos
-        </Link>
-      </div>
-
-      <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <button
-          type="button"
-          onClick={onCreateStory}
-          className="group flex w-[72px] shrink-0 flex-col items-center"
-        >
-          <div className="rounded-full border-2 border-dashed border-[#ff78b9]/35 p-[3px] transition group-hover:border-[#ff78b9]/70">
-            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#ff78b9]/[0.07] transition group-hover:bg-[#ff78b9]/[0.12]">
-              <span className="text-3xl font-light leading-none text-[#ff78b9]">
-                +
-              </span>
-            </div>
-          </div>
-
-          <p className="mt-2 w-full truncate text-center text-[10px] font-bold text-white/45 transition group-hover:text-[#ff78b9]">
-            Seu Story
-          </p>
-        </button>
-
-        {groupedStories.map((story) => (
-          <button
-            key={story.user_id}
-            type="button"
-            onClick={() => onOpen(story)}
-            className="group flex w-[72px] shrink-0 flex-col items-center"
-          >
-            <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px] shadow-[0_0_18px_rgba(255,120,185,0.18)]">
-              <div className="rounded-full bg-[#100c11] p-[2px]">
-                <Avatar
-                  profile={story.user}
-                  size="large"
-                />
-              </div>
-            </div>
-
-            <p className="mt-2 w-full truncate text-center text-[10px] font-semibold text-white/55 transition group-hover:text-white">
-              @{story.user.username}
-            </p>
-          </button>
-        ))}
-
-        {groupedStories.length === 0 && (
-          <div className="flex min-h-[92px] items-center px-2 text-xs text-white/30">
-            Seja a primeira pessoa a publicar um Story.
-          </div>
-        )}
-      </div>
-    </section>
-  );
 }
 
 /* =========================================================
@@ -1671,7 +1603,7 @@ function PostMedia({
         <img
           src={contentMediaUrl(item.media_url)}
           alt=""
-          className="max-h-[620px] w-full object-contain"
+          className="max-h-[360px] w-full object-contain"
         />
       </div>
     );
@@ -1682,7 +1614,7 @@ function PostMedia({
       {media.map((item) => (
         <div
           key={item.id}
-          className="aspect-square overflow-hidden bg-black/40"
+          className="aspect-[4/3] overflow-hidden bg-black/40"
         >
           <img
             src={contentMediaUrl(item.media_url)}
@@ -2231,7 +2163,7 @@ function FeedPost({
     commentsByParent.get(null) || [];
 
   return (
-    <article className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <article className="feed-post">
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Link
@@ -2305,6 +2237,8 @@ function FeedPost({
           <button
             type="button"
             onClick={toggleLike}
+            aria-label="Curtir publicação"
+            aria-pressed={liked}
             disabled={liking}
             className={`group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 transition active:scale-95 ${
               liked
@@ -2323,6 +2257,8 @@ function FeedPost({
 
           <button
             type="button"
+            aria-label="Comentários da publicação"
+            aria-expanded={commentsOpen}
             onClick={() =>
               setCommentsOpen(
                 (value) => !value
@@ -2342,6 +2278,7 @@ function FeedPost({
           <button
             type="button"
             onClick={sharePost}
+            aria-label="Compartilhar publicação"
             className="group relative flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
           >
             <ShareIcon />
@@ -2356,6 +2293,8 @@ function FeedPost({
           <button
             type="button"
             onClick={toggleSave}
+            aria-label={post.saved?"Remover dos salvos":"Salvar publicação"}
+            aria-pressed={post.saved}
             disabled={saving}
             className={`group flex h-11 min-w-[64px] items-center justify-center rounded-xl px-3 transition ${
               post.saved
@@ -3836,36 +3775,6 @@ export default function FeedPage() {
           DESKTOP MENU
       ================================================= */}
 
-      <SideMenu
-        open={drawerOpen}
-        currentUser={currentUser}
-        onClose={() =>
-          setDrawerOpen(false)
-        }
-        onOpenCalendar={() =>
-          setCalendarOpen(true)
-        }
-      />
-
-      {/* =================================================
-          MOBILE MENU
-      ================================================= */}
-
-      <MobileDrawer
-        open={drawerOpen}
-        onClose={() =>
-          setDrawerOpen(false)
-        }
-        currentUser={currentUser}
-        onOpenCalendar={() =>
-          setCalendarOpen(true)
-        }
-      />
-
-      {/* =================================================
-          MOBILE CALENDAR
-      ================================================= */}
-
       <MobileCalendarModal
         open={calendarOpen}
         updates={upcomingUpdates}
@@ -3919,7 +3828,7 @@ export default function FeedPage() {
             : ''
         }`}
       >
-        <div className="mx-auto max-w-[1380px]">
+        <div className="mx-auto max-w-[980px]">
           {/* =================================================
               TOP BAR
           ================================================= */}
@@ -3929,41 +3838,6 @@ export default function FeedPage() {
           {/* =================================================
               HERO / BOAS-VINDAS
           ================================================= */}
-
-          <section className="mb-5 overflow-hidden rounded-[30px] border border-[#ff78b9]/10 bg-gradient-to-br from-[#ff78b9]/[0.09] via-[#100c11]/90 to-[#c63dff]/[0.05] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] sm:p-8">
-            <div className="max-w-3xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#ff78b9]">
-                Seu espaço
-              </p>
-
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
-                Seu Feed, suas conexões.
-              </h2>
-
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40 sm:text-[15px]">
-                Acompanhe publicações da comunidade. Stories ficam na faixa abaixo; conversas e avisos aparecem no mural.
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setComposerOpen(true)
-                  }
-                  className="rounded-full bg-[#ff78b9] px-5 py-2.5 text-xs font-black text-[#190d16] transition hover:brightness-110"
-                >
-                  Escrever no Mural
-                </button>
-
-                <Link
-                  href="/explorar"
-                  className="rounded-full border border-white/10 bg-white/[0.035] px-5 py-2.5 text-xs font-bold text-white/60 transition hover:border-[#ff78b9]/25 hover:text-[#ff78b9]"
-                >
-                  Explorar histórias
-                </Link>
-              </div>
-            </div>
-          </section>
 
           {/* =================================================
               STORIES
@@ -3989,70 +3863,7 @@ export default function FeedPage() {
             <div className="w-full max-w-[680px]">
               {/* CREATE POST */}
 
-              <div className="mb-7 w-full">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setComposerOpen(true)
-                  }
-                  className="group w-full overflow-hidden rounded-[26px] border border-[#ff78b9]/15 bg-gradient-to-br from-[#ff78b9]/[0.09] via-white/[0.035] to-[#c63dff]/[0.05] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/35 hover:shadow-[0_20px_70px_rgba(255,120,185,0.08)] sm:p-6"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative shrink-0">
-                      <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-[#ff78b9]/30 bg-[#ff78b9] font-black text-lg text-[#190d16] shadow-[0_0_25px_rgba(255,120,185,0.12)] sm:h-16 sm:w-16">
-                        {currentUser?.avatar_url ? (
-                          <img
-                            src={
-                              contentMediaUrl(currentUser.avatar_url)
-                            }
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            {getInitial(
-                              currentUser
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#100c11] bg-[#ff78b9] text-[#190d16]">
-                        +
-                      </span>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-black text-white sm:text-lg">
-                        Escreva um aviso ou publicação
-                      </p>
-
-                      <p className="mt-1 text-sm leading-5 text-white/40">
-                        Uma ideia, uma descoberta,
-                        uma história...
-                      </p>
-                    </div>
-
-                    <div className="hidden shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-white/45 transition group-hover:border-[#ff78b9]/25 group-hover:bg-[#ff78b9]/[0.08] group-hover:text-[#ff78b9] sm:block">
-                      Publicar
-                    </div>
-                  </div>
-
-                  <div className="mt-5 border-t border-white/[0.07] pt-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs text-white/25">
-                        O que está passando pela sua
-                        cabeça?
-                      </span>
-
-                      <span className="text-xs font-semibold text-[#ff78b9]/50 transition group-hover:text-[#ff78b9]">
-                        Criar publicação →
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
+              <button type="button" onClick={()=>setComposerOpen(true)} className="feed-compose"><Avatar profile={currentUser}/><span>O que você quer compartilhar?</span><span className="feed-compose-plus" aria-hidden="true">+</span></button>
               {/* ERROR */}
 
               {error && (
@@ -4075,22 +3886,7 @@ export default function FeedPage() {
 
               {/* MURAL */}
 
-              <div className="mb-5 flex items-end justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
-                    Mural
-                  </p>
-
-                  <h2 className="mt-1 text-xl font-black text-white">
-                    Publicações da comunidade
-                  </h2>
-                </div>
-
-                <span className="text-[10px] text-white/20">
-                  Publicações
-                </span>
-              </div>
-
+              <h2 className="sr-only">Publicações da comunidade</h2>
               {loading ? (
                 <div className="w-full space-y-5">
                   {[1, 2, 3].map(

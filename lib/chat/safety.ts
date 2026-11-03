@@ -5,6 +5,7 @@ export const cvvSite='https://www.cvv.org.br/?oai_link_source=model_response_hot
 
 export function detectedMedia(bytes:Uint8Array):string|null{
  const b=Buffer.from(bytes);if(b.length<12)return null;
+ if(/^GIF8[79]a$/.test(b.toString('ascii',0,6)))return 'image/gif';
  if(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)return 'image/jpeg';
  if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'image/png';
  if(b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP')return 'image/webp';
