@@ -2741,37 +2741,26 @@ function MobileCalendarModal({
   updates: UpcomingUpdate[];
   onClose: () => void;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow =
-      'hidden';
-
-    return () => {
-      document.body.style.overflow =
-        previousOverflow;
-    };
+    if (open) dialog.current?.showModal();
+    else dialog.current?.close();
   }, [open]);
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 p-3 backdrop-blur-sm lg:hidden">
-      <div className="mx-auto flex h-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#100c11]">
-        <UpcomingUpdatesContent
-          updates={updates}
-          onClose={onClose}
-          mobile
-        />
+    <dialog
+      ref={dialog}
+      id="feed-updates-calendar"
+      aria-label="Calendário de atualizações"
+      className="m-auto w-[calc(100%_-_1.5rem)] max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[#100c11] p-0 text-white backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+      onCancel={onClose}
+      onClose={onClose}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    >
+      <div className="flex h-[90dvh] max-h-[850px] flex-col overflow-hidden">
+        <UpcomingUpdatesContent updates={updates} onClose={onClose} mobile />
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -3778,6 +3767,19 @@ export default function FeedPage() {
           ================================================= */}
 
           <header className="mb-6 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-[#ffb7da]">Comunidade</p><h1 className="mt-2 text-2xl font-bold">Seu Feed</h1></div><div className="flex gap-2"><button type="button" aria-label="Pesquisar pessoas" onClick={()=>setSearchOpen(true)} className="shell-icon"><SearchIcon /></button><button type="button" aria-label="Atualizar Feed" onClick={()=>{loadFeed(true);loadStories();loadUpcomingUpdates();}} disabled={refreshing} className="shell-icon"><RefreshIcon /></button></div></header>
+
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(true)}
+            aria-haspopup="dialog"
+            aria-controls="feed-updates-calendar"
+            aria-expanded={calendarOpen}
+            className="mb-6 flex min-h-16 w-full items-center gap-3 rounded-2xl border border-[#ff9bca]/25 bg-gradient-to-r from-[#ff78b9]/15 to-[#c798e6]/10 px-4 py-4 text-left transition hover:border-[#ff9bca]/50 hover:bg-[#ff78b9]/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff9bca] xl:hidden"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ff9bca]/15 text-[#ff9bca]"><CalendarIcon /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#ffd1e7]">Calendário de atualizações</span><span className="mt-1 block text-xs leading-5 text-white/60">Veja os próximos capítulos dos autores que você segue.</span></span>
+            {upcomingUpdates.length > 0 && <span aria-label={`${upcomingUpdates.length} atualizações agendadas`} className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-[#ff9bca] px-2 text-xs font-bold text-[#25121e]">{upcomingUpdates.length}</span>}
+          </button>
 
           {/* =================================================
               HERO / BOAS-VINDAS
