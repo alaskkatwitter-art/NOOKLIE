@@ -13,13 +13,16 @@ export async function GET() {
     const user = await getAuthenticatedUserContext();
     if (!user) return NextResponse.json({ error: 'Entre na sua conta.' }, { status: 401, headers: noStore });
     const { data, error } = await supabase.from('user_notifications')
-      .select('id, notification_type, title, body, href, created_at, read_at')
+      .select('id, notification_type, title, body, href, created_at, read_at, actor_id')
       .eq('user_id', user.userId)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) throw error;
+    const ids=[...new Set((data||[]).map(n=>n.actor_id).filter(Boolean))];
+    const actors=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids).is('moderation_hidden_at',null):{data:[],error:null};
+    if(actors.error)throw actors.error;
     return NextResponse.json({
-      notifications: data || [],
+      notifications: (data||[]).map(n=>({...n,actor:(actors.data||[]).find(a=>a.id===n.actor_id)||null})),
       unread_count: (data || []).filter((item) => !item.read_at).length,
     }, { headers: noStore });
   } catch (error) {

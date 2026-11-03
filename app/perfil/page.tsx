@@ -1,4 +1,6 @@
 'use client';
+import ProfileStats from '@/components/ProfileStats';
+import Republicados from '@/components/Republicados';
 
 import { Cloud, MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from 'lucide-react';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -2476,10 +2478,7 @@ export default function PerfilPage() {
             boxShadow: `0 0 80px ${profileTheme}10`,
           }}
         >
-          <button
-            type="button"
-            onClick={openCoverPicker}
-            disabled={uploadingCover}
+          <div
             className="group relative block h-36 w-full overflow-hidden sm:h-44 md:h-48"
             style={{
               background: `linear-gradient(135deg, ${profileTheme}70, #191219, ${profileTheme}25)`,
@@ -2495,14 +2494,7 @@ export default function PerfilPage() {
 
             <div className="absolute inset-0 bg-black/10 transition group-hover:bg-black/40" />
 
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="rounded-full bg-black/60 px-5 py-2.5 text-sm font-bold text-white opacity-0 transition group-hover:opacity-100">
-                {uploadingCover
-                  ? 'Enviando...'
-                  : 'Alterar capa'}
-              </span>
-            </div>
-          </button>
+          </div>
 
           <input
             ref={coverInputRef}
@@ -2542,7 +2534,7 @@ export default function PerfilPage() {
                           '/stories'
                         );
                       } else {
-                        openAvatarPicker();
+                        return;
                       }
                     }}
                     disabled={
@@ -2569,7 +2561,7 @@ export default function PerfilPage() {
                         ? 'Ver Stories'
                         : uploadingAvatar
                           ? 'Enviando...'
-                          : 'Alterar foto'}
+                          : 'Foto do perfil'}
                     </span>
                   </button>
                 </div>
@@ -2623,29 +2615,6 @@ export default function PerfilPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-
-                      setShowThemePicker(
-                        (current) =>
-                          !current
-                      );
-                    }}
-                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-white/60 transition hover:border-white/20 hover:text-white"
-                  >
-                    <span
-                      className="h-4 w-4 rounded-full border border-white/20"
-                      style={{
-                        backgroundColor:
-                          profileTheme,
-                      }}
-                    />
-
-                    Cor
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={openEditor}
                     className="rounded-full px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
                     style={{
@@ -2657,57 +2626,7 @@ export default function PerfilPage() {
                   </button>
                 </div>
 
-                {showThemePicker && (
-                  <div
-                    onClick={(event) =>
-                      event.stopPropagation()
-                    }
-                    className="absolute right-0 top-14 z-30 w-64 rounded-2xl border border-white/10 bg-[#191219] p-4 shadow-2xl"
-                  >
-                    <p className="text-xs font-black uppercase tracking-[0.15em] text-white/40">
-                      Cor do seu perfil
-                    </p>
 
-                    <p className="mt-1 text-xs leading-5 text-white/25">
-                      Essa escolha é privada e só aparece para você.
-                    </p>
-
-                    <div className="mt-4 grid grid-cols-5 gap-2">
-                      {PROFILE_THEME_OPTIONS.map(
-                        (color) => (
-                          <button
-                            key={color}
-                            type="button"
-                            disabled={savingTheme}
-                            onClick={() =>
-                              handleThemeChange(
-                                color
-                              )
-                            }
-                            aria-label={`Escolher cor ${color}`}
-                            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition hover:scale-110 ${
-                              profileTheme ===
-                              color
-                                ? 'border-white'
-                                : 'border-white/10'
-                            }`}
-                            style={{
-                              backgroundColor:
-                                color,
-                            }}
-                          >
-                            {profileTheme ===
-                              color && (
-                              <span className="text-xs font-black text-black/70">
-                                ✓
-                              </span>
-                            )}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -2730,37 +2649,7 @@ export default function PerfilPage() {
               </div>
             )}
 
-            <div className="mt-7 flex gap-7 border-t border-white/5 pt-5 sm:gap-10">
-              <div>
-                <p className="text-xl font-black">
-                  {stories.length}
-                </p>
-
-                <p className="text-xs text-white/35">
-                  Histórias
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xl font-black">
-                  0
-                </p>
-
-                <p className="text-xs text-white/35">
-                  Seguidores
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xl font-black">
-                  0
-                </p>
-
-                <p className="text-xs text-white/35">
-                  Seguindo
-                </p>
-              </div>
-            </div>
+            <ProfileStats profileId={user.id} stories={stories.length}/>
           </div>
         </section>
 
@@ -2773,7 +2662,7 @@ export default function PerfilPage() {
                 ['stories', 'HISTÓRIAS'],
                 ['nook', 'MURAL'],
                 ['lists', 'LISTAS DE LEITURAS'],
-                ['clubs', 'CLUBES DAS FIC'],
+                ['clubs', 'REPUBLICADOS'],
               ] as [ProfileTab, string][]
             ).map(
               ([tab, label]) => (
@@ -3798,135 +3687,7 @@ export default function PerfilPage() {
                 </section>
               </div>
 
-              {/* CLUBES DAS FICS */}
-
-              <div className="w-1/4 shrink-0">
-                <section className="mx-auto w-full max-w-3xl">
-                  <div className="mb-5">
-                    <h2 className="text-xl font-black sm:text-2xl">
-                      Clubes das fics
-                    </h2>
-
-                    <p className="mt-1 text-sm text-white/40">
-                      Comunidades para conversar sobre histórias específicas.
-                    </p>
-                  </div>
-
-                  {loadingClubs ? (
-                    <div className="rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
-                      <p className="text-sm text-white/35">
-                        Carregando clubes...
-                      </p>
-                    </div>
-                  ) : ficClubs.length ===
-                    0 ? (
-                    <div className="rounded-3xl border border-dashed border-white/10 bg-[#191219] px-6 py-14 text-center">
-                      <p className="text-sm text-white/35">
-                        Você ainda não participa de nenhum clube das fics.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {ficClubs.map(
-                        (club) => (
-                          <article
-                            key={club.id}
-                            className="rounded-3xl border border-white/10 bg-[#191219] p-5 sm:p-6"
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="min-w-0">
-                                <h3 className="text-lg font-black">
-                                  {
-                                    club.name
-                                  }
-                                </h3>
-
-                                {club.description && (
-                                  <p className="mt-1 text-sm leading-6 text-white/40">
-                                    {
-                                      club.description
-                                    }
-                                  </p>
-                                )}
-                              </div>
-
-                              <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[9px] font-black uppercase text-white/40">
-                                {
-                                  club.member_count
-                                }{' '}
-                                {club.member_count ===
-                                1
-                                  ? 'membro'
-                                  : 'membros'}
-                              </span>
-                            </div>
-
-                            {club.story && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  router.push(
-                                    `/historia/${club.story!.id}`
-                                  )
-                                }
-                                className="mt-5 flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-[#100b12] p-3 text-left transition hover:border-white/15"
-                              >
-                                <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-[#241722]">
-                                  {club.story.cover_url ? (
-                                    <img
-                                      src={
-                                        contentMediaUrl(club.story.cover_url)
-                                      }
-                                      alt=""
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <div
-                                      className="flex h-full items-center justify-center p-1 text-[7px] font-black"
-                                      style={{
-                                        color:
-                                          profileTheme,
-                                      }}
-                                    >
-                                      {
-                                        club.story.title
-                                      }
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="min-w-0">
-                                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/25">
-                                    Clube da história
-                                  </p>
-
-                                  <p className="mt-1 truncate text-sm font-bold">
-                                    {
-                                      club.story.title
-                                    }
-                                  </p>
-
-                                  <p
-                                    className="mt-1 text-[10px] font-bold"
-                                    style={{
-                                      color:
-                                        profileTheme,
-                                    }}
-                                  >
-                                    {mainFandom(
-                                      club.story
-                                    )}
-                                  </p>
-                                </div>
-                              </button>
-                            )}
-                          </article>
-                        )
-                      )}
-                    </div>
-                  )}
-                </section>
-              </div>
+              <div className="w-1/4 shrink-0"><Republicados profileId={user.id} own active={activeTab==='clubs'}/></div>
             </div>
           </div>
         </section>
@@ -3936,7 +3697,7 @@ export default function PerfilPage() {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
+          <div className="max-h-[88dvh] overflow-y-auto w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black">
@@ -3959,6 +3720,7 @@ export default function PerfilPage() {
             </div>
 
             <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3"><button type="button" onClick={openAvatarPicker} disabled={uploadingAvatar} className="nook-choice">{uploadingAvatar?'Enviando…':'Alterar foto de perfil'}</button><button type="button" onClick={openCoverPicker} disabled={uploadingCover} className="nook-choice">{uploadingCover?'Enviando…':'Alterar capa'}</button></div>
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-white/80">

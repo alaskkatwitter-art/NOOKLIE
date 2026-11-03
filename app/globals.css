@@ -1628,3 +1628,28 @@ body:has(.site-drawer[open]) {
     display: flex;
   }
 }
+
+/* Information pages and comfortable reading */
+.info-page { background: radial-gradient(ellipse at 15% 0%,#ff78b915,transparent 50%),#100b12; }
+.info-hero { border:1px solid #ff9bca25; border-radius:2rem; padding:clamp(1.5rem,5vw,3rem); background:linear-gradient(135deg,#ff78b914,#b891e908); }
+.info-document>h1 { padding-top:1rem; }
+.info-document section { border:1px solid #ffffff10;border-radius:1.5rem;padding:1.5rem;background:#ffffff03; }
+.reader-settings>div { margin-top:.75rem;border:1px solid #ffffff15;border-radius:1.5rem;padding:1.25rem;background:#17121b; }
+.chapter-heading h1 { font-size:clamp(1.8rem,5vw,2.8rem);line-height:1.3;letter-spacing:-.035em; }
+.chapter-reading-shell img { max-width:100%;height:auto;border-radius:1rem; }
+.profile-stat-strip { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;max-width:32rem;margin:1.5rem auto 0;border:1px solid #ff9bca20;border-radius:1.5rem;background:linear-gradient(120deg,#ff9bca09,#b997ee06);padding:.5rem;text-align:center; }
+.profile-stat-strip>* { min-height:4.5rem;padding:.65rem .25rem;border-radius:1rem; }
+.profile-stat-strip button:hover { background:#ff9bca12; }
+.profile-stat-strip strong,.profile-stat-strip span { display:block; }
+.profile-stat-strip span { font-size:.72rem;color:#ffffff80;margin-top:.3rem; }
+.nook-dialog { width:min(94vw,32rem);max-height:85dvh;overflow-y:auto;margin:auto;border:1px solid #ff9bca30;border-radius:1.75rem;padding:1.25rem;background:#1b121c;color:white;box-shadow:0 24px 90px #0008; }
+.nook-dialog::backdrop { background:#09050ddd;backdrop-filter:blur(6px); }
+.nook-choice { display:flex;align-items:center;gap:.75rem;min-height:3rem;border:1px solid #ffffff10;border-radius:1rem;padding:.75rem 1rem;text-align:left;font-size:.875rem; }
+.nook-choice:hover { background:#ff9bca10; }
+.nook-primary { min-height:2.75rem;border-radius:999px;padding:.75rem 1.25rem;background:linear-gradient(110deg,#ff78b9,#e7a2ed);color:#25121e;font-weight:700; }
+.nook-primary:disabled,.nook-choice:disabled { opacity:.45; }
+
+.writer-studio { background-image:radial-gradient(ellipse at 10% 0%,#ff78b908,transparent 40%); }
+.writer-studio .bg-pink-500 { background-image:linear-gradient(110deg,#ed69a7,#b77cd5); }
+.writer-studio .chapter-editor { caret-color:#ff9bca; }
+.writer-studio .chapter-editor:focus { box-shadow:inset 0 0 0 1px #ff9bca15; }

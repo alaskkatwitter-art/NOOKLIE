@@ -1,3 +1,4 @@
+import {chatActor} from '@/lib/chat/server';
 import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -183,7 +184,8 @@ export async function GET(
           original_published_at,
           republished_at,
           updated_at,
-          publication_status
+          publication_status,
+          banner_url
         `)
         .eq('id', id)
         .maybeSingle();
@@ -299,9 +301,12 @@ export async function GET(
       );
     }
 
+    const schedule=await supabase.from('scheduled_chapters').select('scheduled_for').eq('chapter_id',id).maybeSingle();
+    if(schedule.error)throw schedule.error;
     return NextResponse.json(
       {
         chapter:{...chapter,body:safeChapterHtml(chapter.body||'')},
+        scheduled_for: schedule.data?.scheduled_for||null,
         media: media || [],
         previousChapter:
           previousChapter || null,
@@ -412,7 +417,8 @@ export async function PUT(
         original_published_at,
         republished_at,
         updated_at,
-        publication_status
+        publication_status,
+        banner_url
       `)
       .eq('id', id)
       .maybeSingle();
@@ -759,13 +765,10 @@ export async function PUT(
         body,
         author_notes:
           authorNotes || null,
-        published,
-        publication_status:
-          publicationStatus,
-        original_published_at:
-          originalPublishedAt,
-        republished_at:
-          republishedAt,
+        published: chapter.published,
+        publication_status: chapter.publication_status,
+        original_published_at: chapter.original_published_at,
+        republished_at: chapter.republished_at,
         updated_at:
           new Date().toISOString(),
       })
@@ -782,7 +785,8 @@ export async function PUT(
         original_published_at,
         republished_at,
         updated_at,
-        publication_status
+        publication_status,
+        banner_url
       `)
       .single();
 
@@ -812,112 +816,6 @@ export async function PUT(
      * Usamos a tabela scheduled_chapters
      * que já existe.
      */
-
-    const {
-      data: existingSchedule,
-    } = await supabase
-      .from('scheduled_chapters')
-      .select('chapter_id')
-      .eq('chapter_id', id)
-      .maybeSingle();
-
-    if (
-      publicationStatus ===
-      'scheduled'
-    ) {
-      if (existingSchedule) {
-        const {
-          error:
-            scheduleUpdateError,
-        } = await supabase
-          .from('scheduled_chapters')
-          .update({
-            scheduled_for:
-              scheduledDate!.toISOString(),
-          })
-          .eq(
-            'chapter_id',
-            id
-          );
-
-        if (
-          scheduleUpdateError
-        ) {
-          console.error(
-            'Erro ao atualizar agendamento:',
-            scheduleUpdateError
-          );
-
-          return NextResponse.json(
-            {
-              error:
-                'Capítulo salvo, mas não foi possível atualizar o agendamento.',
-            },
-            {
-              status: 500,
-              headers:
-                noCacheHeaders(),
-            }
-          );
-        }
-      } else {
-        const {
-          error:
-            scheduleInsertError,
-        } = await supabase
-          .from(
-            'scheduled_chapters'
-          )
-          .insert({
-            chapter_id: id,
-            scheduled_for:
-              scheduledDate!.toISOString(),
-          });
-
-        if (
-          scheduleInsertError
-        ) {
-          console.error(
-            'Erro ao criar agendamento:',
-            scheduleInsertError
-          );
-
-          return NextResponse.json(
-            {
-              error:
-                'Capítulo salvo, mas não foi possível criar o agendamento.',
-            },
-            {
-              status: 500,
-              headers:
-                noCacheHeaders(),
-            }
-          );
-        }
-      }
-    } else if (
-      existingSchedule
-    ) {
-      const {
-        error:
-          scheduleDeleteError,
-      } = await supabase
-        .from('scheduled_chapters')
-        .delete()
-        .eq(
-          'chapter_id',
-          id
-        );
-
-      if (
-        scheduleDeleteError
-      ) {
-        console.error(
-          'Erro ao remover agendamento:',
-          scheduleDeleteError
-        );
-      }
-    }
 
     /*
      * ========================================================
@@ -1391,6 +1289,10 @@ export async function PUT(
      * ========================================================
      */
 
+    const actor=await chatActor();
+    if(!actor)return NextResponse.json({error:'Sua sessão expirou.'},{status:401,headers:noCacheHeaders()});
+    const publication=await supabase.rpc('set_chapter_publication',{p_session:actor.sessionTokenHash,p_chapter:id,p_status:publicationStatus,p_scheduled_for:scheduledDate?.toISOString()||null});
+    if(publication.error)throw publication.error;
     return NextResponse.json(
       {
         success: true,
@@ -1407,8 +1309,7 @@ export async function PUT(
                 ? 'Capítulo retirado do ar com sucesso!'
                 : 'Rascunho salvo com sucesso!',
 
-        chapter:
-          updatedChapter,
+        chapter: publication.data,
 
         media:
           finalMedia || [],

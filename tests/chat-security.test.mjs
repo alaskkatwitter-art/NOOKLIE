@@ -15,3 +15,11 @@ test('animated GIF signatures are accepted without relaxing SVG or executable ch
  assert.equal(safety.detectedMedia(Buffer.from('GIF87a000000000000')),'image/gif');
  assert.equal(safety.detectedMedia(Buffer.from('GIF00a000000000000')),null);
 });
+test('inline chapter images preserve their position through repeated sanitization and reject remote tracking media',()=>{
+ const old=process.env.NEXT_PUBLIC_SUPABASE_URL;try{
+  process.env.NEXT_PUBLIC_SUPABASE_URL='https://example.supabase.co';
+  const input='<p>Antes</p><img src="https://example.supabase.co/storage/v1/object/public/chapter-media/author/chapter/image.png" data-media-id="image-id" onerror="alert(1)"><p>Depois</p>';
+  const output=html.safeChapterHtml(input);assert.match(output,/<p>Antes<\/p><img[^>]+data-media-id="image-id"[^>]*\/><p>Depois<\/p>/);assert.ok(output.includes('/api/content-media?bucket=chapter-media'));assert.ok(!output.includes('onerror'));assert.equal(html.safeChapterHtml(output),output);
+  for(const src of ['https://tracker.example/pixel.png','data:image/svg+xml,evil','javascript:alert(1)','/api/content-media?bucket=story-covers&path=other'])assert.ok(!html.safeChapterHtml(`<img src="${src}">`).includes('<img'));
+ }finally{if(old===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=old;}
+});
