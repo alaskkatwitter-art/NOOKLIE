@@ -887,7 +887,7 @@ export default function PublicProfilePage() {
               ))}
 
 
-              {!restricted && <ProfileStats profileId={user.id} stories={stories.length}/>}
+              {!restricted && <ProfileStats profileId={user.id} stories={stories.length} counts={{followers_count:followersCount,following_count:followingCount}}/>}
 
               {user.bio ? (
                 <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">

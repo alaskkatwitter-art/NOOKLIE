@@ -12,9 +12,11 @@ type Person = {
 export default function ProfileStats({
   profileId,
   stories,
+  counts: providedCounts,
 }: {
   profileId: string;
   stories: number;
+  counts?: { followers_count: number; following_count: number };
 }) {
   const [counts, setCounts] = useState({
       followers_count: 0,
@@ -26,7 +28,10 @@ export default function ProfileStats({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
+  const supplied = providedCounts !== undefined;
+  const visibleCounts = providedCounts || counts;
   useEffect(() => {
+    if (supplied) return;
     const c = new AbortController();
     fetch("/api/follows?user_id=" + encodeURIComponent(profileId), {
       cache: "no-store",
@@ -37,7 +42,7 @@ export default function ProfileStats({
       })
       .catch(() => {});
     return () => c.abort();
-  }, [profileId]);
+  }, [profileId, supplied]);
   async function load(value: typeof kind, offset = 0) {
     setBusy(true);
     setError("");
@@ -71,11 +76,11 @@ export default function ProfileStats({
           <span>Histórias</span>
         </div>
         <button onClick={() => open("followers")}>
-          <strong>{counts.followers_count}</strong>
+          <strong>{visibleCounts.followers_count}</strong>
           <span>Seguidores</span>
         </button>
         <button onClick={() => open("following")}>
-          <strong>{counts.following_count}</strong>
+          <strong>{visibleCounts.following_count}</strong>
           <span>Seguindo</span>
         </button>
       </div>

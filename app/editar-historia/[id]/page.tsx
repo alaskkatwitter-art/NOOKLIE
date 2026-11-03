@@ -2064,7 +2064,7 @@ export default function EditarHistoriaPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#0b090c] text-white">
+      <main className="writer-studio min-h-screen bg-[#0b090c] text-white">
         <div className="min-h-screen flex items-center justify-center">
           <p className="text-sm text-gray-500">
             Carregando obra...
@@ -2076,7 +2076,7 @@ export default function EditarHistoriaPage() {
 
   if (!story) {
     return (
-      <main className="min-h-screen bg-[#0b090c] text-white">
+      <main className="writer-studio min-h-screen bg-[#0b090c] text-white">
         <div className="mx-auto max-w-2xl px-6 py-20 text-center">
           <p className="text-red-300">
             {error ||
@@ -2100,7 +2100,7 @@ export default function EditarHistoriaPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0b090c] text-white">
+    <main className="writer-studio min-h-screen bg-[#0b090c] text-white">
       <style jsx global>{`
         .chapter-editor {
           min-height: 900px;

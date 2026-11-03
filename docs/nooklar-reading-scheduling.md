@@ -16,3 +16,7 @@ A exclusão de histórias requer sessão ativa, autoria, senha válida e limite 
 - Suíte automatizada, incluindo transições de agendamento, prevenção de publicação antecipada, cancelamento, idempotência, permissões, identidade nas notificações e preservação/segurança de imagens inline.
 - O preview gerenciado não aceitou os argumentos de inicialização do Next.js (`--host`/`--strictPort`). A inspeção visual de navegador deste ambiente não foi certificada.
 - A migração `nooklar_reading_and_scheduling` deve estar aplicada antes da publicação do código. Ela adiciona campos e tabela, atualiza funções de notificação e registra o job de publicação; não exclui histórias nem contas existentes.
+
+## Banco aplicado
+
+A migração foi aplicada como `20261103152626_nooklar_reading_and_scheduling`. O job `nooklie-release-chapters` foi confirmado ativo e já teve execução concluída com sucesso. O advisor apresentou apenas avisos informativos sobre tabelas internas com RLS e sem políticas públicas; o acesso dos papéis de navegador continua revogado.

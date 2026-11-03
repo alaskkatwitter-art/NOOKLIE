@@ -22,7 +22,7 @@ before(async () => {
  `);
   const migration = await readFile(
     new URL(
-      "../supabase/migrations/20261103125736_nooklar_reading_and_scheduling.sql",
+      "../supabase/migrations/20261103152626_nooklar_reading_and_scheduling.sql",
       import.meta.url,
     ),
     "utf8",

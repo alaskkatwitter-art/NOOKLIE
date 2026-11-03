@@ -2103,7 +2103,7 @@ function FeedPost({
     commentsByParent.get(null) || [];
 
   return (
-    <article id={'post-'+post.id} className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
+    <article className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
       {post.repost&&<div className="border-b border-white/10 px-5 py-4"><p className="text-xs text-[#ffb9da]">Nooklado por <Link href={'/perfil/'+encodeURIComponent(post.repost.author.username)} className="font-bold hover:underline">{post.repost.author.display_name||post.repost.author.username}</Link></p>{post.repost.comment&&<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{post.repost.comment}</p>}</div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">

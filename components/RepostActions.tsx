@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { CloudUpload, X } from "lucide-react";
 import { contentMediaUrl } from "@/lib/security/content-media";
@@ -10,6 +10,7 @@ type Person = {
   avatar_url: string | null;
 };
 export default function RepostActions({ postId }: { postId: string }) {
+  const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"menu" | "quote" | "people">("menu"),
     [text, setText] = useState(""),
@@ -81,14 +82,14 @@ export default function RepostActions({ postId }: { postId: string }) {
       </button>
       <dialog
         ref={dialog}
-        aria-labelledby={"repost-title-" + postId}
+        aria-labelledby={titleId}
         className="nook-dialog"
         onClick={(e) => {
           if (e.target === e.currentTarget) dialog.current?.close();
         }}
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={"repost-title-" + postId} className="text-lg font-bold">
+          <h2 id={titleId} className="text-lg font-bold">
             {mode === "quote"
               ? "Nooklar com comentário"
               : mode === "people"
