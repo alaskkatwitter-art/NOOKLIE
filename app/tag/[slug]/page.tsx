@@ -119,13 +119,7 @@ export default function TagPage() {
               'Essa tag não existe ou não está disponível.'}
           </p>
 
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="mt-6 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium hover:bg-pink-400 transition"
-          >
-            Voltar
-          </button>
+
         </div>
       </main>
     );
@@ -144,13 +138,7 @@ export default function TagPage() {
             Nooklie
           </button>
 
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="text-sm text-gray-400 hover:text-white transition"
-          >
-            Voltar
-          </button>
+
         </div>
       </header>
 

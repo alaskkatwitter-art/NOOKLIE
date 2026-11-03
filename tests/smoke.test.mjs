@@ -574,8 +574,10 @@ test('fandom preferences round-trip with account ownership, reject injected owne
 
 
 test('chat, media and privacy changes require authentication and reject foreign origins',async()=>{
- for(const path of ['/api/chat','/api/chat/media/00000000-0000-0000-0000-000000000301','/api/profile/privacy','/api/follows/requests','/api/chapters/00000000-0000-0000-0000-000000000301/favorite'])assert.equal((await fetch(baseUrl+path)).status,401,path);
- for(const path of ['/api/chat','/api/chat/reports','/api/follows'])assert.equal((await fetch(baseUrl+path,{method:'POST',headers:{Origin:'https://untrusted.example','Content-Type':'application/json'},body:'{}'})).status,403,path);
+ for(const path of ['/api/support','/api/profile/control?target=00000000-0000-0000-0000-000000000301','/api/chat','/api/chat/media/00000000-0000-0000-0000-000000000301','/api/profile/privacy','/api/follows/requests','/api/chapters/00000000-0000-0000-0000-000000000301/favorite'])assert.equal((await fetch(baseUrl+path)).status,401,path);
+ for(const path of ['/api/chat','/api/chat/groups','/api/chat/reports','/api/profile/control','/api/support','/api/moderation/warnings','/api/follows'])assert.equal((await fetch(baseUrl+path,{method:'POST',headers:{Origin:'https://untrusted.example','Content-Type':'application/json'},body:'{}'})).status,403,path);
+ assert.equal((await fetch(baseUrl+'/api/moderation/inbox',{method:'PATCH',headers:{Origin:'https://untrusted.example','Content-Type':'application/json'},body:'{}'})).status,403);
+ for(const path of ['/api/chat/groups','/api/profile/control','/api/support','/api/moderation/warnings'])assert.equal((await fetch(baseUrl+path,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401,path);
  const invalid=await fetch(baseUrl+'/api/content-media?bucket=private-chat&path=someone.enc');assert.equal(invalid.status,400);assert.match(invalid.headers.get('cache-control'),/no-store/);
  const page=await fetch(baseUrl+'/fandoms');const text=await page.text();assert.equal(page.status,200);assert.match(text,/Criar fandom/);assert.match(text,/mailto:appnookie@gmail.com/);assert.match(text,/tiktok.com\/@nooklie.com/);
 });

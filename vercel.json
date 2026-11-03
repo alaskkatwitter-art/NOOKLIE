@@ -1,4 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "git": { "deploymentEnabled": { "feature/reader-fonts-and-site-typography": false } }
+  "git": {
+    "deploymentEnabled": {
+      "feature/reader-fonts-and-site-typography": false,
+      "feature/mobile-design-community": false
+    }
+  }
 }

@@ -1,14 +1,15 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import WarningAction from "@/components/WarningAction";
+import { useCallback, useEffect, useState } from "react";
 
 type Report = {
   id: string;
-  content_type: 'profile' | 'post' | 'story';
+  content_type: "profile" | "post" | "story";
   reason: string;
   details: string;
   content_hidden: boolean;
-  status: 'pending' | 'in_review' | 'resolved' | 'dismissed';
+  status: "pending" | "in_review" | "resolved" | "dismissed";
   internal_notes: string;
   created_at: string;
   reporter: { username: string; display_name: string | null } | null;
@@ -17,91 +18,260 @@ type Report = {
 };
 
 const reasons: Record<string, string> = {
-  harassment: 'Assédio ou abuso',
-  spam: 'Spam',
-  inappropriate: 'Conteúdo inadequado',
-  copyright: 'Direitos autorais',
-  safety: 'Segurança',
-  other: 'Outro',
+  harassment: "Assédio ou abuso",
+  spam: "Spam",
+  inappropriate: "Conteúdo inadequado",
+  copyright: "Direitos autorais",
+  safety: "Segurança",
+  other: "Outro",
 };
 
 async function api(url: string, options?: RequestInit) {
-  const response = await fetch(url, { ...options, cache: 'no-store', headers: { 'Content-Type': 'application/json' } });
+  const response = await fetch(url, {
+    ...options,
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir.');
+  if (!response.ok) throw new Error(data.error || "Não foi possível concluir.");
   return data;
 }
 
 export default function ModerationPanel({ canManage }: { canManage: boolean }) {
   const [reports, setReports] = useState<Report[]>([]);
+  const [filter, setFilter] = useState("open");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
-    const data = await api('/api/admin/reports');
+    const data = await api("/api/admin/reports");
     setReports(data.reports || []);
-    setNotes(Object.fromEntries((data.reports || []).map((report: Report) => [report.id, report.internal_notes || ''])));
+    setNotes(
+      Object.fromEntries(
+        (data.reports || []).map((report: Report) => [
+          report.id,
+          report.internal_notes || "",
+        ]),
+      ),
+    );
   }, []);
 
   useEffect(() => {
-    void load().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Falha ao carregar denúncias.'));
+    void load().catch((cause: unknown) =>
+      setError(
+        cause instanceof Error ? cause.message : "Falha ao carregar denúncias.",
+      ),
+    );
   }, [load]);
 
-  async function update(report: Report, status: 'in_review' | 'resolved' | 'dismissed', content_action: 'none' | 'hide' | 'restore' = 'none') {
+  async function update(
+    report: Report,
+    status: "in_review" | "resolved" | "dismissed",
+    content_action: "none" | "hide" | "restore" = "none",
+  ) {
     if (!canManage) return;
-    if (status !== 'in_review' && !window.confirm(content_action === 'hide' ? 'Resolver e ocultar este conteúdo para a comunidade?' : content_action === 'restore' ? 'Resolver e restaurar este conteúdo?' : status === 'resolved' ? 'Marcar esta denúncia como resolvida?' : 'Dispensar esta denúncia?')) return;
-    setBusy(true); setError(''); setMessage('');
+    if (
+      status !== "in_review" &&
+      !window.confirm(
+        content_action === "hide"
+          ? "Resolver e ocultar este conteúdo para a comunidade?"
+          : content_action === "restore"
+            ? "Resolver e restaurar este conteúdo?"
+            : status === "resolved"
+              ? "Marcar esta denúncia como resolvida?"
+              : "Dispensar esta denúncia?",
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      await api('/api/admin/reports', { method: 'PATCH', body: JSON.stringify({
-        id: report.id, status, content_action, internal_notes: notes[report.id] || '', confirm: status !== 'in_review',
-      }) });
-      setMessage('Denúncia atualizada e ação registrada no histórico.');
+      await api("/api/admin/reports", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: report.id,
+          status,
+          content_action,
+          internal_notes: notes[report.id] || "",
+          confirm: status !== "in_review",
+        }),
+      });
+      setMessage("Denúncia atualizada e ação registrada no histórico.");
       await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao atualizar denúncia.'); }
-    finally { setBusy(false); }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Falha ao atualizar denúncia.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
+  const labels: Record<string, string> = {
+    pending: "Pendente",
+    in_review: "Em análise",
+    resolved: "Resolvida",
+    dismissed: "Dispensada",
+  };
+  const kinds: Record<string, string> = {
+    profile: "Perfil",
+    post: "Publicação",
+    story: "História",
+  };
+  const visible = reports.filter(
+    (r) =>
+      filter === "all" ||
+      (filter === "open"
+        ? !["resolved", "dismissed"].includes(r.status)
+        : ["resolved", "dismissed"].includes(r.status)),
+  );
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold">Denúncias da comunidade</h2>
-        <p className="mt-1 text-sm text-white/45">As denúncias são privadas e visíveis apenas à equipe de moderação autorizada.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">Denúncias da comunidade</h2>
+          <p className="nook-muted mt-1">
+            Abra um relato para analisar os detalhes e registrar uma decisão.
+          </p>
+        </div>
+        <label className="nook-field">
+          <span className="sr-only">Filtrar denúncias</span>
+          <select
+            className="nook-input"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          >
+            <option value="open">Em aberto</option>
+            <option value="closed">Finalizadas</option>
+            <option value="all">Todas</option>
+          </select>
+        </label>
       </div>
-      {error && <div role="alert" className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-200">{error}</div>}
-      {message && <div role="status" className="rounded-xl border border-green-400/20 bg-green-400/5 p-3 text-sm text-green-200">{message}</div>}
-      {reports.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 bg-[#191219] p-8 text-center text-sm text-white/40">Nenhuma denúncia registrada.</div>}
-      {reports.map((report) => (
-        <article key={report.id} className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-bold">{report.target?.display_name || report.target?.username || 'Conta indisponível'} <span className="text-xs font-normal text-white/40">· {report.content_type} · {reasons[report.reason] || report.reason}</span></p>
-              <p className="mt-1 text-xs text-white/45">Denunciado por @{report.reporter?.username || 'conta indisponível'} em {new Date(report.created_at).toLocaleString('pt-BR')}</p>
-              <p className="mt-2 text-xs text-white/45">Conteúdo: {report.content_hidden ? 'oculto' : 'visível'}</p>
-              {report.content?.title && <p className="mt-2 text-sm font-semibold">{report.content.title}</p>}
-              {report.content?.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/70">{report.content.body}</p>}
-              {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-white/55">{report.details}</p>}
-            </div>
-            <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/55">{report.status}</span>
-          </div>
-          {canManage && report.status === 'resolved' && report.content_hidden && (
-            <div className="mt-4 border-t border-white/10 pt-4">
-              <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'resolved', 'restore')}>Restaurar conteúdo</button>
-            </div>
-          )}
-          {canManage && report.status !== 'resolved' && report.status !== 'dismissed' && (
-            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
-              <label className="block text-xs font-semibold text-white/55">Observações internas<textarea value={notes[report.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [report.id]: event.target.value }))} maxLength={8000} rows={3} className="mt-2 w-full rounded-xl border border-white/10 bg-[#100b12] p-3 text-sm text-white" /></label>
-              <div className="flex flex-wrap gap-2">
-                <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'in_review')}>Em análise</button>
-                <button disabled={busy} className="rounded-xl bg-[#ff78b9] px-4 py-2 text-sm font-bold text-[#1b1018] disabled:opacity-50" onClick={() => void update(report, 'resolved')}>Resolver</button>
-                <button disabled={busy} className="rounded-xl border border-amber-300/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50" onClick={() => void update(report, 'resolved', report.content_hidden ? 'restore' : 'hide')}>Resolver e {report.content_hidden ? 'restaurar' : 'ocultar'}</button>
-                <button disabled={busy} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => void update(report, 'dismissed')}>Dispensar</button>
+      {error && (
+        <p role="alert" className="nook-status">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p role="status" className="nook-status">
+          {message}
+        </p>
+      )}
+      {!visible.length && (
+        <p className="nook-card nook-muted">Nenhuma denúncia nesta seleção.</p>
+      )}
+      {visible.map((report) => (
+        <details key={report.id} className="nook-card">
+          <summary className="cursor-pointer">
+            <span className="text-sm font-bold">
+              {report.target?.display_name ||
+                report.target?.username ||
+                "Conta indisponível"}
+            </span>
+            <span className="block mt-1 text-xs text-white/50">
+              {kinds[report.content_type]} ·{" "}
+              {reasons[report.reason] || report.reason} ·{" "}
+              {new Date(report.created_at).toLocaleDateString("pt-BR")}
+            </span>
+            <span className="inline-block mt-3 rounded-full border border-white/10 px-3 py-1 text-[11px] text-pink-200/70">
+              {labels[report.status]}
+            </span>
+          </summary>
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="nook-muted text-xs">
+              Enviado por @{report.reporter?.username || "conta indisponível"} ·
+              Conteúdo {report.content_hidden ? "oculto" : "visível"}
+            </p>
+            {report.content?.title && (
+              <p className="mt-3 font-semibold text-sm">
+                {report.content.title}
+              </p>
+            )}
+            {report.content?.body && (
+              <blockquote className="mt-3 border-l-2 border-pink-200/20 pl-3 text-sm text-white/70 whitespace-pre-wrap break-words">
+                {report.content.body}
+              </blockquote>
+            )}
+            {report.details && (
+              <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-white/75">
+                {report.details}
+              </p>
+            )}
+            {canManage && (
+              <div className="mt-5 space-y-4">
+                <WarningAction sourceType="report" sourceId={report.id} />
+                {!["resolved", "dismissed"].includes(report.status) && (
+                  <>
+                    <label className="nook-field">
+                      Observações internas
+                      <textarea
+                        value={notes[report.id] || ""}
+                        onChange={(e) =>
+                          setNotes((current) => ({
+                            ...current,
+                            [report.id]: e.target.value,
+                          }))
+                        }
+                        maxLength={8000}
+                        rows={3}
+                        className="nook-input"
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        disabled={busy}
+                        className="discovery-secondary"
+                        onClick={() => void update(report, "in_review")}
+                      >
+                        Em análise
+                      </button>
+                      <button
+                        disabled={busy}
+                        className="nook-primary"
+                        onClick={() => void update(report, "resolved")}
+                      >
+                        Resolver
+                      </button>
+                      <button
+                        disabled={busy}
+                        className="discovery-secondary"
+                        onClick={() =>
+                          void update(
+                            report,
+                            "resolved",
+                            report.content_hidden ? "restore" : "hide",
+                          )
+                        }
+                      >
+                        Resolver e{" "}
+                        {report.content_hidden ? "restaurar" : "ocultar"}
+                      </button>
+                      <button
+                        disabled={busy}
+                        className="discovery-secondary"
+                        onClick={() => void update(report, "dismissed")}
+                      >
+                        Dispensar
+                      </button>
+                    </div>
+                  </>
+                )}
+                {report.status === "resolved" && report.content_hidden && (
+                  <button
+                    disabled={busy}
+                    className="discovery-secondary"
+                    onClick={() => void update(report, "resolved", "restore")}
+                  >
+                    Restaurar conteúdo
+                  </button>
+                )}
               </div>
-            </div>
-          )}
-        </article>
+            )}
+          </div>
+        </details>
       ))}
     </section>
   );

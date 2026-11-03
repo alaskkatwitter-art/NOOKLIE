@@ -168,13 +168,7 @@ export default function ListasDeLeituraPage() {
 
           <div className="flex min-w-0 items-center gap-3">
 
-            <Link
-              href="/feed"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-white/50 transition hover:border-[#ff78b9]/30 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
-              aria-label="Voltar para o Feed"
-            >
-              <ArrowLeftIcon />
-            </Link>
+
 
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
               <CloudIcon />

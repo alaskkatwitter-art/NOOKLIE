@@ -256,21 +256,7 @@ export default function CapituloPublicadoPage() {
               'Publicação não encontrada.'}
           </p>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (chapter) {
-                router.push(
-                  `/historia/${chapter.story_id}`
-                );
-              } else {
-                router.back();
-              }
-            }}
-            className="mt-6 rounded-xl bg-pink-500 px-5 py-3 text-sm font-medium text-white hover:bg-pink-400 transition"
-          >
-            Voltar
-          </button>
+
         </div>
       </main>
     );

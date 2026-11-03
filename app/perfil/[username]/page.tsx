@@ -1,5 +1,7 @@
 'use client';
 import {contentMediaUrl} from '@/lib/security/content-media';
+import MuralActions from '@/components/MuralActions';
+import {Pin,BookOpen,MessageCircle} from 'lucide-react';
 import MessageProfileButton from '@/components/MessageProfileButton';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 
@@ -15,7 +17,7 @@ import {
   useRouter,
 } from 'next/navigation';
 import OfficialBadge from '../../components/OfficialBadge';
-import ReportProfileButton from '@/components/ReportProfileButton';
+import ProfileActions from '@/components/ProfileActions';
 
 type User = {
   id: string;
@@ -316,7 +318,7 @@ function EmptyState({
   title,
   description,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   description: string;
 }) {
@@ -726,7 +728,7 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#0d0a0d] text-white">
+      <main data-social-page="profile" className="min-h-screen bg-[#0d0a0d] text-white">
         <div className="mx-auto w-full max-w-5xl px-4 py-8">
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]">
             <div className="h-48 animate-pulse bg-white/5" />
@@ -763,39 +765,15 @@ export default function PublicProfilePage() {
               'Este usuário não existe ou o perfil não está disponível.'}
           </p>
 
-          <button
-            type="button"
-            onClick={() =>
-              router.back()
-            }
-            className="mt-7 rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-white/90"
-          >
-            Voltar
-          </button>
+
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#0d0a0d] text-white">
+    <main data-social-page="profile" className="min-h-screen bg-[#0d0a0d] text-white">
       <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-8">
-
-        {/* VOLTAR */}
-
-        <button
-          type="button"
-          onClick={() =>
-            router.back()
-          }
-          className="mb-4 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white/50 transition hover:bg-white/5 hover:text-white"
-        >
-          <span className="text-lg">
-            ←
-          </span>
-
-          Voltar
-        </button>
 
         {/* PERFIL */}
 
@@ -841,7 +819,7 @@ export default function PublicProfilePage() {
               </div>
 
               {!isSelf && (
-                <button
+                <div className="mb-2 flex items-center gap-2"><MessageProfileButton profileId={user.id}/><button
                   type="button"
                   onClick={
                     handleFollow
@@ -849,10 +827,10 @@ export default function PublicProfilePage() {
                   disabled={
                     followLoading
                   }
-                  className={`mb-2 rounded-2xl px-5 py-2.5 text-sm font-black transition disabled:opacity-50 ${
+                  className={`rounded-full px-5 py-2.5 text-sm font-black transition disabled:opacity-50 ${
                     isFollowing
                       ? 'border border-white/15 bg-white/5 text-white hover:bg-white/10'
-                      : 'bg-[#ff78b9] text-[#190d16] hover:brightness-110'
+                      : 'bg-gradient-to-r from-[#ffd0e6] to-[#e999c2] text-[#321a2a] hover:brightness-110'
                   }`}
                 >
                   {followLoading
@@ -860,7 +838,7 @@ export default function PublicProfilePage() {
                     : isFollowing
                       ? 'Seguindo'
                       : requested ? 'Solicitado · cancelar' : 'Seguir'}
-                </button>
+                </button></div>
               )}
 
               {isSelf && (
@@ -905,7 +883,7 @@ export default function PublicProfilePage() {
                   <span className="text-white/45"> · {badge.description}</span>
                 </p>
               ))}
-              {!isSelf && <ReportProfileButton profileId={user.id} />}
+
 
               <div style={restricted?{display:"none"}:undefined} className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div>
@@ -939,11 +917,10 @@ export default function PublicProfilePage() {
                 </p>
               )}
             </div>
+            {!isSelf&&<div className="mt-4 flex items-center justify-end gap-2"><ProfileActions profileId={user.id} username={user.username}/></div>}
           </div>
         </section>
-
-        {!isSelf && <div className="mt-4"><MessageProfileButton profileId={user.id}/></div>}
-        {restricted && <p role="status" className="mt-6 rounded-3xl border border-pink-300/20 bg-pink-300/5 p-8 text-sm text-white/60">essa conta é privada, apenas seguidores de {user.username} podem ter acesso ao restante do perfil</p>}
+        {restricted && <p role="status" className="mt-6 rounded-3xl border border-pink-300/20 bg-pink-300/5 p-8 text-sm text-white/60">O conteúdo deste perfil está restrito. Em contas privadas, apenas seguidores aprovados têm acesso. Se você bloqueou esta pessoa, use o menu de três pontos para gerenciar o bloqueio.</p>}
         {!restricted && <>
         {/* ABAS */}
 
@@ -1016,7 +993,7 @@ export default function PublicProfilePage() {
               {stories.length ===
               0 ? (
                 <EmptyState
-                  icon="📚"
+                  icon={<BookOpen size={28}/>}
                   title="Nenhuma história ainda"
                   description={`${getDisplayName(user)} ainda não publicou nenhuma história.`}
                 />
@@ -1049,7 +1026,7 @@ export default function PublicProfilePage() {
               {posts.length ===
               0 ? (
                 <EmptyState
-                  icon="📝"
+                  icon={<BookOpen size={28}/>}
                   title="Nenhuma publicação ainda"
                   description={`${getDisplayName(user)} ainda não publicou nada no Mural.`}
                 />
@@ -1109,7 +1086,7 @@ export default function PublicProfilePage() {
                                 title="Publicação fixada"
                                 className="text-sm"
                               >
-                                📌
+                                <Pin size={15}/>
                               </span>
                             )}
                           </div>
@@ -1129,7 +1106,7 @@ export default function PublicProfilePage() {
                                   contentMediaUrl(post.image_url)
                                 }
                                 alt=""
-                                className="max-h-[600px] w-full object-cover"
+                                className="max-h-[340px] w-full object-contain"
                               />
                             </div>
                           )}
@@ -1166,13 +1143,14 @@ export default function PublicProfilePage() {
                                             contentMediaUrl(media.media_url)
                                           }
                                           alt=""
-                                          className="max-h-[500px] min-h-[180px] w-full object-cover"
+                                          className="max-h-[340px] w-full object-contain"
                                         />
                                       </div>
                                     )
                                   )}
                               </div>
                             )}
+                          <MuralActions postId={post.id}/>
                         </div>
                       </article>
                     )
@@ -1187,7 +1165,7 @@ export default function PublicProfilePage() {
               {readingLists.length ===
               0 ? (
                 <EmptyState
-                  icon="🔖"
+                  icon={<BookOpen size={28}/>}
                   title="Nenhuma lista pública"
                   description={`${getDisplayName(user)} ainda não deixou nenhuma lista de leitura pública.`}
                 />
@@ -1314,7 +1292,7 @@ export default function PublicProfilePage() {
               {ficClubs.length ===
               0 ? (
                 <EmptyState
-                  icon="💬"
+                  icon={<MessageCircle size={28}/>}
                   title="Nenhum clube ainda"
                   description={`${getDisplayName(user)} ainda não participa de nenhum Clube de FIC.`}
                 />
@@ -1331,7 +1309,7 @@ export default function PublicProfilePage() {
                         <div className="p-5 sm:p-6">
                           <div className="flex items-start gap-4">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff78b9]/20 to-[#b77cff]/20 text-xl">
-                              💬
+                              <MessageCircle size={19}/>
                             </div>
 
                             <div className="min-w-0 flex-1">

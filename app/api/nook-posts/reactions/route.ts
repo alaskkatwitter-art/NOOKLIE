@@ -237,3 +237,14 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET(request:Request){
+ try{
+ const userId=await getCurrentUserId(request);if(!userId)return NextResponse.json({error:'Entre na sua conta.'},{status:401});
+ const id=new URL(request.url).searchParams.get('post_id');if(!id||!await isPublicPostVisible(supabase,id))return NextResponse.json({error:'Publicação indisponível.'},{status:404});
+ const [reactions,comments]=await Promise.all([supabase.from('nook_post_reactions').select('emoji,user_id').eq('post_id',id),supabase.from('nook_comments').select('id',{count:'exact',head:true}).eq('post_id',id)]);
+ if(reactions.error||comments.error)throw reactions.error||comments.error;
+ const counts:Record<string,number>={};for(const r of reactions.data||[])counts[r.emoji]=(counts[r.emoji]||0)+1;
+ return NextResponse.json({summary:{counts,user_reactions:(reactions.data||[]).filter(r=>r.user_id===userId).map(r=>r.emoji),comments_count:comments.count||0}},{headers:{'Cache-Control':'no-store, private'}});
+ }catch{return NextResponse.json({error:'Não foi possível carregar as curtidas.'},{status:503});}
+}

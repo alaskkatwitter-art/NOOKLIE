@@ -462,7 +462,7 @@ export default function AdminConsole({
       <div className="mx-auto max-w-6xl">
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Link href="/perfil" className="text-xs font-semibold text-[#ff9aca] hover:text-white">← Voltar ao perfil</Link>
+
             <p className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-[#ff78b9]/70">NOOKLIE • ADMINISTRAÇÃO</p>
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">Painel da equipe</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/45">

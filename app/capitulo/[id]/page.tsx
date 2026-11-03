@@ -884,22 +884,7 @@ export default function CapituloPage() {
               'Capítulo não encontrado.'}
           </p>
 
-          <button
-            type="button"
-            onClick={() =>
-              router.back()
-            }
-            className="
-              px-5
-              py-3
-              rounded-xl
-              bg-[#ff4f9a]
-              text-black
-              font-semibold
-            "
-          >
-            Voltar
-          </button>
+
         </div>
       </main>
     );

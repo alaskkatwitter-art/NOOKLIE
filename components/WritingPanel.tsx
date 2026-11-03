@@ -1,32 +1,169 @@
-'use client';
-import { useRef, useState } from 'react';
-import FormattedSynopsis from './FormattedSynopsis';
-
-export default function WritingPanel({ value, onChange, maxLength = 2000 }: { value: string; onChange: (value: string) => void; maxLength?: number }) {
+"use client";
+import { useRef, useState } from "react";
+import {
+  Bold,
+  Italic,
+  Heading2,
+  Quote,
+  MoreHorizontal,
+  Expand,
+  Shrink,
+  Eye,
+  Pencil,
+  Minus,
+} from "lucide-react";
+import FormattedSynopsis from "./FormattedSynopsis";
+export default function WritingPanel({
+  value,
+  onChange,
+  maxLength = 2000,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  maxLength?: number;
+}) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [preview, setPreview] = useState(false);
-  function insert(before: string, after = '') {
+  const [expanded, setExpanded] = useState(false),
+    [preview, setPreview] = useState(false);
+  function insert(before: string, after = "") {
     const input = ref.current;
-    if (!input) return;
+    if (!input || preview) return;
     const { selectionStart: start, selectionEnd: end } = input;
-    const next = value.slice(0, start) + before + value.slice(start, end) + after + value.slice(end);
+    const next =
+      value.slice(0, start) +
+      before +
+      value.slice(start, end) +
+      after +
+      value.slice(end);
     if (next.length > maxLength) return;
     onChange(next);
-    requestAnimationFrame(() => { input.focus(); input.setSelectionRange(start + before.length, end + before.length); });
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(start + before.length, end + before.length);
+    });
   }
-  return <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#100b12]">
-    <div role="toolbar" aria-label="Ferramentas da sinopse" className="flex flex-wrap gap-2 border-b border-white/10 p-2 text-sm">
-      <button type="button" disabled={preview} onClick={() => insert('**', '**')} className="min-h-11 rounded-lg px-3 font-bold hover:bg-white/10 disabled:opacity-30">Negrito</button>
-      <button type="button" disabled={preview} onClick={() => insert('*', '*')} className="min-h-11 rounded-lg px-3 italic hover:bg-white/10 disabled:opacity-30">Itálico</button>
-      <button type="button" disabled={preview} onClick={() => insert('\n## ')} className="min-h-11 rounded-lg px-3 hover:bg-white/10 disabled:opacity-30">Subtítulo</button>
-      <button type="button" onClick={() => insert('“', '”')} className="min-h-11 rounded-lg px-3 hover:bg-white/10">“ Citação</button>
-      <button type="button" onClick={() => insert('\n— ')} className="min-h-11 rounded-lg px-3 hover:bg-white/10">— Diálogo</button>
-      <button type="button" onClick={() => insert('\n\n✦ ✦ ✦\n\n')} className="min-h-11 rounded-lg px-3 hover:bg-white/10">✦ Separador</button>
-      <button type="button" aria-pressed={expanded} onClick={() => setExpanded(!expanded)} className="ml-auto min-h-11 rounded-lg px-3 text-[#ff9bca]">{expanded ? 'Reduzir painel' : 'Ampliar painel'}</button>
-      <button type="button" aria-pressed={preview} onClick={() => setPreview(!preview)} className="min-h-11 rounded-lg px-3 text-[#ff9bca]">{preview ? 'Editar' : 'Visualizar'}</button>
+  return (
+    <div className="writing-panel">
+      <div
+        className="writing-toolbar"
+        role="toolbar"
+        aria-label="Ferramentas da sinopse"
+      >
+        <button
+          type="button"
+          title="Negrito"
+          aria-label="Negrito"
+          disabled={preview}
+          onClick={() => insert("**", "**")}
+        >
+          <Bold size={17} />
+        </button>
+        <button
+          type="button"
+          title="Itálico"
+          aria-label="Itálico"
+          disabled={preview}
+          onClick={() => insert("*", "*")}
+        >
+          <Italic size={17} />
+        </button>
+        <button
+          type="button"
+          title="Subtítulo"
+          aria-label="Subtítulo"
+          disabled={preview}
+          onClick={() => insert("\n## ")}
+        >
+          <Heading2 size={18} />
+        </button>
+        <details className="writing-more">
+          <summary aria-label="Mais opções de formatação" title="Mais opções">
+            <MoreHorizontal size={19} />
+          </summary>
+          <div>
+            <button
+              type="button"
+              disabled={preview}
+              onClick={(e) => {
+                insert("“", "”");
+                e.currentTarget.closest("details")?.removeAttribute("open");
+              }}
+            >
+              <Quote size={16} />
+              Citação
+            </button>
+            <button
+              type="button"
+              disabled={preview}
+              onClick={(e) => {
+                insert("\n— ");
+                e.currentTarget.closest("details")?.removeAttribute("open");
+              }}
+            >
+              <Minus size={16} />
+              Diálogo
+            </button>
+            <button
+              type="button"
+              disabled={preview}
+              onClick={(e) => {
+                insert("\n\n✦ ✦ ✦\n\n");
+                e.currentTarget.closest("details")?.removeAttribute("open");
+              }}
+            >
+              <Minus size={16} />
+              Separador
+            </button>
+          </div>
+        </details>
+        <span className="flex-1" />
+        <button
+          type="button"
+          title={expanded ? "Reduzir painel" : "Ampliar painel"}
+          aria-label={expanded ? "Reduzir painel" : "Ampliar painel"}
+          aria-pressed={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? <Shrink size={17} /> : <Expand size={17} />}
+        </button>
+        <button
+          type="button"
+          title={preview ? "Editar sinopse" : "Visualizar sinopse"}
+          aria-label={preview ? "Editar sinopse" : "Visualizar sinopse"}
+          aria-pressed={preview}
+          onClick={() => setPreview(!preview)}
+        >
+          {preview ? <Pencil size={17} /> : <Eye size={17} />}
+        </button>
+      </div>
+      {preview ? (
+        <div
+          className={
+            "p-4 text-sm leading-7 " + (expanded ? "min-h-80" : "min-h-40")
+          }
+        >
+          <FormattedSynopsis text={value || "Sua sinopse aparecerá aqui."} />
+        </div>
+      ) : (
+        <textarea
+          ref={ref}
+          aria-label="Sinopse da história"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={maxLength}
+          rows={expanded ? 20 : 7}
+          placeholder="Apresente seu universo e convide o leitor a entrar…"
+          className="w-full resize-y bg-transparent p-4 text-sm leading-7 outline-none focus:ring-2 focus:ring-inset focus:ring-[#e4a0c4]"
+        />
+      )}
+      <div className="writing-counter">
+        <span>
+          {value.trim() ? value.trim().split(/\s+/).length : 0} palavras
+        </span>
+        <span>
+          {value.length}/{maxLength}
+        </span>
+      </div>
     </div>
-    {preview ? <div className="min-h-80 p-5 leading-8 sm:p-8"><FormattedSynopsis text={value || 'Sua sinopse aparecerá aqui.'} /></div> : <textarea ref={ref} aria-label="Sinopse da história" value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} rows={expanded ? 28 : 14} placeholder="Apresente seu universo e convide o leitor a entrar…" className="w-full resize-y bg-transparent p-5 text-base leading-8 outline-none focus:ring-2 focus:ring-inset focus:ring-[#ff78b9] sm:p-8" />}
-    <div className="flex justify-between border-t border-white/10 px-4 py-3 text-xs text-white/60"><span>{value.trim() ? value.trim().split(/\s+/).length : 0} palavras</span><span>{value.length}/{maxLength} caracteres</span></div>
-  </div>;
+  );
 }
