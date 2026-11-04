@@ -4,6 +4,7 @@ import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { storyFormats, storyKinds } from '@/lib/stories/metadata';
 import TagFilters from './TagFilters';
 
 type ExploreUser = {
@@ -17,6 +18,8 @@ type ExploreUser = {
 };
 
 type ExploreStory = {
+  story_kind?: keyof typeof storyKinds;
+  story_format?: keyof typeof storyFormats;
   id: string;
   title: string;
   description: string | null;
@@ -715,7 +718,7 @@ export default function ExplorarContent() {
                                   href={`/historia/${story.id}`}
                                 >
                                   <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#ff78b9]">
-                                    História
+                                    {story.story_kind ? storyKinds[story.story_kind] : 'História'}{story.story_format && ` · ${storyFormats[story.story_format]}`}
                                   </p>
 
                                   <h4 className="mt-2 line-clamp-2 text-lg font-black transition group-hover:text-[#ff9bca]">

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from 'next/link';
+import { chapterKinds, ChapterKind, SeriesBook, storyFormats, storyKinds } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import FormattedSynopsis from '@/components/FormattedSynopsis';
 import { useEffect, useState } from "react";
@@ -21,6 +23,7 @@ type Tag = {
 };
 
 type Chapter = {
+  entry_kind?: ChapterKind;
   id: string;
   story_id: string;
   chapter_number: number;
@@ -30,6 +33,10 @@ type Chapter = {
 };
 
 type Story = {
+  series_name?: string;
+  series_books?: SeriesBook[];
+  story_kind?: keyof typeof storyKinds;
+  story_format?: keyof typeof storyFormats;
   has_content_warnings?: boolean; fandom?: string; work_has_ai?: boolean; cover_has_ai?: boolean; content_warnings?: string; accepts_translation?: boolean;
   id: string;
   author_id: string;
@@ -349,12 +356,27 @@ export default function HistoriaPage() {
         </div>
 
         <section aria-label="Informações e avisos da obra" className="mt-8 space-y-3 rounded-2xl border border-pink-400/20 bg-pink-400/5 p-5 text-sm leading-7">
+{story.story_kind && <p><strong>Tipo de obra</strong> · {storyKinds[story.story_kind]}{story.story_format && ` · ${storyFormats[story.story_format]}`}</p>}
 {story.fandom && <p><strong>Fandom:</strong> {story.fandom}</p>}
 {story.work_has_ai && <p className="text-pink-200">✦ Esta obra tem IA</p>}
 {story.cover_has_ai && <p className="text-pink-200">✦ Esta capa tem IA</p>}
 {(story.has_content_warnings || story.content_warnings) && <div className="rounded-xl border border-amber-300/30 bg-amber-300/5 p-4"><h2 className="font-bold text-amber-200">Avisos de conteúdo e gatilhos</h2><p className="whitespace-pre-wrap">{story.content_warnings || 'O autor sinalizou temas sensíveis sem detalhar os avisos.'}</p></div>}
 <p>{story.accepts_translation ? 'O autor aceita propostas de tradução. Solicite autorização antes de publicar.' : 'Traduções não autorizadas. Consulte o autor antes de traduzir.'}</p>
-</section><section className="mt-16">
+</section>
+        {!!story.series_books?.length && (
+          <section aria-label="Ordem de leitura da série" className="mt-8 rounded-2xl border border-pink-300/20 bg-gradient-to-br from-[#321729] to-[#171018] p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Ordem de leitura</p>
+            <h2 className="mt-2 text-xl font-bold">{story.series_name}</h2>
+            <ol className="mt-4 space-y-2">
+              {story.series_books.map(book => <li key={book.id}>{book.id === story.id ? (
+                <span aria-current="page" className="block rounded-xl bg-pink-300/10 p-3 text-pink-100">Volume {book.series_volume} · {book.title}</span>
+              ) : (
+                <Link href={`/historia/${book.id}`} className="block rounded-xl border border-white/10 p-3 hover:border-pink-300/50">Volume {book.series_volume} · {book.title}</Link>
+              )}</li>)}
+            </ol>
+          </section>
+        )}
+        <section className="mt-16">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-pink-300/60">
@@ -422,7 +444,7 @@ export default function HistoriaPage() {
 
                     <div className="min-w-0">
                       <p className="mb-1 text-xs text-white/30">
-                        Capítulo {chapter.chapter_number}
+                        {chapter.entry_kind && chapter.entry_kind !== 'chapter' ? chapterKinds[chapter.entry_kind] : `Capítulo ${chapter.chapter_number}`}
                       </p>
 
                       <h3 className="truncate font-medium text-white/80 transition group-hover:text-pink-300">

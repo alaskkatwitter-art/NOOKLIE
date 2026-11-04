@@ -1,6 +1,6 @@
 'use client';
 import {contentMediaUrl} from '@/lib/security/content-media';
-import StoryMetadataFields from '@/components/StoryMetadataFields';
+import StoryMetadataFields, { StoryKindFields } from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
 import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
 
@@ -168,9 +168,15 @@ export default function CriarPage() {
 
     setSaving(true);
 
+    if (!storyMetadata.story_kind) {
+      setError('Escolha Obra original ou Fanfic.');
+      goToStep(0);
+      return;
+    }
+
     try {
       const formData = new FormData();
-      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value ?? '')));
 
       formData.append('title', title);
       formData.append(
@@ -260,6 +266,7 @@ export default function CriarPage() {
             </div>
 
             <div className="space-y-5">
+              <StoryKindFields value={storyMetadata} onChange={setStoryMetadata} />
               {/* TÍTULO */}
 
               <div>

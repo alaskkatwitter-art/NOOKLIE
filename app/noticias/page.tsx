@@ -76,6 +76,12 @@ export default function NoticiasPage() {
         </section>
 
         <section className="mt-12" aria-label="Edições do Jornal Nooklie">
+          <article className="mb-5 rounded-3xl border border-pink-300/20 bg-gradient-to-br from-[#321729] to-[#171018] p-7 sm:p-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Obras da comunidade</p>
+            <h2 className="mt-4 text-3xl font-black">Conheça os originais do Nooklie</h2>
+            <p className="mt-4 max-w-xl leading-7 text-white/75">Encontre novos livros, contos e poemas e veja como publicar sua própria história.</p>
+            <Link href="/noticias/originais" className="mt-6 inline-flex font-bold text-pink-200 hover:underline">Ler a matéria →</Link>
+          </article>
           <article className="rounded-3xl border border-[#ff78b9]/25 bg-[#171018] p-7 sm:p-10">
             <p className="text-xs font-bold uppercase tracking-widest text-[#ff9bca]">Jornal Nooklie · Edição 01</p>
             <h2 className="mt-4 text-3xl font-black">{welcome.title}</h2>

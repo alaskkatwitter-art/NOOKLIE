@@ -42,6 +42,7 @@ const links = [
 const drawerLinks = [
   ["/chat", "Mensagens", MessageCircle],
   ["/minhas-historias", "Minhas histórias", NotebookPen],
+  ["/leitura-beta", "Leitura beta", NotebookPen],
   ["/noticias", "Jornal Nooklie", Newspaper],
   ["/eventos", "Eventos literários", CalendarDays],
   ["/fandoms", "Meus universos", Sparkles],

@@ -22,6 +22,7 @@ import OfficialBadge from '../../components/OfficialBadge';
 import ProfileActions from '@/components/ProfileActions';
 
 type User = {
+  pinned_story_id?: string | null;
   id: string;
   username: string;
   display_name: string | null;
@@ -34,6 +35,7 @@ type User = {
 };
 
 type Story = {
+  story_kind?: 'original' | 'fanfic' | '';
   id: string;
   title: string;
   description: string | null;
@@ -368,6 +370,9 @@ export default function PublicProfilePage() {
       null
     );
 
+  const [storyFilter, setStoryFilter] = useState<'' | 'original' | 'fanfic'>('');
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinError, setPinError] = useState('');
   const [stories, setStories] =
     useState<Story[]>([]);
 
@@ -750,6 +755,25 @@ export default function PublicProfilePage() {
     );
   }
 
+  async function pinStory(storyId: string | null) {
+    setPinBusy(true);
+    setPinError('');
+    try {
+      const response = await fetch('/api/profile/pinned-story', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_id: storyId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível atualizar o destaque.');
+      setUser(current => current ? { ...current, pinned_story_id: result.pinned_story_id } : current);
+    } catch (error) {
+      setPinError(error instanceof Error ? error.message : 'Não foi possível atualizar o destaque.');
+    } finally {
+      setPinBusy(false);
+    }
+  }
+
   if (error || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0d0a0d] px-5 text-white">
@@ -972,17 +996,25 @@ export default function PublicProfilePage() {
             {/* HISTÓRIAS */}
 
             <section className="w-1/4 shrink-0 px-0.5">
-              {stories.length ===
-              0 ? (
+              <div className="mx-auto mb-5 flex w-full max-w-2xl flex-wrap gap-2" role="group" aria-label="Filtrar obras no perfil">
+                {([['', 'Todas'], ['original', 'Originais'], ['fanfic', 'Fanfics']] as const).map(([kind, label]) => (
+                  <button type="button" key={kind} aria-pressed={storyFilter === kind} onClick={() => setStoryFilter(kind)} className="min-h-11 rounded-full border border-pink-300/20 px-4 text-sm font-semibold text-pink-100 aria-pressed:bg-pink-300 aria-pressed:text-[#200f1b]">{label}</button>
+                ))}
+              </div>
+              {pinError && <p role="alert" className="mx-auto mb-4 max-w-2xl text-sm text-rose-200">{pinError}</p>}
+              {!stories.some(story => !storyFilter || story.story_kind === storyFilter) ? (
                 <EmptyState
                   icon={<BookOpen size={28}/>}
                   title="Nenhuma história ainda"
-                  description={`${getDisplayName(user)} ainda não publicou nenhuma história.`}
+                  description={storyFilter ? "Nenhuma obra desse tipo foi encontrada neste perfil." : `${getDisplayName(user)} ainda não publicou nenhuma história.`}
                 />
               ) : (
                 <div className="mx-auto w-full max-w-2xl space-y-4">
-                  {stories.map(
-                    (story) => (
+                  {stories.filter(story => !storyFilter || story.story_kind === storyFilter).sort(
+                    (a, b) => Number(b.id === user.pinned_story_id) - Number(a.id === user.pinned_story_id)
+                  ).map(story => (
+                    <div key={story.id}>
+                      {story.id === user.pinned_story_id && <p className="mb-2 text-sm font-semibold text-pink-200">Obra em destaque</p>}
                       <StoryCard
                         key={
                           story.id
@@ -996,8 +1028,9 @@ export default function PublicProfilePage() {
                           )
                         }
                       />
-                    )
-                  )}
+                      {isSelf && <button type="button" disabled={pinBusy} className="mt-2 min-h-11 rounded-full border border-pink-300/25 px-4 text-sm font-semibold text-pink-200 disabled:opacity-50" onClick={() => void pinStory(story.id === user.pinned_story_id ? null : story.id)}>{story.id === user.pinned_story_id ? 'Remover destaque' : 'Destacar no perfil'}</button>}
+                    </div>
+                  ))}
                 </div>
               )}
             </section>

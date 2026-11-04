@@ -58,6 +58,7 @@ export async function GET(
           verified,
           is_official,
           is_private,
+          pinned_story_id,
           moderation_hidden_at
           `
         )
@@ -535,9 +536,14 @@ export async function GET(
     // 7. RESPOSTA
     // =========================================================
 
+    const pinnedStory = profile.pinned_story_id && stories?.find(story => story.id === profile.pinned_story_id);
+    const pinnedChapter = pinnedStory
+      ? await supabase.from('chapters').select('id').eq('story_id', pinnedStory.id).eq('published', true).limit(1).maybeSingle()
+      : null;
+
     return NextResponse.json({
       restricted:false,
-      user: { ...profile, staff_badges: staffBadges },
+      user: { ...profile, pinned_story_id: pinnedChapter?.data && pinnedStory ? pinnedStory.id : null, staff_badges: staffBadges },
       stories: stories || [],
       posts: postsWithMedia,
       reading_lists:

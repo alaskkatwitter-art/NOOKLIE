@@ -2,9 +2,10 @@
 import ChapterBannerEditor from '@/components/ChapterBannerEditor';
 import DeleteStoryButton from '@/components/DeleteStoryButton';
 import {contentMediaUrl} from '@/lib/security/content-media';
-import StoryMetadataFields from '@/components/StoryMetadataFields';
+import BetaReadingInvite from '@/components/BetaReadingInvite';
+import StoryMetadataFields, { StoryKindFields } from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
-import { emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
+import { chapterKinds, ChapterKind, emptyStoryMetadata, StoryMetadata } from '@/lib/stories/metadata';
 
 import React, {
   ChangeEvent,
@@ -42,6 +43,10 @@ type StoryChapter = {
 
 type Story = {
   has_content_warnings?: boolean;
+  series_name?: string;
+  series_volume?: number | null;
+  story_kind?: StoryMetadata['story_kind'];
+  story_format?: StoryMetadata['story_format'];
   fandom?: string;
   work_has_ai?: boolean;
   cover_has_ai?: boolean;
@@ -66,6 +71,7 @@ type ChapterMedia = {
 };
 
 type Chapter = {
+  entry_kind?: ChapterKind;
   id: string;
   story_id: string;
   chapter_number: number;
@@ -275,6 +281,7 @@ export default function EditarHistoriaPage() {
   const [coverPreview, setCoverPreview] =
     useState<string | null>(null);
 
+  const [entryKind, setEntryKind] = useState<ChapterKind>('chapter');
   const [chapterTitle, setChapterTitle] =
     useState('');
 
@@ -454,7 +461,7 @@ export default function EditarHistoriaPage() {
         setDescription(
           normalizedStory.description || ''
         );
-        setStoryMetadata({ fandom: normalizedStory.fandom ?? "", work_has_ai: normalizedStory.work_has_ai ?? false, cover_has_ai: normalizedStory.cover_has_ai ?? false, has_content_warnings: normalizedStory.has_content_warnings ?? false, content_warnings: normalizedStory.content_warnings ?? "", accepts_translation: normalizedStory.accepts_translation ?? false });
+        setStoryMetadata({ series_name: normalizedStory.series_name ?? '', series_volume: normalizedStory.series_volume ?? null, story_kind: normalizedStory.story_kind ?? '', story_format: normalizedStory.story_format ?? '', fandom: normalizedStory.fandom ?? "", work_has_ai: normalizedStory.work_has_ai ?? false, cover_has_ai: normalizedStory.cover_has_ai ?? false, has_content_warnings: normalizedStory.has_content_warnings ?? false, content_warnings: normalizedStory.content_warnings ?? "", accepts_translation: normalizedStory.accepts_translation ?? false });
 
         setStatus(
           normalizedStory.status || ''
@@ -576,6 +583,7 @@ export default function EditarHistoriaPage() {
           normalizedChapter
         );
 
+        setEntryKind(normalizedChapter.entry_kind ?? 'chapter');
         setChapterTitle(
           normalizedChapter.title || ''
         );
@@ -903,7 +911,6 @@ export default function EditarHistoriaPage() {
     try {
       const formData =
         new FormData();
-      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
       formData.append(
         'cover',
@@ -1072,7 +1079,7 @@ export default function EditarHistoriaPage() {
     try {
       const formData =
         new FormData();
-      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
+      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value ?? '')));
 
       formData.append(
         'title',
@@ -1606,6 +1613,7 @@ export default function EditarHistoriaPage() {
         const uploadData =
           new FormData();
 
+        uploadData.set('entry_kind', entryKind);
         uploadData.append(
           'title',
           chapterTitle.trim()
@@ -1735,8 +1743,8 @@ export default function EditarHistoriaPage() {
 
       const formData =
         new FormData();
-      Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value))); 
 
+      formData.set('entry_kind', entryKind);
       formData.append(
         'title',
         chapterTitle.trim()
@@ -2034,6 +2042,7 @@ export default function EditarHistoriaPage() {
     );
 
     setChapter(null);
+    setEntryKind('chapter');
     setChapterTitle('');
     setChapterBody('');
     setAuthorNotes('');
@@ -2394,7 +2403,7 @@ export default function EditarHistoriaPage() {
                       Sinopse
                     </label>
 
-                    <WritingPanel value={description} onChange={setDescription} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
+                    <WritingPanel value={description} onChange={setDescription} /><StoryKindFields value={storyMetadata} onChange={setStoryMetadata} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
                       {description.length}/5000
@@ -2872,10 +2881,16 @@ export default function EditarHistoriaPage() {
                     </div>
                   </div>
 
+                  {storyMetadata.story_kind === 'original' && !chapter.published && <BetaReadingInvite key={chapter.id} chapterId={chapter.id} />}
                   <details className="mb-5 rounded-2xl border border-[#ff9bca]/20 bg-[#ff9bca]/[.04] p-4" open={chapterStatus==='scheduled'||undefined}><summary className="min-h-9 cursor-pointer text-sm font-semibold text-[#ffb9da]">Agendar atualização</summary><div className="mt-4 flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 text-xs text-white/65">Dia e horário de publicação<input type="datetime-local" value={scheduledFor} onChange={e=>setScheduledFor(e.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-[#171018] px-3 text-sm text-white [color-scheme:dark]"/></label><button type="button" disabled={savingChapter||mediaUploading||!scheduledFor} onClick={()=>void saveChapter('scheduled')} className="nook-primary">Agendar capítulo</button></div><p className="mt-3 text-xs leading-6 text-white/50">Horário do seu dispositivo. A atualização fica visível no calendário de quem segue você e é liberada automaticamente no minuto marcado.</p>{chapterStatus==='scheduled'&&<button type="button" disabled={savingChapter} onClick={()=>void saveChapter('draft')} className="mt-2 min-h-11 text-xs text-rose-200">Cancelar agendamento e salvar como rascunho</button>}</details>
                   <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
                     {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="max-h-80 w-full object-cover"/>}
                     <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
+                      <label className="block text-sm font-semibold text-pink-200">No sumário
+                        <select value={entryKind} onChange={event => setEntryKind(event.target.value as ChapterKind)} className="ml-3 min-h-11 rounded-xl border border-pink-300/20 bg-[#171018] px-3 text-white">
+                          {Object.entries(chapterKinds).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
+                        </select>
+                      </label>
                       <input
                         value={
                           chapterTitle
