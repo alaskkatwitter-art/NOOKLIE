@@ -12,6 +12,7 @@ import {
   Menu,
   MessageCircle,
   NotebookPen,
+  Newspaper,
   X,
   UserRound,
   Settings,
@@ -41,6 +42,7 @@ const links = [
 const drawerLinks = [
   ["/chat", "Mensagens", MessageCircle],
   ["/minhas-historias", "Minhas histórias", NotebookPen],
+  ["/noticias", "Jornal Nooklie", Newspaper],
   ["/eventos", "Eventos literários", CalendarDays],
   ["/fandoms", "Meus universos", Sparkles],
   ["/solicitacoes", "Solicitações de seguidores", Users],

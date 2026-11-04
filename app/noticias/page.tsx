@@ -11,26 +11,11 @@ const menu = [
   { label: "Notícias", href: "/noticias" },
 ];
 
-const news = [
-  {
-    category: "Nooklie",
-    title: "Bem-vindo ao Nooklie",
-    description:
-      "Um novo espaço para leitores e escritores descobrirem histórias, criarem universos e encontrarem suas comunidades.",
-  },
-  {
-    category: "Plataforma",
-    title: "Novas ferramentas para escritores",
-    description:
-      "O Nooklie está construindo uma experiência de escrita cada vez mais completa para quem publica histórias e capítulos.",
-  },
-  {
-    category: "Comunidade",
-    title: "Encontre novos fandoms",
-    description:
-      "Explore comunidades diferentes, conheça novos autores e descubra histórias que talvez você nunca encontrasse sozinho.",
-  },
-];
+const welcome = {
+  title: "Bem-vindo ao Nooklie 1.0",
+  description:
+    "O primeiro guia do Jornal Nooklie, com capturas da plataforma e passos para ler, escrever e participar da comunidade.",
+};
 
 export default function NoticiasPage() {
   return (
@@ -90,47 +75,15 @@ export default function NoticiasPage() {
           </div>
         </section>
 
-        <section className="mt-12">
-          <div className="grid gap-5 lg:grid-cols-3">
-            {news.map((item, index) => (
-              <article
-                key={item.title}
-                className={`group rounded-[1.5rem] border border-white/10 bg-[#171018] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#ff78b9]/25 ${
-                  index === 0
-                    ? "lg:col-span-2 lg:row-span-2"
-                    : ""
-                }`}
-              >
-                <div className="mb-8 flex items-center justify-between">
-                  <span className="rounded-full border border-[#ff78b9]/20 bg-[#ff78b9]/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#ff9bca]">
-                    {item.category}
-                  </span>
-
-                  <span className="text-xs text-white/20">
-                    Nooklie
-                  </span>
-                </div>
-
-                <h2
-                  className={`font-black transition group-hover:text-[#ff9bca] ${
-                    index === 0
-                      ? "text-3xl md:text-4xl"
-                      : "text-2xl"
-                  }`}
-                >
-                  {item.title}
-                </h2>
-
-                <p className="mt-4 max-w-xl leading-7 text-white/40">
-                  {item.description}
-                </p>
-
-                <div className="mt-8 text-sm font-semibold text-[#ff78b9] transition group-hover:text-[#ff9bca]">
-                  Leia mais →
-                </div>
-              </article>
-            ))}
-          </div>
+        <section className="mt-12" aria-label="Edições do Jornal Nooklie">
+          <article className="rounded-3xl border border-[#ff78b9]/25 bg-[#171018] p-7 sm:p-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#ff9bca]">Jornal Nooklie · Edição 01</p>
+            <h2 className="mt-4 text-3xl font-black">{welcome.title}</h2>
+            <p className="mt-4 max-w-xl leading-7 text-white/75">{welcome.description}</p>
+            <Link href="/noticias/boas-vindas" className="mt-6 inline-flex font-bold text-[#ff9bca] hover:underline">
+              Ler o guia de boas-vindas →
+            </Link>
+          </article>
         </section>
 
         <section className="mt-12 rounded-[2rem] border border-white/10 bg-[#171018] p-8 text-center md:p-12">
