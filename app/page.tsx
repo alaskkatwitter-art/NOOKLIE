@@ -1,5 +1,6 @@
 "use client";
 
+import OriginalsShelf from '@/components/OriginalsShelf';
 import Link from "next/link";
 import AuthStatus from "../components/AuthStatus";
 
@@ -201,6 +202,7 @@ export default function Home() {
           </Link>
         </section>
 
+      <OriginalsShelf />
         <section className="pb-16">
           <SectionHeading
             title="Fandoms"

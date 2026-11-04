@@ -1,5 +1,7 @@
 'use client';
 
+import { storyFormats } from '@/lib/stories/metadata';
+
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -116,6 +118,7 @@ export default function TagFilters({ currentUser }: Props) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
+    if (key === 'kind' && value === 'fanfic') next.delete('format');
     navigate(next);
   }
 
@@ -211,7 +214,23 @@ export default function TagFilters({ currentUser }: Props) {
         </button>
       </div>
 
+      <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Tipo de obra">
+        {([['', 'Todas'], ['original', 'Originais'], ['fanfic', 'Fanfics']] as const).map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={(params.get('kind') || '') === value} onClick={() => setSingleFilter('kind', value)} className="min-h-11 rounded-full border border-pink-300/20 px-4 text-sm font-semibold text-pink-100 aria-pressed:bg-pink-300 aria-pressed:text-[#200f1b]">
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {params.get('kind') !== 'fanfic' && (
+          <label className="grid gap-1.5 text-xs text-white/65">
+            Formato literário
+            <select value={params.get('format') || ''} onChange={event => setSingleFilter('format', event.target.value)} className={filterClass()}>
+              <option value="">Todos os formatos</option>
+              {Object.entries(storyFormats).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
+        )}
         <label className="grid gap-1.5 text-xs text-white/45">
           Categoria da tag
           <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={filterClass()}>
@@ -238,6 +257,7 @@ export default function TagFilters({ currentUser }: Props) {
           Ordenar por
           <select value={params.get('sort') || 'updated'} onChange={(event) => setSingleFilter('sort', event.target.value === 'updated' ? '' : event.target.value)} className={filterClass()}>
             <option value="updated">Atualizadas recentemente</option>
+            <option value="debut">Estreias recentes</option>
             <option value="newest">Publicadas recentemente</option>
             <option value="title_asc">Título: A–Z</option>
             <option value="title_desc">Título: Z–A</option>

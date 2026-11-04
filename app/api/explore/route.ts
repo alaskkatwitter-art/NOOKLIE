@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { storyFormats, storyKinds } from '@/lib/stories/metadata';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabase = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY!);
@@ -13,6 +14,8 @@ function slugify(value: string) {
 type StoryRow = {
   id: string;
   author_id: string;
+  story_kind?: string;
+  story_format?: string;
   title: string;
   description: string | null;
   cover_url: string | null;
@@ -84,6 +87,11 @@ export async function GET(request: Request) {
     const excludedTagSlugs = Array.from(new Set(searchParams.getAll('excludeTag').map(slugify).filter(Boolean))).slice(0, 12);
     const rating = searchParams.get('rating') || null;
     const storyStatus = searchParams.get('status') || null;
+    const kind = searchParams.get('kind') || null;
+    const format = searchParams.get('format') || null;
+    if ((kind && !Object.hasOwn(storyKinds, kind)) || (format && !Object.hasOwn(storyFormats, format))) {
+      return NextResponse.json({ error: 'Tipo de obra ou formato inválido.' }, { status: 400 });
+    }
     const sort = searchParams.get('sort') || 'updated';
     const requestedPage = Number(searchParams.get('page') || '1');
     if (!Number.isInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000) {
@@ -96,7 +104,7 @@ export async function GET(request: Request) {
     if (storyStatus && !['Em andamento', 'Concluída'].includes(storyStatus)) {
       return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
     }
-    if (!['updated', 'newest', 'title_asc', 'title_desc'].includes(sort)) {
+    if (!['updated', 'newest', 'debut', 'title_asc', 'title_desc'].includes(sort)) {
       return NextResponse.json({ error: 'Ordenação inválida.' }, { status: 400 });
     }
 
@@ -186,7 +194,9 @@ export async function GET(request: Request) {
      * =========================================================
      */
 
-    const { data: stories, error: storiesError } = await supabase.rpc('search_visible_stories', {
+    const { data: stories, error: storiesError } = await supabase.rpc('search_catalog_stories', {
+      p_kind: kind,
+      p_format: format,
       p_viewer: currentProfileId,
       p_query: query || null,
       p_include_slugs: includedTagSlugs,
@@ -386,6 +396,8 @@ export async function GET(request: Request) {
       (story) => ({
         id: story.id,
         title: story.title,
+        story_kind: story.story_kind,
+        story_format: story.story_format,
         description: story.description,
         cover_url: story.cover_url,
         status: story.status,

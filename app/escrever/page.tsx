@@ -20,7 +20,7 @@ export default function EscreverPage() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-base leading-7 text-white/50 md:text-lg">
-              Crie sua obra, organize capítulos, escolha seus fandoms e
+              Publique uma obra original ou fanfic, organize capítulos e
               publique suas histórias no Nooklie.
             </p>
 

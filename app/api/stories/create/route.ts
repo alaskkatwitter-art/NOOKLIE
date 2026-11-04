@@ -285,8 +285,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            storyError?.message ||
-            'Não foi possível criar a história.',
+            storyError?.code === '23505' ? 'Já existe um livro com esse número nesta série.' : 'Não foi possível criar a história.',
         },
         { status: 500 }
       );

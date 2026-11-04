@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { chapterKinds, type ChapterKind, type SeriesBook } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useEffect,
@@ -19,6 +21,7 @@ import { readerFontFamily } from '@/lib/reader/preferences';
 type Chapter = {
   id: string;
   story_id?: string;
+  entry_kind?: ChapterKind;
   chapter_number: number;
   title: string;
   body?: string;
@@ -95,6 +98,7 @@ export default function CapituloPage() {
   const [previousChapter, setPreviousChapter] =
     useState<Chapter | null>(null);
 
+  const [nextBook, setNextBook] = useState<SeriesBook | null>(null);
   const [nextChapter, setNextChapter] =
     useState<Chapter | null>(null);
 
@@ -207,6 +211,7 @@ export default function CapituloPage() {
         }
 
         setChapter(data.chapter);
+        setNextBook(null);
 
         setMedia(
           Array.isArray(data.media)
@@ -269,6 +274,9 @@ export default function CapituloPage() {
           await response.json();
 
         if (!cancelled) {
+          const books: SeriesBook[] = data.story?.series_books ?? [];
+          const current = books.findIndex(book => book.id === storyId);
+          setNextBook(current >= 0 && data.story?.status === 'Concluída' ? books[current + 1] ?? null : null);
           setChapters(
             Array.isArray(data.chapters)
               ? data.chapters
@@ -1075,8 +1083,7 @@ export default function CapituloPage() {
         {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="mb-8 max-h-96 w-full rounded-3xl object-cover"/>}
         <header className="chapter-heading mb-10 border-b border-[#ff9bca]/15 pb-8 text-center">
           <p className="text-sm text-[#ff4f9a] mb-2">
-            Capítulo{' '}
-            {chapter.chapter_number}
+            {chapter.entry_kind && chapter.entry_kind !== 'chapter' ? chapterKinds[chapter.entry_kind] : `Capítulo ${chapter.chapter_number}`}
           </p>
 
           <h1 className="text-3xl font-bold">
@@ -2015,7 +2022,9 @@ export default function CapituloPage() {
               </span>
             </button>
           ) : (
-            <div className="flex-1" />
+            nextBook && chapter.published ? (
+              <Link href={`/historia/${nextBook.id}`} className="nook-primary ml-auto text-right">Próximo livro · {nextBook.title} →</Link>
+            ) : <div className="flex-1" />
           )}
         </nav>
       </div>

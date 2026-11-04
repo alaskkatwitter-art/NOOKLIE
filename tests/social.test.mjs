@@ -5,7 +5,7 @@ before(async()=>{await db.exec(`
     create table auth_accounts(id uuid primary key,account_status text default 'active');
     create table profiles(id uuid primary key,user_id uuid,username text,display_name text,moderation_hidden_at timestamptz);
     create table stories(id uuid primary key,author_id uuid,title text,description text,cover_url text,status text,rating text,created_at timestamptz default now(),updated_at timestamptz default now(),moderation_hidden_at timestamptz,fandom text default '',work_has_ai boolean default false,cover_has_ai boolean default false,has_content_warnings boolean default false,content_warnings text default '');
-    create table chapters(id uuid primary key,story_id uuid,title text,chapter_number int,published boolean,created_at timestamptz default now(),original_published_at timestamptz);
+    create table chapters(id uuid primary key,story_id uuid,title text,chapter_number int,body text,published boolean,created_at timestamptz default now(),original_published_at timestamptz);
     create table tag_categories(id uuid primary key,name text,slug text);
     create table tags(id uuid primary key,name text,slug text,category_id uuid);
     create table story_tags(story_id uuid,tag_id uuid);
@@ -36,8 +36,58 @@ create table nook_saved_posts(id uuid default gen_random_uuid(),post_id uuid,use
 create table reading_lists(id uuid primary key,user_id uuid);create table reading_list_items(id uuid default gen_random_uuid(),list_id uuid,story_id uuid);
 create table posts(id uuid default gen_random_uuid(),user_id uuid,chapter_id uuid);create table post_likes(post_id uuid,user_id uuid);
 create table nook_post_media(id uuid);create table chapter_media(id uuid);create table social_stories(id uuid);
-`);const files=await readdir(new URL('../supabase/migrations/',import.meta.url));await db.exec(await readFile(new URL('../supabase/migrations/'+files.find(f=>f.endsWith('_personalized_discovery.sql')),import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261102195927_private_chat_social_privacy.sql',import.meta.url),'utf8'));});after(()=>db.close());
+`);const files=await readdir(new URL('../supabase/migrations/',import.meta.url));await db.exec(await readFile(new URL('../supabase/migrations/'+files.find(f=>f.endsWith('_personalized_discovery.sql')),import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261102195927_private_chat_social_privacy.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261104120000_original_story_catalog.sql',import.meta.url),'utf8'));});after(()=>db.close());
 test('private profiles require owner-approved follows and disappear from public search',async()=>{await db.exec(`update profiles set is_private=true where id='${id(102)}'`);assert.equal((await rows(`select profile_content_allowed('${id(102)}',null) ok`))[0].ok,false);assert.equal((await rows("select count(*)::int n from search_public_stories('Hogwarts')"))[0].n,0);await rows(`select social_follow('reader-token','${id(102)}','follow')`);assert.equal((await rows('select count(*)::int n from follows'))[0].n,0);await assert.rejects(rows(`select social_follow('reader-token','${id(102)}','accept')`));await rows(`select social_follow('writer-token','${id(101)}','accept')`);assert.equal((await rows(`select profile_content_allowed('${id(102)}','${id(101)}') ok`))[0].ok,true);assert.equal((await rows(`select count(*)::int n from search_visible_stories('${id(101)}','Hogwarts')`))[0].n,1);});
 test('chat acceptance, blocks, sessions and same-thread replies are enforced in SQL',async()=>{assert.equal((await rows("select social_actor('forged') id"))[0].id,null);assert.equal((await rows("select social_actor('suspended-token') id"))[0].id,null);const t=(await rows(`select chat_request('reader-token','${id(102)}') id`))[0].id;await assertFalse(`select chat_send('reader-token','${t}','${id(700)}','encrypted')`);await assertFalse(`select chat_action('reader-token','${t}','accept')`);await rows(`select chat_action('writer-token','${t}','accept')`);await rows(`select chat_send('reader-token','${t}','${id(700)}','encrypted')`);await rows(`select chat_send('writer-token','${t}','${id(701)}','encrypted','${id(700)}')`);await assertFalse(`select chat_send('reader-token','${t}','${id(702)}','encrypted','${id(999)}')`);await rows(`select chat_action('writer-token','${t}','block')`);await assertFalse(`select chat_send('reader-token','${t}','${id(703)}','encrypted')`);await assert.rejects(rows(`select chat_request('reader-token','${id(102)}')`));await rows(`select chat_action('writer-token','${t}','unblock')`);await rows(`select chat_action('writer-token','${t}','deny')`);assert.equal((await rows(`select status from chat_threads where id='${t}'`))[0].status,'spam');});
 test('interaction notifications cover comments, reactions, saves, quotes and chapter subscriptions without self notifications',async()=>{await db.exec(`insert into chapter_likes values('${id(301)}','${id(101)}');insert into chapter_favorites values('${id(301)}','${id(101)}',now());insert into comments(id,chapter_id,user_id,body)values('${id(800)}','${id(301)}','${id(101)}','legal');insert into comment_likes values('${id(800)}','${id(102)}');insert into nook_posts(id,user_id,story_id,body)values('${id(801)}','${id(101)}','${id(201)}','leiam');insert into nook_comments(id,post_id,author_id,content)values('${id(802)}','${id(801)}','${id(102)}','oi');insert into nook_post_reactions(post_id,user_id)values('${id(801)}','${id(102)}');insert into nook_comment_reactions(comment_id,user_id)values('${id(802)}','${id(101)}');insert into nook_saved_posts(post_id,user_id)values('${id(801)}','${id(102)}');insert into reading_lists values('${id(803)}','${id(101)}');insert into reading_list_items(list_id,story_id)values('${id(803)}','${id(201)}');insert into posts(user_id,chapter_id)values('${id(101)}','${id(301)}');insert into chapters(id,story_id,title,chapter_number,published)values('${id(804)}','${id(201)}','Novo',2,true);`);const kinds=new Set((await rows('select notification_type from user_notifications')).map(r=>r.notification_type));for(const k of ['chapter_likes','chapter_favorites','comments','comment_likes','nook_posts','nook_comments','nook_post_reactions','nook_comment_reactions','nook_saved_posts','reading_list_items','posts','chapter_release'])assert.ok(kinds.has(k),k);const before=(await rows('select count(*)::int n from user_notifications'))[0].n;await db.exec(`insert into chapter_likes values('${id(301)}','${id(102)}')`);assert.equal((await rows('select count(*)::int n from user_notifications'))[0].n,before);});
 test('browser roles cannot bypass chat/profile privacy and every account gets one safety notice',async()=>{for(const role of ['anon','authenticated'])for(const table of ['chat_threads','chat_messages','chat_reports','follow_requests','stories','chapters'])assert.equal((await rows(`select has_table_privilege('${role}','public.${table}','SELECT') ok`))[0].ok,false);assert.equal((await rows("select count(*)::int n from user_notifications where source_key='chat-safety-v1'"))[0].n,3);await db.exec(`insert into auth_accounts(id)values('${id(4)}')`);assert.equal((await rows("select count(*)::int n from user_notifications where source_key='chat-safety-v1'"))[0].n,4);});
+
+
+test('original catalogue, series and highlights respect publication and profile visibility', async () => {
+  await db.exec(`
+    update profiles set is_private=false where id='${id(102)}';
+    update stories set story_kind='original', story_format='conto', series_name='Lua', series_volume=1 where id='${id(202)}';
+    update stories set story_kind='original', story_format='conto', series_name='lua', series_volume=2 where id='${id(206)}';
+    update stories set story_kind='original', story_format='conto', series_name='Lua', series_volume=3 where id='${id(204)}';
+    update stories set story_kind='fanfic' where id='${id(201)}';
+    update chapters set original_published_at='2026-10-01' where id='${id(302)}';
+    update chapters set original_published_at='2026-10-02' where id='${id(306)}';
+  `);
+  const catalogue = await rows("select id from search_catalog_stories(p_kind=>'original',p_format=>'conto',p_sort=>'debut')");
+  assert.deepEqual(catalogue.map(row => row.id), [id(206), id(202)]);
+  assert.deepEqual((await rows(`select id from list_story_series('${id(202)}',null)`)).map(row => row.id), [id(202), id(206)]);
+  await assert.rejects(rows(`update stories set series_volume=1 where id='${id(206)}'`), /duplicate key/);
+  await assertFalse(`select pin_profile_story('${id(101)}','${id(202)}')`);
+  await assertFalse(`select pin_profile_story('${id(102)}','${id(204)}')`);
+  assert.equal((await rows(`select pin_profile_story('${id(102)}','${id(202)}') ok`))[0].ok, true);
+  await db.exec(`update profiles set is_private=true where id='${id(102)}'`);
+  assert.deepEqual(await rows("select id from search_catalog_stories(p_kind=>'original')"), []);
+  assert.deepEqual(await rows(`select id from list_story_series('${id(202)}',null)`), []);
+});
+
+test('beta drafts and notes are visible only to the author and the accepted reader until revocation', async () => {
+  const author = id(102), reader = id(101), outsider = id(103), chapter = id(304);
+  await db.exec(`update stories set story_kind='original' where id='${id(204)}'; update chapters set body='Segredo do rascunho' where id='${chapter}'`);
+  const action = async (actor, verb, args = '') => (await rows(`select beta_reading_action('${actor}','${verb}'${args}) data`))[0].data;
+  assert.equal(await action(reader, 'invite', `, null, '${chapter}', 'writer'`), null);
+  assert.equal(await action(author, 'invite', `, null, '${chapter}', 'reader'`), true);
+  const [{ id: invite }] = await action(reader, 'list');
+  const args = `, '${invite}'`;
+  assert.equal(await action(reader, 'read', args), null);
+  assert.equal(await action(outsider, 'accept', args), null);
+  assert.equal(await action(author, 'accept', args), null);
+  assert.equal(await action(reader, 'accept', args), true);
+  assert.equal((await action(reader, 'read', args)).body, 'Segredo do rascunho');
+  assert.equal(await action(reader, 'note', args + ", null, null, 'Segredo', 'Gostei da abertura'"), true);
+  assert.equal((await action(author, 'read', args)).notes[0].body, 'Gostei da abertura');
+  assert.equal(await action(outsider, 'read', args), null);
+  assert.equal(await action(author, 'revoke', args), true);
+  assert.equal(await action(reader, 'read', args), null);
+  assert.equal(await action(reader, 'note', args + ", null, null, '', 'Sem acesso'"), null);
+  assert.deepEqual(await action(reader, 'list'), []);
+  for (const role of ['anon', 'authenticated']) {
+    assert.equal((await rows(`select has_table_privilege('${role}','public.beta_reading_invites','SELECT') ok`))[0].ok, false);
+    assert.equal((await rows(`select has_table_privilege('${role}','public.beta_reading_notes','SELECT') ok`))[0].ok, false);
+    assert.equal((await rows(`select has_function_privilege('${role}','public.beta_reading_action(uuid,text,uuid,uuid,text,text,text)','EXECUTE') ok`))[0].ok, false);
+  }
+});

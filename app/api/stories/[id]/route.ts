@@ -132,7 +132,7 @@ export async function GET(
         cover_url,
         status,
         rating,
-        has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
+        story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
         created_at,
         updated_at,
         moderation_hidden_at
@@ -234,6 +234,7 @@ export async function GET(
           id,
           story_id,
           chapter_number,
+          entry_kind,
           title,
           body,
           published,
@@ -511,10 +512,15 @@ export async function GET(
      * ==================================================
      */
 
+    const series = story.series_volume
+      ? await supabase.rpc('list_story_series', { p_story: id, p_viewer: currentUserId })
+      : null;
+
     return NextResponse.json(
       {
         story: {
           ...story,
+          series_books: series?.data ?? [],
 
           author:
             author || null,
@@ -1009,7 +1015,7 @@ export async function PUT(
         cover_url,
         status,
         rating,
-        has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
+        story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
         created_at,
         updated_at
       `)
@@ -1036,7 +1042,7 @@ export async function PUT(
       return NextResponse.json(
         {
           error:
-            'Não foi possível atualizar a história.',
+            updateError.code === '23505' ? 'Já existe um livro com esse número nesta série.' : 'Não foi possível atualizar a história.',
         },
         {
           status: 500,

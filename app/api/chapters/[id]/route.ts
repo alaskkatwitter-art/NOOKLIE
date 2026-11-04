@@ -1,3 +1,4 @@
+import { chapterKinds } from '@/lib/stories/metadata';
 import {chatActor} from '@/lib/chat/server';
 import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
@@ -176,6 +177,7 @@ export async function GET(
           id,
           story_id,
           chapter_number,
+          entry_kind,
           title,
           body,
           published,
@@ -409,6 +411,7 @@ export async function PUT(
         id,
         story_id,
         chapter_number,
+          entry_kind,
         title,
         body,
         published,
@@ -502,6 +505,11 @@ export async function PUT(
 
     const formData =
       await request.formData();
+
+    const entryKind = formData.get('entry_kind');
+    if (entryKind !== null && (typeof entryKind !== 'string' || !Object.hasOwn(chapterKinds, entryKind))) {
+      return NextResponse.json({ error: 'Tipo de capítulo inválido.' }, { status: 400 });
+    }
 
     const titleValue =
       formData.get('title');
@@ -761,6 +769,7 @@ export async function PUT(
     } = await supabase
       .from('chapters')
       .update({
+        ...(entryKind !== null ? { entry_kind: entryKind } : {}),
         title,
         body,
         author_notes:
@@ -777,6 +786,7 @@ export async function PUT(
         id,
         story_id,
         chapter_number,
+          entry_kind,
         title,
         body,
         published,

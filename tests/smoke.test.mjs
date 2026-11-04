@@ -72,8 +72,8 @@ before(async () => {
     { id: 'tag-terror', name: 'Terror', slug: 'terror', category_id: categoryIds['content-warning'], created_at: new Date().toISOString() },
   ];
   state.discoveryStories = [
-    { id: 'story-filter-one', author_id: userId, title: 'Dragões e Romance', description: 'Uma aventura', cover_url: null, status: 'Concluída', rating: '12', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
-    { id: 'story-filter-two', author_id: userId, title: 'Fantasia sombria', description: 'Um mistério', cover_url: null, status: 'Em andamento', rating: '18', created_at: '2026-10-03T00:00:00.000Z', updated_at: '2026-10-04T00:00:00.000Z' },
+    { id: 'story-filter-one', story_kind: 'original', story_format: 'conto', author_id: userId, title: 'Dragões e Romance', description: 'Uma aventura', cover_url: null, status: 'Concluída', rating: '12', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
+    { id: 'story-filter-two', story_kind: 'fanfic', author_id: userId, title: 'Fantasia sombria', description: 'Um mistério', cover_url: null, status: 'Em andamento', rating: '18', created_at: '2026-10-03T00:00:00.000Z', updated_at: '2026-10-04T00:00:00.000Z' },
     { id: 'story-filter-draft', author_id: userId, title: 'Rascunho de fantasia', description: 'Ainda não publicada', cover_url: null, status: 'Concluída', rating: '12', created_at: '2026-10-05T00:00:00.000Z', updated_at: '2026-10-06T00:00:00.000Z' },
   ];
   state.storyTags = [
@@ -145,7 +145,7 @@ before(async () => {
       return sendJson(response, count <= p_limit);
     }
 
-    if ((path === 'rpc/search_public_stories' || path === 'rpc/search_visible_stories') && request.method === 'POST') {
+    if ((path === 'rpc/search_public_stories' || path === 'rpc/search_visible_stories' || path === 'rpc/search_catalog_stories') && request.method === 'POST') {
       let body = '';
       for await (const chunk of request) body += chunk;
       const input = JSON.parse(body);
@@ -162,6 +162,8 @@ before(async () => {
         return (!query || `${story.title} ${story.description || ''}`.toLowerCase().includes(query)) &&
           (input.p_include_slugs || []).every((slug) => slugs.includes(slug)) &&
           !(input.p_exclude_slugs || []).some((slug) => slugs.includes(slug)) &&
+          (!input.p_kind || story.story_kind === input.p_kind) &&
+          (!input.p_format || story.story_format === input.p_format) &&
           (!input.p_rating || story.rating === input.p_rating) &&
           (!input.p_status || story.status === input.p_status) &&
           state.chapters.some((chapter) => chapter.story_id === story.id && chapter.published);
@@ -489,6 +491,16 @@ test('signed-in readers can publish a categorized tag immediately and duplicates
   assert.equal((await duplicate.json()).created, false);
 });
 
+
+test('originals can be discovered by type and literary format', async () => {
+  const response = await fetch(`${baseUrl}/api/explore?kind=original&format=conto&sort=debut`);
+  assert.equal(response.status, 200);
+  const { stories } = await response.json();
+  assert.deepEqual(stories.map(story => [story.title, story.story_kind, story.story_format]), [
+    ['Dragões e Romance', 'original', 'conto'],
+  ]);
+  assert.equal((await fetch(`${baseUrl}/api/explore?kind=invalido`)).status, 400);
+});
 
 test('story discovery can continue to the next page', async () => {
   const firstResponse = await fetch(`${baseUrl}/api/explore`);
