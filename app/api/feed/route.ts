@@ -1,7 +1,7 @@
 import { visibleReposts } from '@/lib/social/posts';
 import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
 import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
 
@@ -19,37 +19,10 @@ const ALLOWED_REACTIONS = [
   '🔥',
 ];
 
-async function getCurrentUserId(request: Request) {
+
+export async function GET() {
   try {
-    const meResponse = await fetch(
-      new URL('/api/auth/me', request.url),
-      {
-        headers: {
-          cookie: (await cookies()).toString(),
-        },
-        cache: 'no-store',
-      }
-    );
-
-    const meData = await meResponse.json();
-
-    if (
-      !meResponse.ok ||
-      !meData.authenticated ||
-      !meData.user?.id
-    ) {
-      return null;
-    }
-
-    return meData.user.id as string;
-  } catch {
-    return null;
-  }
-}
-
-export async function GET(request: Request) {
-  try {
-    const userId = await getCurrentUserId(request);
+    const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(

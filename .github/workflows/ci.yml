@@ -65,6 +65,7 @@ jobs:
           path: ci-dependencies
       - run: cp ci-dependencies/package.json ci-dependencies/package-lock.json .
       - run: npm ci --no-audit --no-fund
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run build
       - run: npm test

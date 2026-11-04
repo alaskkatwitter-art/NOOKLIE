@@ -1,5 +1,7 @@
+import { contentMediaUrl } from '@/lib/security/content-media';
+import { privateHeaders } from '@/lib/discovery/server';
 import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
-import {getPublicProfileIds} from '@/lib/moderation/content-visibility';
+import {currentViewerProfileId, getPublicProfileIds} from '@/lib/moderation/content-visibility';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,69 +36,6 @@ const ALLOWED_TYPES = [
   'image/gif',
 ];
 
-async function getCurrentUser() {
-  try {
-    const response =
-      await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/auth/me`,
-        {
-          headers: {
-            cookie:
-              '',
-          },
-          cache: 'no-store',
-        }
-      );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data =
-      await response.json();
-
-    return data?.user || null;
-  } catch {
-    return null;
-  }
-}
-
-async function getAuthenticatedUser(
-  request: Request
-) {
-  try {
-    const cookie =
-      request.headers.get(
-        'cookie'
-      ) || '';
-
-    const response =
-      await fetch(
-        new URL(
-          '/api/auth/me',
-          request.url
-        ),
-        {
-          headers: {
-            cookie,
-          },
-          cache: 'no-store',
-        }
-      );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data =
-      await response.json();
-
-    return data?.user || null;
-  } catch {
-    return null;
-  }
-}
-
 function getStoragePathFromPublicUrl(
   url: string
 ) {
@@ -117,33 +56,18 @@ function getStoragePathFromPublicUrl(
   );
 }
 
-export async function GET(
-  request: Request
-) {
+export async function GET() {
   try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
+    const userId = await currentViewerProfileId(supabaseAdmin);
 
-    if (!user?.id) {
+    if (!userId) {
       return NextResponse.json(
         {
           stories: [],
-        }
+        },
+        { headers: privateHeaders }
       );
     }
-
-    /*
-     * Remove Stories expirados.
-     */
-    await supabaseAdmin
-      .from('social_stories')
-      .delete()
-      .lt(
-        'expires_at',
-        new Date().toISOString()
-      );
 
     /*
      * Descobre quem o usuário segue.
@@ -159,7 +83,7 @@ export async function GET(
         )
         .eq(
           'follower_id',
-          user.id
+          userId
         );
 
     if (followsError) {
@@ -176,7 +100,7 @@ export async function GET(
       );
 
     const userIds = [
-      user.id,
+      userId,
       ...followedIds,
     ];
 
@@ -245,6 +169,7 @@ export async function GET(
       (stories || []).filter(s=>allowed.has(s.user_id)).map(
         (story: any) => ({
           ...story,
+          media_url: contentMediaUrl(story.media_url),
           user: Array.isArray(
             story.user
           )
@@ -259,7 +184,8 @@ export async function GET(
       {
         stories:
           normalizedStories,
-      }
+      },
+      { headers: privateHeaders }
     );
   } catch (error) {
     console.error(
@@ -286,12 +212,9 @@ export async function POST(
     null;
 
   try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
+    const userId = await currentViewerProfileId(supabaseAdmin);
 
-    if (!user?.id) {
+    if (!userId) {
       return NextResponse.json(
         {
           error:
@@ -317,7 +240,7 @@ export async function POST(
         )
         .eq(
           'id',
-          user.id
+          userId
         )
         .maybeSingle();
 
@@ -361,11 +284,6 @@ export async function POST(
     const thoughtValue =
       formData.get(
         'thought'
-      );
-
-    const captionValue =
-      formData.get(
-        'caption'
       );
 
     if (!(file instanceof File)) {
@@ -443,43 +361,10 @@ export async function POST(
         );
     }
 
-    /*
-     * Legenda fica preparada,
-     * mas não é salva porque a tabela
-     * atualmente não possui coluna caption.
-     */
-    const caption =
-      typeof captionValue ===
-      'string'
-        ? captionValue.trim()
-        : '';
-
-    console.log(
-      '[SOCIAL STORIES] Publicando Story:',
-      {
-        userId: user.id,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        thought:
-          thought || null,
-        caption:
-          caption || null,
-      }
-    );
-
-    /*
-     * Caminho único no Storage.
-     */
-    const extension =
-      file.name
-        .split('.')
-        .pop()
-        ?.toLowerCase() ||
-      'jpg';
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
 
     const storagePath =
-      `${user.id}/${crypto.randomUUID()}.${extension}`;
+      `${userId}/${crypto.randomUUID()}.${extension}`;
 
     uploadedPath =
       storagePath;
@@ -507,6 +392,7 @@ export async function POST(
           {
             contentType:
               file.type,
+            cacheControl: '0',
             upsert: false,
           }
         );
@@ -600,7 +486,7 @@ export async function POST(
         )
         .insert({
           user_id:
-            user.id,
+            userId,
           media_url:
             mediaUrl,
           media_type:
@@ -659,20 +545,17 @@ export async function POST(
 
     uploadedPath = null;
 
-    console.log(
-      '[SOCIAL STORIES] Story publicado:',
-      story.id
-    );
-
     return NextResponse.json(
       {
         story: {
           ...story,
+          media_url: contentMediaUrl(story.media_url),
           user: profile,
         },
       },
       {
         status: 201,
+        headers: privateHeaders,
       }
     );
   } catch (error) {
@@ -713,12 +596,9 @@ export async function DELETE(
   request: Request
 ) {
   try {
-    const user =
-      await getAuthenticatedUser(
-        request
-      );
+    const userId = await currentViewerProfileId(supabaseAdmin);
 
-    if (!user?.id) {
+    if (!userId) {
       return NextResponse.json(
         {
           error:
@@ -765,7 +645,7 @@ export async function DELETE(
         )
         .eq(
           'user_id',
-          user.id
+          userId
         )
         .maybeSingle();
 
@@ -812,7 +692,7 @@ export async function DELETE(
         )
         .eq(
           'user_id',
-          user.id
+          userId
         );
 
     if (deleteError) {

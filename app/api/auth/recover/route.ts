@@ -34,6 +34,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Username ou chave de recuperação incorretos.' }, { status: 401, headers: noStoreHeaders() });
     }
 
+    if (bcrypt.truncates(newPassword)) {
+      return NextResponse.json(
+        { error: 'A senha deve ter até 72 bytes. Acentos e emojis podem ocupar mais de um byte.' },
+        { status: 400, headers: noStoreHeaders() }
+      );
+    }
+
     const clientIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const limiterKeys = [
       { value: `recovery:user:${username}:ip:${clientIp}`, limit: 10 },

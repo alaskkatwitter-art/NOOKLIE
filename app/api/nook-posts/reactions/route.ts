@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
 import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
 
@@ -17,29 +17,6 @@ const ALLOWED_EMOJIS = [
   '🔥',
 ];
 
-async function getCurrentUserId(request: Request) {
-  const meResponse = await fetch(
-    new URL('/api/auth/me', request.url),
-    {
-      headers: {
-        cookie: (await cookies()).toString(),
-      },
-      cache: 'no-store',
-    }
-  );
-
-  const meData = await meResponse.json();
-
-  if (
-    !meResponse.ok ||
-    !meData.authenticated ||
-    !meData.user?.id
-  ) {
-    return null;
-  }
-
-  return meData.user.id as string;
-}
 
 /*
  * POST
@@ -56,7 +33,7 @@ async function getCurrentUserId(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const userId = await getCurrentUserId(request);
+    const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -240,7 +217,7 @@ export async function POST(request: Request) {
 
 export async function GET(request:Request){
  try{
- const userId=await getCurrentUserId(request);if(!userId)return NextResponse.json({error:'Entre na sua conta.'},{status:401});
+ const userId=await currentViewerProfileId(supabase);if(!userId)return NextResponse.json({error:'Entre na sua conta.'},{status:401});
  const id=new URL(request.url).searchParams.get('post_id');if(!id||!await isPublicPostVisible(supabase,id))return NextResponse.json({error:'Publicação indisponível.'},{status:404});
  const [reactions,comments]=await Promise.all([supabase.from('nook_post_reactions').select('emoji,user_id').eq('post_id',id),supabase.from('nook_comments').select('id',{count:'exact',head:true}).eq('post_id',id)]);
  if(reactions.error||comments.error)throw reactions.error||comments.error;

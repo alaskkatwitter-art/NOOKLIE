@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { rateLimitKey } from '@/lib/security/rate-key';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,9 +13,9 @@ export async function POST(request: Request) {
   try {
     const { username, password, officialSignupCode } = await request.json();
 
-    const cleanUsername = username?.trim().toLowerCase();
+    const cleanUsername = typeof username === 'string' ? username.trim().toLowerCase() : '';
 
-    if (!cleanUsername || !password) {
+    if (!cleanUsername || typeof password !== 'string' || !password) {
       return NextResponse.json(
         { error: 'Username e senha são obrigatórios.' },
         { status: 400 }
@@ -35,6 +36,30 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'A senha precisa ter pelo menos 8 caracteres.' },
         { status: 400 }
+      );
+    }
+
+    if (bcrypt.truncates(password)) {
+      return NextResponse.json(
+        { error: 'A senha deve ter até 72 bytes. Acentos e emojis podem ocupar mais de um byte.' },
+        { status: 400 }
+      );
+    }
+
+    const windowSeconds = 15 * 60;
+    const clientIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const { data: allowed, error: limitError } = await supabase.rpc('consume_auth_rate_limit', {
+      p_key_hash: rateLimitKey('signup:ip', clientIp),
+      p_limit: 20,
+      p_window_seconds: windowSeconds,
+    });
+    if (limitError || typeof allowed !== 'boolean') {
+      return NextResponse.json({ error: 'Não foi possível criar a conta agora.' }, { status: 503 });
+    }
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
+        { status: 429, headers: { 'Retry-After': String(windowSeconds) } }
       );
     }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -7,29 +7,6 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-async function getCurrentUserId(request: Request) {
-  const meResponse = await fetch(
-    new URL('/api/auth/me', request.url),
-    {
-      headers: {
-        cookie: (await cookies()).toString(),
-      },
-      cache: 'no-store',
-    }
-  );
-
-  const meData = await meResponse.json();
-
-  if (
-    !meResponse.ok ||
-    !meData.authenticated ||
-    !meData.user?.id
-  ) {
-    return null;
-  }
-
-  return meData.user.id as string;
-}
 
 /*
  * PATCH
@@ -48,7 +25,7 @@ export async function PATCH(
   }
 ) {
   try {
-    const userId = await getCurrentUserId(request);
+    const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -356,7 +333,7 @@ export async function PATCH(
  * O usuário só pode excluir os próprios posts.
  */
 export async function DELETE(
-  request: Request,
+  _request: Request,
   context: {
     params: Promise<{
       id: string;
@@ -364,7 +341,7 @@ export async function DELETE(
   }
 ) {
   try {
-    const userId = await getCurrentUserId(request);
+    const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(

@@ -595,3 +595,28 @@ test('notifications route renders an inbox and reads only the signed-in account 
   assert.equal((await fetch(baseUrl+'/api/notifications',{method:'PATCH',headers,body:JSON.stringify({all:true})})).status,200);
   const refreshed=await (await fetch(baseUrl+'/api/notifications',{headers})).json();assert.equal(refreshed.unread_count,0);assert.equal(state.notifications[1].read_at,null);
 });
+
+test('credential routes reject cross-site requests and oversized new passwords', async () => {
+  const headers = { 'Content-Type': 'application/json' };
+  for (const path of ['/api/auth/login', '/api/auth/signup', '/api/auth/recover', '/api/stories']) {
+    const response = await fetch(baseUrl + path, {
+      method: 'POST', headers: { ...headers, Origin: 'https://foreign.example' }, body: '{}',
+    });
+    assert.equal(response.status, 403, path);
+  }
+  const response = await fetch(baseUrl + '/api/auth/signup', {
+    method: 'POST',
+    headers: { ...headers, Origin: baseUrl },
+    body: JSON.stringify({ username: 'owner', password: 'á'.repeat(37) }),
+  });
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /72 bytes/);
+  assert.match(response.headers.get('cache-control'), /no-store/);
+});
+
+test('anonymous readers cannot fetch a social Story image from the media proxy', async () => {
+  const response = await fetch(baseUrl + '/api/content-media?bucket=social-stories&path=user-other%2Fstory.png');
+  assert.equal(response.status, 404);
+  assert.match(response.headers.get('cache-control'), /private/);
+  assert.match(response.headers.get('cache-control'), /no-store/);
+});

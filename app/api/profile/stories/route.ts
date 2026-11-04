@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -7,35 +7,12 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    /*
-     * Usa o próprio /api/auth/me para descobrir
-     * quem está logado, sem precisar conhecer
-     * a estrutura interna de auth_sessions.
-     */
-    const meResponse = await fetch(
-      new URL('/api/auth/me', request.url),
-      {
-        headers: {
-          cookie: (await cookies()).toString(),
-        },
-        cache: 'no-store',
-      }
-    );
-
-    const meData = await meResponse.json();
-
-    if (!meResponse.ok || !meData.authenticated || !meData.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autenticado.' },
-        { status: 401 }
-      );
+    const userId = await currentViewerProfileId(supabase);
+    if (!userId) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
     }
-
-    const userId = meData.user.id;
-
-    console.log('USUÁRIO DO PERFIL:', userId);
 
     /*
      * Busca TODAS as histórias criadas pelo usuário.
