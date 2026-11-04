@@ -81,7 +81,7 @@ const { data: comments, error } = await supabase
     profiles:user_id (
       username,
       display_name,
-      avatar_url
+      avatar_url, verified, is_official
     ),
     user_stickers:sticker_id (
       id,
@@ -233,7 +233,7 @@ const { data: comment, error } = await supabase
     profiles:user_id (
       username,
       display_name,
-      avatar_url
+      avatar_url, verified, is_official
     ),
     user_stickers:sticker_id (
       id,

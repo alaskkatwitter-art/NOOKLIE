@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import Link from 'next/link';
 import { chapterKinds, type ChapterKind, type SeriesBook } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -64,7 +65,7 @@ type Comment = {
   created_at: string;
   profiles?: {
     username: string;
-    display_name: string | null;
+    display_name: string | null; verified?: boolean; is_official?: boolean;
     avatar_url: string | null;
   } | null;
   user_stickers?: {
@@ -1704,7 +1705,7 @@ export default function CapituloPage() {
                               ?.display_name ||
                               comment.profiles
                                 ?.username ||
-                              'Usuário'}
+                              'Usuário'}<AccountBadge account={comment.profiles} />
                           </p>
 
                           {comment.profiles
@@ -1887,7 +1888,7 @@ export default function CapituloPage() {
                             ?.display_name ||
                             comment.profiles
                               ?.username ||
-                            'Usuário'}
+                            'Usuário'}<AccountBadge account={comment.profiles} />
                         </p>
 
                         {comment.profiles

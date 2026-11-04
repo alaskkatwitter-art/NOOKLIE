@@ -128,7 +128,7 @@ export async function GET(
             id,
             username,
             display_name,
-            avatar_url
+            avatar_url, verified, is_official
           `)
           .in('id', authorIds);
 

@@ -298,7 +298,7 @@ export async function GET() {
         id,
         username,
         display_name,
-        avatar_url
+        avatar_url, verified, is_official
       `)
       .in(
         'id',
@@ -403,6 +403,8 @@ export async function GET() {
               author.username,
             display_name:
               author.display_name,
+            verified: author.verified,
+            is_official: author.is_official,
             avatar_url:
               author.avatar_url,
           },

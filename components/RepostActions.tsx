@@ -1,4 +1,5 @@
 "use client";
+import AccountBadge from '@/components/AccountBadge';
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { CloudUpload, X } from "lucide-react";
@@ -6,7 +7,7 @@ import { contentMediaUrl } from "@/lib/security/content-media";
 type Person = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 export default function RepostActions({ postId }: { postId: string }) {
@@ -191,7 +192,7 @@ export default function RepostActions({ postId }: { postId: string }) {
                   )}
                   <span>
                     <strong className="block text-sm">
-                      {p.author.display_name || p.author.username}
+                      {p.author.display_name || p.author.username}<AccountBadge account={p.author} />
                     </strong>
                     <span className="text-xs text-white/50">
                       @{p.author.username}

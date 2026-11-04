@@ -201,7 +201,7 @@ export async function GET() {
           id,
           username,
           display_name,
-          avatar_url
+          avatar_url, verified, is_official
         `)
         .eq('id', userId)
         .maybeSingle();
@@ -274,6 +274,8 @@ export async function GET() {
               id: author.id,
               username: author.username,
               display_name: author.display_name,
+              verified: author.verified,
+              is_official: author.is_official,
               avatar_url: author.avatar_url,
             }
           : null,
@@ -478,7 +480,7 @@ export async function POST(request: Request) {
         id,
         username,
         display_name,
-        avatar_url
+        avatar_url, verified, is_official
       `)
       .eq('id', userId)
       .maybeSingle();
@@ -501,6 +503,8 @@ export async function POST(request: Request) {
                 username: author.username,
                 display_name:
                   author.display_name,
+                verified: author.verified,
+                is_official: author.is_official,
                 avatar_url:
                   author.avatar_url,
               }

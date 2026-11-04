@@ -1,4 +1,5 @@
 'use client';
+import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import Republicados from '@/components/Republicados';
 
@@ -18,7 +19,7 @@ import { useRouter } from 'next/navigation';
 type User = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
@@ -81,7 +82,7 @@ type NookComment = {
   author?: {
     id: string;
     username: string;
-    display_name: string | null;
+    display_name: string | null; verified?: boolean; is_official?: boolean;
     avatar_url: string | null;
   } | null;
 };
@@ -2221,7 +2222,7 @@ export default function PerfilPage() {
             <div className="rounded-2xl bg-[#191219] px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-bold text-white/80">
-                  {authorName}
+                  {authorName}<AccountBadge account={author} />
                 </span>
 
                 {isOwn &&
@@ -2589,7 +2590,7 @@ export default function PerfilPage() {
 
               <div className="min-w-0 pb-1">
                 <h1 className="break-words text-2xl font-black sm:text-3xl">
-                  {displayName}
+                  {displayName}<AccountBadge account={user} size="normal" />
                 </h1>
                 {!!user.staff_badges?.length && (
                   <span title="Integrante oficial da equipe" aria-label="Integrante oficial da equipe" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ff78b9] text-xs font-black text-[#190d16]">✦</span>
@@ -3153,7 +3154,7 @@ export default function PerfilPage() {
                                       <div className="min-w-0">
                                         <p className="truncate text-sm font-bold text-white/85">
                                           {user.display_name ||
-                                            user.username}
+                                            user.username}<AccountBadge account={user} />
                                         </p>
 
                                         <p

@@ -9,7 +9,7 @@ export async function getDiscoveryReader() {
   const account = await getAuthenticatedUserContext();
   if (!account) return null;
   const [profile, status] = await Promise.all([
-    discoveryDb.from('profiles').select('id, username, display_name, avatar_url, moderation_hidden_at').eq('user_id', account.userId).maybeSingle(),
+    discoveryDb.from('profiles').select('id, username, display_name, avatar_url, verified, is_official, moderation_hidden_at').eq('user_id', account.userId).maybeSingle(),
     discoveryDb.from('auth_accounts').select('account_status').eq('id', account.userId).maybeSingle(),
   ]);
   if (profile.error || status.error) throw profile.error || status.error;

@@ -1,10 +1,11 @@
 "use client";
+import AccountBadge from '@/components/AccountBadge';
 import { useCallback, useEffect, useState } from "react";
 import { Cloud, MessageCircle, Send } from "lucide-react";
 type Comment = {
   id: string;
   content: string;
-  author?: { username: string; display_name: string | null } | null;
+  author?: { username: string; display_name: string | null; verified?: boolean; is_official?: boolean } | null;
 };
 export default function MuralActions({ postId }: { postId: string }) {
   const [liked, setLiked] = useState(false),
@@ -92,7 +93,7 @@ export default function MuralActions({ postId }: { postId: string }) {
           {comments.map((c) => (
             <article key={c.id} className="rounded-xl bg-white/5 px-3 py-2">
               <p className="text-[11px] text-pink-200/70">
-                @{c.author?.username || "leitor"}
+                @{c.author?.username || "leitor"}<AccountBadge account={c.author} />
               </p>
               <p className="text-sm whitespace-pre-wrap break-words mt-1">
                 {c.content}

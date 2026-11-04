@@ -20,7 +20,7 @@ export async function visiblePosts(ids: string[], viewer: string | null) {
   const [authors, media, reactions, comments, saved] = await Promise.all([
     chatDb
       .from("profiles")
-      .select("id,username,display_name,avatar_url")
+      .select("id,username,display_name,avatar_url, verified, is_official")
       .in("id", authorIds),
     chatDb
       .from("nook_post_media")
@@ -86,7 +86,7 @@ export async function visibleReposts(
   const [profiles, visible, hidden] = await Promise.all([
     chatDb
       .from("profiles")
-      .select("id,username,display_name,avatar_url,reposts_private")
+      .select("id,username,display_name,avatar_url, verified, is_official,reposts_private")
       .in("id", ids),
     getPublicProfileIds(chatDb, ids),
     hiddenFeedProfiles(),

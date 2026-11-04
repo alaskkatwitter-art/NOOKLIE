@@ -166,7 +166,7 @@ export async function PATCH(request: Request) {
         .update(updates)
         .eq('user_id', session.user_id)
         .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color'
+          'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official'
         )
         .single();
 

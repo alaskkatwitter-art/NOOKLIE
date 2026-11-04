@@ -201,7 +201,7 @@ export async function GET() {
         await supabase
           .from('profiles')
           .select(
-            'id, username, display_name, avatar_url, verified'
+            'id, username, display_name, avatar_url, verified, is_official'
           )
           .in('id', authorIds);
 

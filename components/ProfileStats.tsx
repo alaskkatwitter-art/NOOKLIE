@@ -1,4 +1,5 @@
 "use client";
+import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -6,7 +7,7 @@ import { contentMediaUrl } from "@/lib/security/content-media";
 type Person = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 export default function ProfileStats({
@@ -128,7 +129,7 @@ export default function ProfileStats({
             )}
             <span>
               <strong className="block text-sm">
-                {p.display_name || p.username}
+                {p.display_name || p.username}<AccountBadge account={p} />
               </strong>
               <span className="text-xs text-white/50">@{p.username}</span>
             </span>

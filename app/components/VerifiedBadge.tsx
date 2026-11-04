@@ -22,6 +22,7 @@ export default function VerifiedBadge({
 
   return (
     <span
+      role="img"
       className={`inline-flex ${current.wrapper} shrink-0 items-center justify-center rounded-full bg-[#ff78b9] shadow-[0_0_12px_rgba(255,120,185,0.25)]`}
       title="Conta verificada"
       aria-label="Conta verificada"

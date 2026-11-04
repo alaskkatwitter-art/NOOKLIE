@@ -1,5 +1,6 @@
 "use client";
 
+import AccountBadge from '@/components/AccountBadge';
 import Link from 'next/link';
 import { chapterKinds, ChapterKind, SeriesBook, storyFormats, storyKinds } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -10,7 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 type Author = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 
@@ -281,7 +282,7 @@ export default function HistoriaPage() {
 
                   <p className="font-medium text-white/80 transition hover:text-pink-300">
                     {story.author.display_name ||
-                      story.author.username}
+                      story.author.username}<AccountBadge account={story.author} />
                   </p>
                 </div>
               </button>

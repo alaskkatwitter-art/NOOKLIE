@@ -128,7 +128,7 @@ export async function GET() {
           user:profiles!social_stories_user_id_fkey(
             id,
             username,
-            avatar_url
+            avatar_url, verified, is_official
           )
         `
         )
@@ -236,7 +236,7 @@ export async function POST(
       await supabaseAdmin
         .from('profiles')
         .select(
-          'id, username, avatar_url'
+          'id, username, avatar_url, verified, is_official'
         )
         .eq(
           'id',

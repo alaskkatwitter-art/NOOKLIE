@@ -1,12 +1,13 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type User = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
@@ -100,6 +101,7 @@ export default function AuthStatus() {
         <span className="max-w-[120px] truncate text-sm font-semibold text-white">
           @{user.username}
         </span>
+        <AccountBadge account={user} />
       </button>
 
       {isAdmin && <button

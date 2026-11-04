@@ -1,4 +1,5 @@
 'use client';
+import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import OriginalsShelf from '@/components/OriginalsShelf';
 import Link from 'next/link';
@@ -24,7 +25,7 @@ export default function ReaderHome() {
     void load();return()=>controller.abort();
   },[router,revision]);
   return <main className="discovery-home"><div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#e8a9cd]">Seu próximo capítulo começa aqui</p><h1 className="mt-3 text-3xl font-bold sm:text-4xl">Olá{home ? `, ${home.user.display_name || home.user.username}` : ''}!</h1><p className="mt-2 text-white/60">Bem-vindo de volta ao seu cantinho de histórias.</p></div><Link href="/preferencias" className="discovery-secondary"><Sparkles size={17}/>Meus fandoms favoritos</Link></div>
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#e8a9cd]">Seu próximo capítulo começa aqui</p><h1 className="mt-3 text-3xl font-bold sm:text-4xl">Olá{home ? `, ${home.user.display_name || home.user.username}` : ''}!<AccountBadge account={home?.user} size="normal" /></h1><p className="mt-2 text-white/60">Bem-vindo de volta ao seu cantinho de histórias.</p></div><Link href="/preferencias" className="discovery-secondary"><Sparkles size={17}/>Meus fandoms favoritos</Link></div>
     <form action="/explorar" className="discovery-search"><Search size={22} className="shrink-0 text-[#ffb4d9]"/><label htmlFor="home-search" className="sr-only">Buscar histórias, autores, tags ou fandoms</label><input id="home-search" name="q" maxLength={100} placeholder="Qual história você está procurando?" className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none placeholder:text-white/45 sm:text-base"/><button type="submit" className="min-h-11 rounded-full bg-[#f5b9d7] px-4 text-sm font-bold text-[#28121f]">Buscar</button></form>
     {error && <div role="alert" className="my-8 rounded-2xl border border-rose-300/25 p-5"><p>{error}</p><button type="button" className="mt-3 min-h-11 text-[#ffc4df] underline" onClick={()=>setRevision(n=>n+1)}>Tentar novamente</button></div>}
     {!home && !error && <p className="py-12 text-white/60" role="status">Preparando suas leituras…</p>}

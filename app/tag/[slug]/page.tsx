@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -7,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 type Author = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 
@@ -222,7 +223,7 @@ export default function TagPage() {
                         por{' '}
                         <span className="text-gray-400">
                           {story.author.display_name ||
-                            story.author.username}
+                            story.author.username}<AccountBadge account={story.author} />
                         </span>
                       </p>
                     )}
