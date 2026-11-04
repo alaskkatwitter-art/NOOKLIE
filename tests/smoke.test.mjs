@@ -225,7 +225,11 @@ before(async () => {
     }
 
     if (path === 'profiles' && request.method === 'GET') {
-      return sendJson(response, [{ id: userId, username: 'owner', display_name: 'Owner', avatar_url: null, verified: false }]);
+      const select = (url.searchParams.get('select') || '').split(',').map(field => field.trim());
+      const profile = { id: userId, username: 'owner', display_name: 'Owner', avatar_url: null };
+      if (select.includes('verified')) profile.verified = true;
+      if (select.includes('is_official')) profile.is_official = true;
+      return sendJson(response, [profile]);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
@@ -499,6 +503,8 @@ test('originals can be discovered by type and literary format', async () => {
   assert.deepEqual(stories.map(story => [story.title, story.story_kind, story.story_format]), [
     ['Dragões e Romance', 'original', 'conto'],
   ]);
+  assert.equal(stories[0].author.verified, true);
+  assert.equal(stories[0].author.is_official, true);
   assert.equal((await fetch(`${baseUrl}/api/explore?kind=invalido`)).status, 400);
 });
 

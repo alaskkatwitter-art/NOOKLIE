@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -13,6 +14,7 @@ type ExploreUser = {
   display_name: string | null;
   avatar_url: string | null;
   verified: boolean;
+  is_official?: boolean;
   is_following?: boolean;
   is_self?: boolean;
 };
@@ -44,6 +46,7 @@ type CurrentUser = {
   display_name: string | null;
   avatar_url: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 export default function ExplorarContent() {
@@ -454,9 +457,7 @@ export default function ExplorarContent() {
                   currentUser.username}
               </span>
 
-              {currentUser.verified && (
-                <VerifiedBadge size="small" />
-              )}
+              <AccountBadge account={currentUser} />
             </Link>
           ) : (
             <Link
@@ -623,9 +624,7 @@ export default function ExplorarContent() {
                                       user.username}
                                   </p>
 
-                                  {user.verified && (
-                                    <VerifiedBadge size="small" />
-                                  )}
+                                  <AccountBadge account={user} />
                                 </div>
 
                                 <p className="truncate text-sm text-white/35">
@@ -742,10 +741,7 @@ export default function ExplorarContent() {
                                         story.author.username}
                                     </Link>
 
-                                    {story.author
-                                      .verified && (
-                                      <VerifiedBadge size="small" />
-                                    )}
+                                    <AccountBadge account={story.author} />
                                   </div>
                                 )}
 
@@ -949,52 +945,6 @@ function Avatar({
   );
 }
 
-function VerifiedBadge({
-  size = 'normal',
-}: {
-  size?: 'small' | 'normal' | 'large';
-}) {
-  const sizes = {
-    small: {
-      wrapper: 'h-4 w-4',
-      icon: 10,
-    },
-    normal: {
-      wrapper: 'h-5 w-5',
-      icon: 12,
-    },
-    large: {
-      wrapper: 'h-6 w-6',
-      icon: 14,
-    },
-  };
-
-  const current = sizes[size];
-
-  return (
-    <span
-      className={`inline-flex ${current.wrapper} shrink-0 items-center justify-center rounded-full bg-[#ff78b9] shadow-[0_0_12px_rgba(255,120,185,0.25)]`}
-      title="Conta verificada"
-      aria-label="Conta verificada"
-    >
-      <svg
-        width={current.icon}
-        height={current.icon}
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M5 12.5L9.2 16.5L19 7"
-          stroke="#180d15"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
 
 function NavLink({
   href,

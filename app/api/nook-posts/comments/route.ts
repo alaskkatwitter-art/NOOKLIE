@@ -133,6 +133,8 @@ export async function GET(request: Request) {
       id: string;
       username: string;
       display_name: string | null;
+      is_official?: boolean;
+      verified?: boolean;
       avatar_url: string | null;
     }> = [];
 
@@ -143,7 +145,7 @@ export async function GET(request: Request) {
       } = await supabase
         .from('profiles')
         .select(
-          'id, username, display_name, avatar_url'
+          'id, username, display_name, avatar_url, verified, is_official'
         )
         .in('id', authorIds);
 
@@ -437,7 +439,7 @@ export async function POST(
     } = await supabase
       .from('profiles')
       .select(
-        'id, username, display_name, avatar_url'
+        'id, username, display_name, avatar_url, verified, is_official'
       )
       .eq('id', userId)
       .maybeSingle();

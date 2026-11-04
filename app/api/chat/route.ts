@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       const peers = ids.length
         ? await chatDb
             .from("profiles")
-            .select("id,username,display_name,avatar_url")
+            .select("id,username,display_name,avatar_url, verified, is_official")
             .in("id", ids)
         : { data: [], error: null };
       if (peers.error) throw peers.error;
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
       const result = await chatDb
         .from("chat_group_members")
         .select(
-          "profile_id,status,profile:profiles(username,display_name,avatar_url)",
+          "profile_id,status,profile:profiles(username,display_name,avatar_url, verified, is_official)",
         )
         .eq("thread_id", id);
       if (result.error) throw result.error;

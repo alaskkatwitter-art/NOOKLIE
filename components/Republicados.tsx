@@ -1,4 +1,5 @@
 "use client";
+import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CloudUpload, LockKeyhole } from "lucide-react";
@@ -8,7 +9,7 @@ type Post = {
   id: string;
   body: string | null;
   image_url: string | null;
-  author: { username: string; display_name: string | null };
+  author: { username: string; display_name: string | null; verified?: boolean; is_official?: boolean };
   media: { id: string; media_url: string }[];
   repost: { id: string; comment: string | null; created_at: string };
 };
@@ -131,7 +132,7 @@ export default function Republicados({
               className="block rounded-2xl border border-white/10 p-4 hover:border-[#ff9bca]/40"
             >
               <strong className="text-sm text-[#ffb9da]">
-                {p.author.display_name || p.author.username}{" "}
+                {p.author.display_name || p.author.username}<AccountBadge account={p.author} />{" "}
                 <span className="font-normal text-white/40">
                   @{p.author.username}
                 </span>

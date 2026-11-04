@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -8,6 +9,8 @@ type UserProfile = {
   id: string;
   username: string;
   display_name: string | null;
+  verified?: boolean;
+  is_official?: boolean;
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
@@ -334,7 +337,7 @@ export default function ConfiguracoesPage() {
 
                   <div className="min-w-0">
                     <h3 className="text-lg font-bold">
-                      {displayName}
+                      {displayName}<AccountBadge account={profile} />
                     </h3>
 
                     <p className="mt-1 text-sm text-white/40">

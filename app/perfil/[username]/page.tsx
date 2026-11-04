@@ -1,4 +1,5 @@
 'use client';
+import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import Republicados from '@/components/Republicados';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -1081,7 +1082,7 @@ export default function PublicProfilePage() {
                               <p className="truncate text-sm font-black text-white">
                                 {getDisplayName(
                                   user
-                                )}
+                                )}<AccountBadge account={user} />
                               </p>
 
                               <p className="text-xs text-white/35">

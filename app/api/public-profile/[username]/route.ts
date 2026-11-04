@@ -89,7 +89,7 @@ export async function GET(
     }
 
     const viewerId=await currentViewerProfileId(supabase);
-    if(!(await isPublicProfileVisible(supabase,profile.id,viewerId))){return NextResponse.json({user:{id:profile.id,username:profile.username,display_name:profile.display_name,bio:profile.bio,avatar_url:profile.avatar_url,cover_url:profile.cover_url,is_private:profile.is_private},restricted:true,stories:[],posts:[],reading_lists:[],fic_clubs:[]},{headers:{'Cache-Control':'no-store, private',Vary:'Cookie'}});}
+    if(!(await isPublicProfileVisible(supabase,profile.id,viewerId))){return NextResponse.json({user:{id:profile.id,username:profile.username,display_name:profile.display_name,bio:profile.bio,avatar_url:profile.avatar_url,cover_url:profile.cover_url,is_private:profile.is_private,verified:profile.verified,is_official:profile.is_official},restricted:true,stories:[],posts:[],reading_lists:[],fic_clubs:[]},{headers:{'Cache-Control':'no-store, private',Vary:'Cookie'}});}
     const { data: accountIdentity, error: identityError } = await supabase
       .from("profiles")
       .select("user_id")

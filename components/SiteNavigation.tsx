@@ -1,5 +1,6 @@
 "use client";
 
+import AccountBadge from '@/components/AccountBadge';
 import { contentMediaUrl } from "@/lib/security/content-media";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +29,7 @@ import {
 
 type User = {
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   bio?: string | null;
   avatar_url: string | null;
 };
@@ -299,7 +300,7 @@ export default function SiteNavigation() {
           <h2 id="site-menu-title">
             {user?.display_name ||
               user?.username ||
-              "Seu cantinho de histórias"}
+              "Seu cantinho de histórias"}<AccountBadge account={user} />
           </h2>
           <p>
             {user ? "@" + user.username : "Entre para encontrar seu universo."}

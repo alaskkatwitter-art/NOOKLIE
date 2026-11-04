@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
@@ -11,7 +12,7 @@ type Original = {
   title: string;
   cover_url: string | null;
   story_format?: keyof typeof storyFormats;
-  author: { username: string; display_name: string | null } | null;
+  author: { username: string; display_name: string | null; verified?: boolean; is_official?: boolean } | null;
 };
 
 export default function OriginalsShelf() {
@@ -52,7 +53,7 @@ export default function OriginalsShelf() {
                 {story.cover_url ? <img src={contentMediaUrl(story.cover_url)} alt="" loading="lazy" className="h-full w-full object-cover group-hover:opacity-85" /> : <BookOpen size={32} />}
               </div>
               <h3 className="mt-2 line-clamp-2 text-sm font-bold group-hover:text-pink-200">{story.title}</h3>
-              <p className="mt-1 truncate text-xs text-white/60">{story.author?.display_name || story.author?.username}</p>
+              <p className="mt-1 truncate text-xs text-white/60">{story.author?.display_name || story.author?.username}<AccountBadge account={story.author} /></p>
               {story.story_format && <p className="mt-1 text-xs text-pink-200">{storyFormats[story.story_format]}</p>}
             </Link>
           ))}

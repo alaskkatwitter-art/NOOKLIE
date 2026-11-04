@@ -1,4 +1,5 @@
 "use client";
+import AccountBadge from '@/components/AccountBadge';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -24,7 +25,7 @@ import { chatSafetyNotice, needsSupport } from "@/lib/chat/safety";
 import ChatAudio from "@/components/ChatAudio";
 type Peer = {
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 type Thread = {
@@ -500,7 +501,7 @@ export default function ChatClient() {
                   <p>
                     {t.kind === "group"
                       ? t.name
-                      : t.peer?.display_name || t.peer?.username}
+                      : t.peer?.display_name || t.peer?.username}{t.kind !== "group" && <AccountBadge account={t.peer} />}
                   </p>
                   <span>
                     {t.status === "accepted"
@@ -552,13 +553,13 @@ export default function ChatClient() {
                 <Avatar peer={thread.peer} group={groupChat} />
                 <div className="min-w-0 flex-1">
                   {groupChat ? (
-                    <h2 className="truncate font-bold text-sm">{peerName}</h2>
+                    <h2 className="truncate font-bold text-sm">{peerName}{!groupChat && <AccountBadge account={thread?.peer} />}</h2>
                   ) : (
                     <Link
                       className="truncate block font-bold text-sm"
                       href={"/perfil/" + thread.peer?.username}
                     >
-                      {peerName}
+                      {peerName}{!groupChat && <AccountBadge account={thread?.peer} />}
                     </Link>
                   )}
                   <p className="text-[11px] text-white/45">

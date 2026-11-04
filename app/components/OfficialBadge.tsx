@@ -11,6 +11,7 @@ export default function OfficialBadge({
 
   return (
     <span
+      role="img"
       className={`inline-flex ${sizes[size]} shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8be8ff] to-[#85b8ff] text-[#10212a] shadow-[0_0_12px_rgba(139,232,255,0.3)]`}
       title="Conta oficial do Nooklie"
       aria-label="Conta oficial do Nooklie"

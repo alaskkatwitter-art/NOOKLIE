@@ -122,13 +122,14 @@ export async function GET(request: Request) {
       display_name: string | null;
       avatar_url: string | null;
       verified: boolean;
+      is_official?: boolean;
     }> = [];
     let usersError: { message?: string } | null = null;
     const safeUserQuery = query.replace(/[^\p{L}\p{N}_ -]/gu, '').trim();
     if (safeUserQuery) {
       const result = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, verified')
+        .select('id, username, display_name, avatar_url, verified, is_official')
         .or(`username.ilike.%${safeUserQuery}%,display_name.ilike.%${safeUserQuery}%`)
         .order('username', { ascending: true })
         .limit(20);
@@ -242,6 +243,7 @@ export async function GET(request: Request) {
       display_name: string | null;
       avatar_url: string | null;
       verified: boolean;
+      is_official?: boolean;
     }[] = [];
 
     if (authorIds.length > 0) {
@@ -249,7 +251,7 @@ export async function GET(request: Request) {
         await supabase
           .from('profiles')
           .select(
-            'id, username, display_name, avatar_url, verified'
+            'id, username, display_name, avatar_url, verified, is_official'
           )
           .in('id', authorIds);
 

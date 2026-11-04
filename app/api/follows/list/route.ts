@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     // A private account's basic identity is public; its content remains protected.
     const profiles = await chatDb
       .from("profiles")
-      .select("id,user_id,username,display_name,avatar_url")
+      .select("id,user_id,username,display_name,avatar_url, verified, is_official")
       .in("id", ids)
       .is("moderation_hidden_at", null);
     if (profiles.error) throw profiles.error;

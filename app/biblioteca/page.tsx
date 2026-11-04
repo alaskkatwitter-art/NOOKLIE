@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge, { type AccountBadgeFlags } from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useCallback,
@@ -26,6 +27,7 @@ type LibraryItem = {
 
   author_username?: string | null;
   author_display_name?: string | null;
+  author?: AccountBadgeFlags | null;
   author_avatar_url?: string | null;
 
   chapter_id?: string | null;
@@ -301,6 +303,7 @@ export default function BibliotecaPage() {
                   item.author_username ||
                   null,
 
+                author: item.author ?? null,
                 author_display_name:
                   item.author_display_name ||
                   null,
@@ -666,7 +669,7 @@ export default function BibliotecaPage() {
 
                         {author && (
                           <p className="mt-1 truncate text-xs font-semibold text-white/50">
-                            por {author}
+                            por {author}<AccountBadge account={item.author} />
                           </p>
                         )}
 

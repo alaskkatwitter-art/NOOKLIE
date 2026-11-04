@@ -1,4 +1,5 @@
 'use client';
+import AccountBadge from '@/components/AccountBadge';
 import RepostActions from '@/components/RepostActions';
 
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -24,6 +25,7 @@ type Profile = {
   display_name: string | null;
   avatar_url: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 type CurrentUser = {
@@ -35,6 +37,7 @@ type CurrentUser = {
   cover_url: string | null;
   theme_color: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 type FeedSearchUser = {
@@ -43,6 +46,7 @@ type FeedSearchUser = {
   display_name: string | null;
   avatar_url: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 type Media = {
@@ -89,7 +93,7 @@ type Post = {
 type StoryUser = {
   id: string;
   username: string;
-  display_name: string | null;
+  display_name: string | null; verified?: boolean; is_official?: boolean;
   avatar_url: string | null;
 };
 
@@ -667,17 +671,6 @@ function Avatar({
    SELO DE VERIFICADO
 ========================================================= */
 
-function VerifiedBadge() {
-  return (
-    <span
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[10px] font-black text-[#190d16]"
-      title="Perfil verificado"
-      aria-label="Perfil verificado"
-    >
-      ✓
-    </span>
-  );
-}
 
 /* =========================================================
    STORIES ROW
@@ -704,7 +697,7 @@ function StoriesRow({
     return Array.from(map.values());
   }, [stories]);
 
-  return <section className="feed-stories" aria-label="Stories"><div className="feed-story-strip"><button type="button" onClick={onCreateStory} className="feed-story" aria-label="Criar seu Story"><span className="feed-story-create">+</span><span>Seu Story</span></button>{groupedStories.map(story=><button type="button" key={story.user_id} onClick={()=>onOpen(story)} className="feed-story" aria-label={'Ver Story de @'+story.user.username}><span className="feed-story-ring"><Avatar profile={story.user}/></span><span>@{story.user.username}</span></button>)}</div></section>;
+  return <section className="feed-stories" aria-label="Stories"><div className="feed-story-strip"><button type="button" onClick={onCreateStory} className="feed-story" aria-label="Criar seu Story"><span className="feed-story-create">+</span><span>Seu Story</span></button>{groupedStories.map(story=><button type="button" key={story.user_id} onClick={()=>onOpen(story)} className="feed-story" aria-label={'Ver Story de @'+story.user.username}><span className="feed-story-ring"><Avatar profile={story.user}/></span><span>@{story.user.username}<AccountBadge account={story.user} /></span></button>)}</div></section>;
 
 }
 
@@ -857,7 +850,7 @@ function StoryViewer({
               {
                 currentStory.user
                   .username
-              }
+              }<AccountBadge account={currentStory.user} />
             </p>
 
             <p className="text-[10px] text-white/45">
@@ -968,7 +961,7 @@ type ApiUpcomingUpdate = {
   author: {
     id: string;
     username: string;
-    display_name: string | null;
+    display_name: string | null; verified?: boolean; is_official?: boolean;
     avatar_url: string | null;
   };
 };
@@ -1363,7 +1356,7 @@ function UpcomingUpdatesContent({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="truncate text-[11px] font-bold text-white group-hover:text-[#ff78b9]">
-                          @{update.author.username}
+                          @{update.author.username}<AccountBadge account={update.author} />
                         </p>
 
                         <span
@@ -1669,7 +1662,7 @@ function CommentItem({
                 ?.display_name ||
                 comment.author
                   ?.username ||
-                'Usuário'}
+                'Usuário'}<AccountBadge account={comment.author} />
             </Link>
 
             <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/75">
@@ -2104,7 +2097,7 @@ function FeedPost({
 
   return (
     <article className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
-      {post.repost&&<div className="border-b border-white/10 px-5 py-4"><p className="text-xs text-[#ffb9da]">Nooklado por <Link href={'/perfil/'+encodeURIComponent(post.repost.author.username)} className="font-bold hover:underline">{post.repost.author.display_name||post.repost.author.username}</Link></p>{post.repost.comment&&<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{post.repost.comment}</p>}</div>}
+      {post.repost&&<div className="border-b border-white/10 px-5 py-4"><p className="text-xs text-[#ffb9da]">Nooklado por <Link href={'/perfil/'+encodeURIComponent(post.repost.author.username)} className="font-bold hover:underline">{post.repost.author.display_name||post.repost.author.username}<AccountBadge account={post.repost.author} /></Link></p>{post.repost.comment&&<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{post.repost.comment}</p>}</div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Link
@@ -2142,9 +2135,7 @@ function FeedPost({
                       'Usuário'}
                   </span>
 
-                  {post.author?.verified && (
-                    <VerifiedBadge />
-                  )}
+                  <AccountBadge account={post.author} />
                 </Link>
 
                 <Link
@@ -2419,7 +2410,7 @@ function SideMenu({
             <p className="truncate text-sm font-bold text-white">
               {currentUser?.display_name ||
                 currentUser?.username ||
-                'Usuário'}
+                'Usuário'}<AccountBadge account={currentUser} />
             </p>
 
             <p className="mt-0.5 truncate text-xs text-[#ff78b9]/70">
@@ -2605,7 +2596,7 @@ function MobileDrawer({
               <p className="truncate text-sm font-bold text-white">
                 {currentUser?.display_name ||
                   currentUser?.username ||
-                  'Usuário'}
+                  'Usuário'}<AccountBadge account={currentUser} />
               </p>
 
               <p className="mt-0.5 truncate text-xs text-[#ff78b9]/70">
@@ -3002,9 +2993,7 @@ function FeedSearchModal({
                             user.username}
                         </p>
 
-                        {user.verified && (
-                          <VerifiedBadge />
-                        )}
+                        <AccountBadge account={user} />
                       </div>
 
                       <p className="mt-0.5 truncate text-xs text-[#ff78b9]/65">
@@ -3967,7 +3956,7 @@ export default function FeedPage() {
                               </div>
 
                               <span className="min-w-0 flex-1 truncate text-xs font-bold text-white/65">
-                                @{story.user.username}
+                                @{story.user.username}<AccountBadge account={story.user} />
                               </span>
                             </button>
                           )

@@ -1,5 +1,6 @@
 'use client';
 
+import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import {
@@ -66,6 +67,7 @@ type CurrentUser = {
   display_name: string | null;
   avatar_url: string | null;
   verified?: boolean;
+  is_official?: boolean;
 };
 
 export default function FandomsContent() {
@@ -236,9 +238,7 @@ export default function FandomsContent() {
                   currentUser.username}
               </span>
 
-              {currentUser.verified && (
-                <VerifiedBadge />
-              )}
+              <AccountBadge account={currentUser} />
             </Link>
           ) : (
             <Link
@@ -472,31 +472,6 @@ function Avatar({
   );
 }
 
-function VerifiedBadge() {
-  return (
-    <span
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff78b9]"
-      title="Conta verificada"
-      aria-label="Conta verificada"
-    >
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M5 12.5L9.2 16.5L19 7"
-          stroke="#180d15"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
 
 function NavLink({
   href,
