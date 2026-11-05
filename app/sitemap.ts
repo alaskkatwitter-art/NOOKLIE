@@ -4,7 +4,7 @@ import { discoveryDb } from '@/lib/discovery/server';
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const origin='https://toriland.vercel.app';
+  const origin='https://nooklie.vercel.app';
   const { data,error } = await discoveryDb.rpc('discovery_sitemap');
   if(error)throw error;
   return [
