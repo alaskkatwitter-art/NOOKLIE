@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    sitemap: 'https://toriland.vercel.app/sitemap.xml',
+    sitemap: 'https://nooklie.vercel.app/sitemap.xml',
     rules: [
       { userAgent: '*', allow: '/' },
       // Training-specific controls. These depend on crawler compliance and are
