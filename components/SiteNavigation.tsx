@@ -62,11 +62,17 @@ export default function SiteNavigation() {
   const [admin, setAdmin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const lastLoaded = useRef(0);
   useEffect(() => {
     profileMenu.current?.removeAttribute("open");
     drawer.current?.close();
     const controller = new AbortController();
     async function load() {
+      // This only retains navigation labels. Every protected endpoint still
+      // validates the current session and permissions on the server.
+      const authTransition = pathname === '/login' || pathname === '/logout' || pathname === '/cadastro';
+      if (authTransition) lastLoaded.current = 0;
+      if (!authTransition && Date.now() - lastLoaded.current < 30000) return;
       try {
         const response = await fetch("/api/auth/me", {
           cache: "no-store",
@@ -93,6 +99,7 @@ export default function SiteNavigation() {
           }
           const result = notifications.ok ? await notifications.json() : null;
           if (!controller.signal.aborted) setUnread(result?.unread_count || 0);
+          lastLoaded.current = Date.now();
         } else {
           setUnread(0);
           setStaff(false);
@@ -148,6 +155,7 @@ export default function SiteNavigation() {
     try {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error();
+      lastLoaded.current = 0;
       setUser(null);
       setUnread(0);
       profileMenu.current?.removeAttribute("open");

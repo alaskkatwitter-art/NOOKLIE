@@ -84,6 +84,7 @@ export async function hasStaffPermission(
   departmentId?: string
 ): Promise<boolean> {
   if (context.isPlatformAdmin) return true;
+  if (context.memberships.length === 0) return false;
 
   const { data: permission, error: permissionError } = await supabase
     .from('permissions')

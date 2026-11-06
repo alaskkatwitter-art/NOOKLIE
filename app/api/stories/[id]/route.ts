@@ -167,6 +167,12 @@ export async function GET(
       );
     }
 
+    if (new URL(request.url).searchParams.get('summary') === '1') {
+      return NextResponse.json({ story: {
+        id: story.id, title: story.title, description: story.description, cover_url: story.cover_url,
+      } }, { headers: privateHeaders });
+    }
+
     /*
      * ==================================================
      * LIBERA CAPÍTULOS AGENDADOS

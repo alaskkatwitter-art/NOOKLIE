@@ -6,5 +6,8 @@
       "feature/mobile-design-community": false,
       "feature/nooklar-reading-scheduling": false
     }
-  }
+  },
+  "regions": [
+    "iad1"
+  ]
 }
