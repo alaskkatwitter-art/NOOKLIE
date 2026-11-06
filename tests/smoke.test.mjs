@@ -195,6 +195,8 @@ before(async () => {
       return respondRows(request, response, rows);
     }
 
+    if (path === 'news_comments' && request.method === 'GET') return sendJson(response, []);
+
     if (path === 'tags' && request.method === 'GET') {
       let rows = state.tags;
       const slug = (url.searchParams.get('slug') || '').replace(/^eq\./, '');
@@ -659,4 +661,14 @@ test('creating a Portuguese catalogue tag reuses its existing English slug', asy
   assert.equal(response.status,200);
   const result=await response.json();
   assert.equal(result.created,false);assert.equal(result.tag.slug,'thriller');assert.equal(state.tags.length,before);
+});
+
+test('the newspaper publishes the update and every article exposes its own comments section',async()=>{
+ for(const slug of ['boas-vindas','originais','atualizacao-6-novembro-2026']){
+  const response=await fetch(baseUrl+'/noticias/'+slug);assert.equal(response.status,200,slug);const html=await response.text();assert.match(html,/Comentários da notícia/);if(slug==='atualizacao-6-novembro-2026')assert.match(html,/Vocês testaram, nós ouvimos/);
+ }
+ const response=await fetch(baseUrl+'/api/news/comments?article=boas-vindas');assert.equal(response.status,200);assert.deepEqual((await response.json()).comments,[]);assert.match(response.headers.get('cache-control'),/private/);
+ assert.equal((await fetch(baseUrl+'/api/news/comments?article=unknown')).status,404);
+ assert.equal((await fetch(baseUrl+'/api/news/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({article:'boas-vindas',body:'x'})})).status,401);
+ assert.equal((await fetch(baseUrl+'/api/news/comments',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://foreign.example'},body:'{}'})).status,403);
 });

@@ -490,3 +490,21 @@ test('chapter replies notify the original commenter and suppress self notificati
  await db.query('insert into comments values($1,$2,$3,$4)',[id(2003),id(3001),id(21),id(2001)]);
  assert.equal(await value('select count(*)::int from user_notifications where source_key=$1',['chapter-reply:'+id(2003)]),0);
 });
+
+test('news comments keep replies on their article, notify readers and preserve replies after removal',async()=>{
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/20261106213433_news_article_comments.sql',import.meta.url),'utf8'));
+ await db.exec('set role service_role');
+ await db.query('insert into news_comments(id,article_slug,author_id,body)values($1,$2,$3,$4)',[id(4001),'boas-vindas',id(40),'Primeiro comentário']);
+ await db.query('insert into news_comments(id,article_slug,author_id,body,parent_id)values($1,$2,$3,$4,$5)',[id(4002),'boas-vindas',id(41),'Uma resposta',id(4001)]);
+ assert.equal(await value('select count(*)::int from user_notifications where source_key=$1 and user_id=$2',['news-reply:'+id(4002),id(40)]),1);
+ await assert.rejects(db.query('insert into news_comments(article_slug,author_id,body,parent_id)values($1,$2,$3,$4)',['originais',id(41),'Outro artigo',id(4001)]),/foreign key/);
+ for(const body of ['', ' '.repeat(5),'x'.repeat(3001)])await assert.rejects(db.query('insert into news_comments(article_slug,author_id,body)values($1,$2,$3)',['boas-vindas',id(40),body]),/check constraint/);
+ await db.query('update news_comments set deleted_at=now(),deleted_by=$2 where id=$1',[id(4001),id(40)]);
+ assert.equal(await value('select count(*)::int from news_comments where parent_id=$1',[id(4001)]),1);
+ await db.query('delete from news_comments where id=$1',[id(4001)]);
+ assert.equal(await value('select parent_id from news_comments where id=$1',[id(4002)]),null);
+ assert.equal(await value('select article_slug from news_comments where id=$1',[id(4002)]),'boas-vindas');
+ for(const role of ['anon','authenticated'])assert.equal(await value(`select has_table_privilege('${role}','news_comments','SELECT')`),false);
+ assert.equal(await value("select relrowsecurity from pg_class where oid='news_comments'::regclass"),true);
+});

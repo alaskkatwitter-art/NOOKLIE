@@ -51,7 +51,8 @@ export async function isAccountVisible(supabase:VisibilityClient,id:string){retu
 
 export async function getPublicProfileIds(
   supabase: VisibilityClient,
-  profileOrUserIds: string[]
+  profileOrUserIds: string[],
+  viewerProfileId?: string | null
 ): Promise<Set<string>> {
   const identifiers = Array.from(new Set(profileOrUserIds.filter(Boolean)));
   if (identifiers.length === 0) return new Set();
@@ -94,7 +95,7 @@ export async function getPublicProfileIds(
   );
 
   const privateIds=profiles.filter(p=>p.is_private).map(p=>p.id);
-  const viewer=await currentViewerProfileId(supabase);const followed=new Set<string>();
+  const viewer=viewerProfileId === undefined ? await currentViewerProfileId(supabase) : viewerProfileId;const followed=new Set<string>();
   const blocked=new Set<string>();
   if(viewer){const blocks=await supabase.from('chat_blocks').select('blocker_id,blocked_id').or(`blocker_id.eq.${viewer},blocked_id.eq.${viewer}`);if(blocks.error)throw blocks.error;for(const b of blocks.data||[])blocked.add(b.blocker_id===viewer?b.blocked_id:b.blocker_id);}
   if(privateIds.length){if(viewer){const follows=await supabase.from('follows').select('following_id').eq('follower_id',viewer).in('following_id',privateIds);if(follows.error)throw follows.error;for(const f of follows.data||[])followed.add(f.following_id);}}
