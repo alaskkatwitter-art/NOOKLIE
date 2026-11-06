@@ -1,3 +1,4 @@
+import NewsComments from '@/components/NewsComments';
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -126,6 +127,7 @@ export default function WelcomeNewsPage() {
           <p>Se você chegou para ler, esperamos que encontre uma história que dê vontade de virar a página. Se chegou para escrever, que bom ter sua voz aqui. Boas leituras e boa escrita!</p>
           <p className="mt-3 font-bold text-[#ff9bca]">Equipe Nooklie</p>
         </footer>
+        <NewsComments article="boas-vindas" />
       </article>
     </main>
   );

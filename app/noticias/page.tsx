@@ -76,6 +76,12 @@ export default function NoticiasPage() {
         </section>
 
         <section className="mt-12" aria-label="Edições do Jornal Nooklie">
+          <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · 6 de novembro de 2026</p>
+            <h2 className="mt-4 text-3xl font-black">Vocês testaram, nós ouvimos.</h2>
+            <p className="mt-4 max-w-xl leading-7 text-white/75">Novas cores e recortes para o perfil, correções nos capítulos, respostas aos comentários e convites de grupos. Veja o que mudou e converse com a gente nos comentários da notícia.</p>
+            <Link href="/noticias/atualizacao-6-novembro-2026" className="mt-6 inline-flex min-h-11 items-center font-bold text-pink-200 hover:underline">Conhecer as mudanças →</Link>
+          </article>
           <article className="mb-5 rounded-3xl border border-pink-300/20 bg-gradient-to-br from-[#321729] to-[#171018] p-7 sm:p-10">
             <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Obras da comunidade</p>
             <h2 className="mt-4 text-3xl font-black">Conheça os originais do Nooklie</h2>
