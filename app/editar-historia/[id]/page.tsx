@@ -485,21 +485,6 @@ export default function EditarHistoriaPage() {
           normalizedStory.cover_url || null
         );
 
-        const requestedChapter =
-          searchParams.get('chapter');
-
-        /*
-         * IMPORTANTE:
-         * Não verificamos se o capítulo está na lista
-         * retornada pela obra. Um capítulo recém-criado
-         * pode ainda não estar nessa lista no momento
-         * da navegação.
-         */
-        if (requestedChapter) {
-          setSelectedChapterId(
-            requestedChapter
-          );
-        }
       } catch (caughtError) {
         if (cancelled) return;
 
@@ -520,7 +505,12 @@ export default function EditarHistoriaPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, searchParams]);
+  }, [id]);
+
+  const requestedChapterId = searchParams.get('chapter');
+  useEffect(() => {
+    setSelectedChapterId(requestedChapterId || null);
+  }, [requestedChapterId]);
 
   useEffect(() => {
     if (!selectedChapterId) {
@@ -664,7 +654,7 @@ export default function EditarHistoriaPage() {
   }, [selectedChapterId]);
 
   useEffect(() => {
-    if (loadingChapter || previewMode) return;
+    if (loading || loadingChapter || previewMode) return;
     if (!editorRef.current) return;
     if (!chapter) return;
 
@@ -675,7 +665,7 @@ export default function EditarHistoriaPage() {
       editorRef.current.innerHTML =
         chapterBody || '';
     }
-  }, [chapter, chapterBody, loadingChapter, previewMode]);
+  }, [chapter, chapterBody, loading, loadingChapter, previewMode]);
 
   useEffect(() => {
     if (!showLinkBox) return;
