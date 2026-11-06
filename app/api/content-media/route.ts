@@ -17,7 +17,8 @@ export async function GET(request:Request){try{
  bucket!=='chapter-media'?Promise.resolve({data:[],error:null}):db.from('chapters').select('id,story_id,published').in('banner_url',urls).limit(10),
  ]);for(const r of candidates)if(r.error)throw r.error;
  let allowed=false;
- for(const story of candidates[0].data||[]){if(story.author_id===viewer){allowed=true;break;}const published=await db.from('chapters').select('id').eq('story_id',story.id).eq('published',true).limit(1);if(published.error)throw published.error;if(published.data?.length&&await isPublicStoryVisible(db,story.id)){allowed=true;break;}}
+ // Covers follow the story page's visibility, even before its first chapter is published.
+ for(const story of candidates[0].data||[]){if(story.author_id===viewer||await isPublicStoryVisible(db,story.id)){allowed=true;break;}}
  if(!allowed)for(const media of candidates[1].data||[]){const chapter=await db.from('chapters').select('story_id,published').eq('id',media.chapter_id).maybeSingle();if(chapter.error)throw chapter.error;if(!chapter.data)continue;const story=await db.from('stories').select('author_id').eq('id',chapter.data.story_id).maybeSingle();if(story.error)throw story.error;if(story.data?.author_id===viewer||(chapter.data.published&&await isPublicStoryVisible(db,chapter.data.story_id))){allowed=true;break;}}
  if(!allowed)for(const media of candidates[2].data||[])if(await isPublicPostVisible(db,media.post_id)){allowed=true;break;}
  if(!allowed)for(const post of candidates[3].data||[])if(await isPublicPostVisible(db,post.id)){allowed=true;break;}
