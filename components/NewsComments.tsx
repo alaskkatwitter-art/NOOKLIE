@@ -25,7 +25,7 @@ export default function NewsComments({article}:{article:string}) {
     }catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:'Não foi possível carregar os comentários.');}
     finally{if(!signal?.aborted)setLoading(false);}
   },[article]);
-  useEffect(()=>{const controller=new AbortController();setBody('');setReply(null);setNotice('');void load(controller.signal);return()=>controller.abort();},[load]);
+  useEffect(()=>{const controller=new AbortController();setComments([]);setCursor(null);setViewer(null);setModerator(false);setBody('');setReply(null);setNotice('');void load(controller.signal);return()=>controller.abort();},[load]);
   async function older(){
     if(!cursor||olderLoading)return;setOlderLoading(true);setError('');
     try{const response=await fetch('/api/news/comments?article='+encodeURIComponent(article)+'&cursor='+encodeURIComponent(JSON.stringify(cursor)),{cache:'no-store'});const data=await response.json();if(!response.ok)throw Error(data.error);setComments(current=>mergeComments([...(data.comments||[]),...current]));setCursor(data.next_cursor);}
