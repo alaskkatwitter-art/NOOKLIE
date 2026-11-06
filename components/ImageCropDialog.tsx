@@ -45,7 +45,7 @@ export default function ImageCropDialog({ source, kind, onCancel, onSave }: {
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
       {[['Zoom',zoom,1,3,0.01,setZoom],['Posição horizontal',x,0,100,1,setX],['Posição vertical',y,0,100,1,setY]].map(([label,value,min,max,step,setter]) => <label key={label as string} className="block text-sm">{label as string}<input type="range" aria-label={label as string} min={min as number} max={max as number} step={step as number} value={value as number} disabled={busy || !image} onChange={event => (setter as (value:number)=>void)(Number(event.target.value))} className="mt-2 block w-full accent-pink-400" /></label>)}
       {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}
-      <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={onCancel} className="nook-secondary">Cancelar</button><button type="button" disabled={!image || busy} className="nook-primary" onClick={async () => {
+      <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={onCancel} className="nook-choice">Cancelar</button><button type="button" disabled={!image || busy} className="nook-primary" onClick={async () => {
         if (!canvas.current) return; setBusy(true); setError('');
         try { const output = await new Promise<Blob>((resolve,reject) => canvas.current!.toBlob(blob => blob ? resolve(blob) : reject(Error('Não foi possível preparar a imagem.')), 'image/webp', 0.9)); await onSave(new File([output], kind+'.webp', {type:'image/webp'})); }
         catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível salvar. Tente novamente.'); }
