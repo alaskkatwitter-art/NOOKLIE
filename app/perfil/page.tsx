@@ -1,5 +1,6 @@
 'use client';
 import AccountBadge from '@/components/AccountBadge';
+import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileStats from '@/components/ProfileStats';
 import Republicados from '@/components/Republicados';
 
@@ -182,6 +183,7 @@ const PROFILE_THEME_OPTIONS = [
   '#9be15d',
   '#ffd166',
   '#ff8a65',
+  '#e53935',
   '#ffffff',
 ];
 
@@ -376,6 +378,8 @@ export default function PerfilPage() {
   const [saving, setSaving] =
     useState(false);
 
+  const [crop, setCrop] = useState<{source: File | string; kind: 'avatar' | 'cover'} | null>(null);
+  const [customColor, setCustomColor] = useState('#e53935');
   const [profileTheme, setProfileTheme] =
     useState(DEFAULT_PROFILE_THEME);
 
@@ -524,14 +528,14 @@ export default function PerfilPage() {
         localStorage.getItem(themeMigratedKey) === 'true';
       const savedTheme =
         typeof data.user.theme_color === 'string' &&
-        PROFILE_THEME_OPTIONS.includes(data.user.theme_color)
+        /^#[0-9a-f]{6}$/i.test(data.user.theme_color)
           ? data.user.theme_color
           : DEFAULT_PROFILE_THEME;
 
       if (
         !themeWasMigrated &&
         privateTheme &&
-        PROFILE_THEME_OPTIONS.includes(privateTheme)
+        /^#[0-9a-f]{6}$/i.test(privateTheme)
       ) {
         setProfileTheme(privateTheme);
 
@@ -814,6 +818,7 @@ export default function PerfilPage() {
     setBio(user.bio || '');
     setError('');
     setSuccess('');
+    setCustomColor(profileTheme);
     setEditing(true);
   }
 
@@ -885,7 +890,7 @@ export default function PerfilPage() {
     if (
       !user ||
       savingTheme ||
-      !PROFILE_THEME_OPTIONS.includes(color)
+      !/^#[0-9a-f]{6}$/i.test(color)
     ) return;
 
     const previousTheme = profileTheme;
@@ -953,79 +958,28 @@ export default function PerfilPage() {
     avatarInputRef.current?.click();
   }
 
-  async function handleAvatarChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file =
-      event.target.files?.[0];
+  function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) setCrop({ source: file, kind: 'avatar' });
+    event.target.value = '';
+  }
 
-    if (!file) return;
-
-    setUploadingAvatar(true);
+  async function saveCroppedImage(file: File) {
+    if (!crop) return;
+    const kind = crop.kind;
+    const setUploading = kind === 'avatar' ? setUploadingAvatar : setUploadingCover;
+    setUploading(true);
     setError('');
-    setSuccess('');
-
     try {
-      const formData =
-        new FormData();
-
-      formData.append(
-        'file',
-        file
-      );
-
-      const response = await fetch(
-        '/api/profile/avatar',
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.error ||
-            'Não foi possível atualizar sua foto de perfil.'
-        );
-
-        return;
-      }
-
-      setUser(
-        (currentUser) =>
-          currentUser
-            ? {
-                ...currentUser,
-                avatar_url:
-                  data.avatar_url,
-              }
-            : currentUser
-      );
-
-      setSuccess(
-        'Foto de perfil atualizada.'
-      );
-
-      setTimeout(() => {
-        setSuccess('');
-      }, 2000);
-    } catch {
-      setError(
-        'Não foi possível enviar a foto. Tente novamente.'
-      );
-    } finally {
-      setUploadingAvatar(false);
-
-      if (
-        avatarInputRef.current
-      ) {
-        avatarInputRef.current.value =
-          '';
-      }
-    }
+      const form = new FormData();
+      form.set('file', file);
+      const response = await fetch('/api/profile/' + kind, { method: 'POST', body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Não foi possível salvar a imagem.');
+      setUser(current => current ? { ...current, [kind + '_url']: data[kind + '_url'] } : current);
+      setSuccess(kind === 'avatar' ? 'Foto de perfil atualizada.' : 'Capa atualizada.');
+      setCrop(null);
+    } finally { setUploading(false); }
   }
 
   function openCoverPicker() {
@@ -1037,79 +991,10 @@ export default function PerfilPage() {
     coverInputRef.current?.click();
   }
 
-  async function handleCoverChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file =
-      event.target.files?.[0];
-
-    if (!file) return;
-
-    setUploadingCover(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const formData =
-        new FormData();
-
-      formData.append(
-        'file',
-        file
-      );
-
-      const response = await fetch(
-        '/api/profile/cover',
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.error ||
-            'Não foi possível atualizar sua capa.'
-        );
-
-        return;
-      }
-
-      setUser(
-        (currentUser) =>
-          currentUser
-            ? {
-                ...currentUser,
-                cover_url:
-                  data.cover_url,
-              }
-            : currentUser
-      );
-
-      setSuccess(
-        'Capa atualizada com sucesso.'
-      );
-
-      setTimeout(() => {
-        setSuccess('');
-      }, 2000);
-    } catch {
-      setError(
-        'Não foi possível enviar a capa. Tente novamente.'
-      );
-    } finally {
-      setUploadingCover(false);
-
-      if (
-        coverInputRef.current
-      ) {
-        coverInputRef.current.value =
-          '';
-      }
-    }
+  function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) setCrop({ source: file, kind: 'cover' });
+    event.target.value = '';
   }
 
   function handleMediaSelection(
@@ -3721,6 +3606,11 @@ export default function PerfilPage() {
             </div>
 
             <div className="space-y-5">
+              {crop && <ImageCropDialog source={crop.source} kind={crop.kind} onCancel={() => setCrop(null)} onSave={saveCroppedImage} />}
+              <div className="flex flex-wrap gap-3">
+                {user?.avatar_url && <button type="button" className="nook-choice" onClick={() => setCrop({source: user.avatar_url!, kind: 'avatar'})}>Ajustar foto atual</button>}
+                {user?.cover_url && <button type="button" className="nook-choice" onClick={() => setCrop({source: user.cover_url!, kind: 'cover'})}>Ajustar capa atual</button>}
+              </div>
               <div className="grid grid-cols-2 gap-3"><button type="button" onClick={openAvatarPicker} disabled={uploadingAvatar} className="nook-choice">{uploadingAvatar?'Enviando…':'Alterar foto de perfil'}</button><button type="button" onClick={openCoverPicker} disabled={uploadingCover} className="nook-choice">{uploadingCover?'Enviando…':'Alterar capa'}</button></div>
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -3798,6 +3688,11 @@ export default function PerfilPage() {
                   />
                 </div>
 
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="text-sm">Escolher um tom<input aria-label="Seletor de cor do perfil" type="color" value={customColor} onChange={event => setCustomColor(event.target.value)} className="mt-2 block h-12 w-20 cursor-pointer rounded-lg" /></label>
+                  <label className="text-sm">Código hexadecimal<input aria-label="Código hexadecimal da cor" value={customColor} maxLength={7} onChange={event => setCustomColor(event.target.value)} placeholder="#e53935" className="nook-input mt-2 w-32" /></label>
+                  <button type="button" disabled={savingTheme || !/^#[0-9a-f]{6}$/i.test(customColor)} onClick={() => void handleThemeChange(customColor)} className="nook-primary">Aplicar cor</button>
+                </div>
                 <div className="mt-4 grid grid-cols-5 gap-2">
                   {PROFILE_THEME_OPTIONS.map(
                     (color) => (

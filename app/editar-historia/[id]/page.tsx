@@ -485,21 +485,6 @@ export default function EditarHistoriaPage() {
           normalizedStory.cover_url || null
         );
 
-        const requestedChapter =
-          searchParams.get('chapter');
-
-        /*
-         * IMPORTANTE:
-         * Não verificamos se o capítulo está na lista
-         * retornada pela obra. Um capítulo recém-criado
-         * pode ainda não estar nessa lista no momento
-         * da navegação.
-         */
-        if (requestedChapter) {
-          setSelectedChapterId(
-            requestedChapter
-          );
-        }
       } catch (caughtError) {
         if (cancelled) return;
 
@@ -520,7 +505,12 @@ export default function EditarHistoriaPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, searchParams]);
+  }, [id]);
+
+  const requestedChapterId = searchParams.get('chapter');
+  useEffect(() => {
+    setSelectedChapterId(requestedChapterId || null);
+  }, [requestedChapterId]);
 
   useEffect(() => {
     if (!selectedChapterId) {
@@ -664,6 +654,7 @@ export default function EditarHistoriaPage() {
   }, [selectedChapterId]);
 
   useEffect(() => {
+    if (loading || loadingChapter || previewMode) return;
     if (!editorRef.current) return;
     if (!chapter) return;
 
@@ -674,7 +665,7 @@ export default function EditarHistoriaPage() {
       editorRef.current.innerHTML =
         chapterBody || '';
     }
-  }, [chapter, chapterBody]);
+  }, [chapter, chapterBody, loading, loadingChapter, previewMode]);
 
   useEffect(() => {
     if (!showLinkBox) return;
@@ -1515,7 +1506,7 @@ export default function EditarHistoriaPage() {
   async function saveChapter(
     targetStatus?: ChapterStatus
   ) {
-    if (!chapter) return;
+    if (!chapter || savingChapter) return;
 
     const finalStatus =
       targetStatus ||
@@ -1921,6 +1912,10 @@ export default function EditarHistoriaPage() {
 
         return updatedStory;
       });
+      if (finalStatus === 'published') {
+        router.push(`/capitulo-publicado/${normalizedSavedChapter.id}`);
+        router.refresh();
+      }
     } catch (caughtError) {
       setError(
         caughtError instanceof Error

@@ -435,3 +435,58 @@ test("blocks cannot be bypassed with follow requests and muted actors stop gener
     1,
   );
 });
+
+test('group owners can invite after creation; links expire, rotate, revoke and enforce capacity and blocks', async () => {
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../supabase/migrations/20261106211236_group_invitations_and_links.sql',import.meta.url),'utf8'));
+  await db.exec('set role service_role');
+  for (let n=21;n<=42;n++) {
+    await db.query('insert into auth_accounts(id)values($1)',[id(n)]);
+    await db.query('insert into profiles(id,user_id,username)values($1,$1,$2)',[id(n),'person'+n]);
+    await db.query("insert into auth_sessions values($1,$2,now()+interval '1 day')",[id(n),'session'+n]);
+  }
+  const group=await value('select chat_group_create($1,$2,$3)',['session21','Novo grupo',[id(22)]]);
+  const invite=async (session,members)=>value('select chat_group_invite_members($1,$2,$3)',[session,group,members]);
+  assert.equal(await invite('session22',[id(23)]),false);
+  assert.equal(await invite('session24',[id(23)]),false);
+  assert.equal(await invite('session21',[id(23)]),true);
+  assert.equal(await value('select status from chat_group_members where thread_id=$1 and profile_id=$2',[group,id(23)]),'pending');
+  assert.equal(await value("select chat_group_action('session23',$1,'accept')",[group]),true);
+  const first='a'.repeat(64),second='b'.repeat(64);
+  assert.equal(await value('select chat_group_link_manage($1,$2,$3)',['session23',group,first]),false);
+  assert.equal(await value('select chat_group_link_manage($1,$2,$3)',['session21',group,first]),true);
+  assert.deepEqual(Object.keys(await value('select chat_group_link_info($1)',[first])).sort(),['expires_at','name']);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['missing-session',first]),null);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session24',first]),group);
+  assert.equal(await value('select chat_group_link_manage($1,$2,$3)',['session21',group,second]),true);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session25',first]),null);
+  await value("select profile_control('session24',$1,'block')",[id(25)]);
+  assert.equal(await invite('session21',[id(25)]),false);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session25',second]),null);
+  await value("select profile_control('session24',$1,'unblock')",[id(25)]);
+  await db.query("update chat_group_invite_links set expires_at=now()-interval '1 second' where thread_id=$1",[group]);
+  assert.equal(await value('select chat_group_link_info($1)',[second]),null);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session25',second]),null);
+  await value('select chat_group_link_manage($1,$2,$3)',['session21',group,second]);
+  assert.equal(await invite('session21',Array.from({length:11},(_,i)=>id(i+25))),true);
+  assert.equal(await value('select count(*)::int from chat_group_members where thread_id=$1',[group]),15);
+  assert.equal(await invite('session21',[id(36)]),false);
+  assert.equal(await invite('session21',[id(25)]),true,'existing invitations do not reserve another slot');
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session36',second]),null);
+  assert.equal(await value('select chat_group_link_join($1,$2)',['session25',second]),group,'pending members can accept in a full group');
+  assert.equal(await value('select chat_group_link_manage($1,$2,null,true)',['session21',group]),true);
+  assert.equal(await value('select chat_group_link_info($1)',[second]),null);
+  for(const role of ['anon','authenticated']){
+    assert.equal(await value(`select has_table_privilege('${role}','chat_group_invite_links','SELECT')`),false);
+    for(const signature of ['chat_group_invite_members(text,uuid,uuid[])','chat_group_link_manage(text,uuid,text,boolean)','chat_group_link_info(text)','chat_group_link_join(text,text)'])assert.equal(await value(`select has_function_privilege('${role}',$1,'EXECUTE')`,[signature]),false);
+  }
+});
+
+test('chapter replies notify the original commenter and suppress self notifications',async()=>{
+ await db.exec(`reset role; create table public.comments(id uuid primary key,chapter_id uuid,user_id uuid,parent_comment_id uuid); create trigger notify_chapter_comment_reply after insert on public.comments for each row execute function public.notify_chapter_comment_reply(); grant all on public.comments to service_role; set role service_role;`);
+ await db.query('insert into comments values($1,$2,$3,null)',[id(2001),id(3001),id(21)]);
+ await db.query('insert into comments values($1,$2,$3,$4)',[id(2002),id(3001),id(22),id(2001)]);
+ assert.equal(await value("select count(*)::int from user_notifications where source_key=$1 and user_id=$2",['chapter-reply:'+id(2002),id(21)]),1);
+ await db.query('insert into comments values($1,$2,$3,$4)',[id(2003),id(3001),id(21),id(2001)]);
+ assert.equal(await value('select count(*)::int from user_notifications where source_key=$1',['chapter-reply:'+id(2003)]),0);
+});
