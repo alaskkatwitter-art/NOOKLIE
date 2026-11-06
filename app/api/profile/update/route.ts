@@ -2,21 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const PROFILE_THEME_COLORS = new Set([
-  '#ff78b9',
-  '#ff9aca',
-  '#b77cff',
-  '#7c8cff',
-  '#62c8ff',
-  '#61d6a4',
-  '#9be15d',
-  '#ffd166',
-  '#ff8a65',
-  '#ffffff',
-]);
-
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
@@ -142,7 +129,7 @@ export async function PATCH(request: Request) {
     if (Object.prototype.hasOwnProperty.call(body, 'theme_color')) {
       if (
         typeof body.theme_color !== 'string' ||
-        !PROFILE_THEME_COLORS.has(body.theme_color)
+        !/^#[0-9a-f]{6}$/i.test(body.theme_color)
       ) {
         return NextResponse.json(
           { error: 'Cor do perfil inválida.' },
@@ -150,7 +137,7 @@ export async function PATCH(request: Request) {
         );
       }
 
-      updates.theme_color = body.theme_color;
+      updates.theme_color = body.theme_color.toLowerCase();
     }
 
     if (Object.keys(updates).length === 0) {

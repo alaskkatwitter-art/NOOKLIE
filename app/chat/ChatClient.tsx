@@ -1,4 +1,5 @@
 "use client";
+import GroupInvites from "@/components/GroupInvites";
 import AccountBadge from '@/components/AccountBadge';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -622,6 +623,7 @@ export default function ChatClient() {
                   </div>
                 </details>
               </header>
+              {groupChat && thread.initiator_id === me && thread.status === 'accepted' && !thread.blocked && <GroupInvites key={thread.id} threadId={thread.id} onInvited={() => void refresh()} />}
               {groupChat && members.length > 0 && (
                 <details className="chat-members">
                   <summary>

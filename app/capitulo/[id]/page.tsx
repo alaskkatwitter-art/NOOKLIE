@@ -124,6 +124,7 @@ export default function CapituloPage() {
   const [showCommentBox, setShowCommentBox] =
     useState(false);
 
+  const [replyingToComment, setReplyingToComment] = useState<Comment | null>(null);
   const [commentText, setCommentText] =
     useState('');
 
@@ -436,6 +437,7 @@ export default function CapituloPage() {
   }
 
   function openGeneralComment() {
+    setReplyingToComment(null);
     setCommentMode('general');
     setSelectedText('');
     setSelectionOffset(null);
@@ -446,6 +448,7 @@ export default function CapituloPage() {
   }
 
   function handleTextSelection() {
+    setReplyingToComment(null);
     setCommentMode('selection');
 
     const selection =
@@ -491,6 +494,7 @@ export default function CapituloPage() {
   }
 
   function cancelComment() {
+    setReplyingToComment(null);
     setShowCommentBox(false);
     setCommentText('');
     setSelectedText('');
@@ -593,6 +597,7 @@ export default function CapituloPage() {
   }
 
   async function submitComment() {
+    if (sendingComment) return;
     if (
       !commentText.trim() &&
       !selectedSticker
@@ -608,6 +613,7 @@ export default function CapituloPage() {
 
       const payload = {
         chapter_id: id,
+        parent_comment_id: replyingToComment?.id || null,
 
         body:
           commentText.trim() ||
@@ -1198,7 +1204,7 @@ export default function CapituloPage() {
                     {commentMode ===
                     'selection'
                       ? 'Comentando o trecho'
-                      : 'Comentando o capítulo'}
+                      : replyingToComment ? 'Respondendo a @' + (replyingToComment.profiles?.username || 'leitor') : 'Comentando o capítulo'}
                   </p>
 
                   {commentMode ===
@@ -1233,6 +1239,8 @@ export default function CapituloPage() {
               </div>
 
               <textarea
+                data-comment-composer
+                aria-label="Texto do comentário ou resposta"
                 value={commentText}
                 onChange={(event) =>
                   setCommentText(
@@ -1722,7 +1730,9 @@ export default function CapituloPage() {
                         </div>
                       </div>
 
-                      {comment.body.trim() && (
+                      {comment.parent_comment_id && <p className="mb-2 text-xs text-pink-200">Em resposta a @{comments.find(parent => parent.id === comment.parent_comment_id)?.profiles?.username || 'um comentário'}</p>}
+                    <button type="button" className="mb-3 text-sm font-semibold text-pink-300" onClick={() => { openGeneralComment(); setReplyingToComment(comment); setShowCommentBox(true); window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-comment-composer]')?.focus(), 0); }}>Responder</button>
+                    {comment.body.trim() && (
                         <p className="text-gray-300 leading-7">
                           {comment.body}
                         </p>
@@ -1904,6 +1914,8 @@ export default function CapituloPage() {
                       </div>
                     </div>
 
+                    {comment.parent_comment_id && <p className="mb-2 text-xs text-pink-200">Em resposta a @{comments.find(parent => parent.id === comment.parent_comment_id)?.profiles?.username || 'um comentário'}</p>}
+                    <button type="button" className="mb-3 text-sm font-semibold text-pink-300" onClick={() => { openGeneralComment(); setReplyingToComment(comment); setShowCommentBox(true); window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-comment-composer]')?.focus(), 0); }}>Responder</button>
                     {comment.body.trim() && (
                       <p className="text-gray-300 leading-7">
                         {comment.body}

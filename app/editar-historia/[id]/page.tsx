@@ -664,6 +664,7 @@ export default function EditarHistoriaPage() {
   }, [selectedChapterId]);
 
   useEffect(() => {
+    if (loadingChapter || previewMode) return;
     if (!editorRef.current) return;
     if (!chapter) return;
 
@@ -674,7 +675,7 @@ export default function EditarHistoriaPage() {
       editorRef.current.innerHTML =
         chapterBody || '';
     }
-  }, [chapter, chapterBody]);
+  }, [chapter, chapterBody, loadingChapter, previewMode]);
 
   useEffect(() => {
     if (!showLinkBox) return;
@@ -1515,7 +1516,7 @@ export default function EditarHistoriaPage() {
   async function saveChapter(
     targetStatus?: ChapterStatus
   ) {
-    if (!chapter) return;
+    if (!chapter || savingChapter) return;
 
     const finalStatus =
       targetStatus ||
@@ -1921,6 +1922,10 @@ export default function EditarHistoriaPage() {
 
         return updatedStory;
       });
+      if (finalStatus === 'published') {
+        router.push(`/capitulo-publicado/${normalizedSavedChapter.id}`);
+        router.refresh();
+      }
     } catch (caughtError) {
       setError(
         caughtError instanceof Error

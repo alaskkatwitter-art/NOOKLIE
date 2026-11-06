@@ -1,46 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createHash } from 'crypto';
+import { chatActor, uuid, privateHeaders } from '@/lib/chat/server';
 import { createClient } from '@supabase/supabase-js';
 import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
-process.env.NEXT_PUBLIC_SUPABASE_URL!,
+process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_SECRET_KEY!
 );
-
-async function getUserId(request: Request) {
-const cookieHeader = request.headers.get('cookie') || '';
-
-const match = cookieHeader.match(
-/toriland_session=([^;]+)/
-);
-
-if (!match) {
-return null;
-}
-
-const token = match[1];
-
-const tokenHash = createHash('sha256')
-.update(token)
-.digest('hex');
-
-const { data: session } = await supabase
-.from('auth_sessions')
-.select('user_id, expires_at')
-.eq('token_hash', tokenHash)
-.maybeSingle();
-
-if (!session) {
-return null;
-}
-
-if (new Date(session.expires_at) < new Date()) {
-return null;
-}
-
-return session.user_id;
-}
 
 export async function GET(request: Request) {
 try {
@@ -48,7 +14,7 @@ const { searchParams } = new URL(request.url);
 
 const chapterId = searchParams.get('chapter_id');
 
-if (!chapterId) {
+if (typeof chapterId !== 'string' || !uuid.test(chapterId)) {
   return NextResponse.json(
     {
       error: 'Capítulo não informado.',
@@ -118,7 +84,7 @@ error: 'Não foi possível carregar os comentários.',
 
 export async function POST(request: Request) {
 try {
-const userId = await getUserId(request);
+const userId = (await chatActor())?.profileId;
 
 if (!userId) {
   return NextResponse.json(
@@ -134,6 +100,7 @@ const body = await request.json();
 const chapterId = body.chapter_id;
 const commentBody = body.body;
 const selectedText = body.selected_text || null;
+const parentId = body.parent_comment_id || null;
 
 const startOffset =
   typeof body.start_offset === 'number'
@@ -145,7 +112,7 @@ const stickerId =
     ? body.sticker_id
     : null;
 
-if (!chapterId) {
+if (typeof chapterId !== 'string' || !uuid.test(chapterId)) {
   return NextResponse.json(
     {
       error: 'Capítulo não informado.',
@@ -155,9 +122,8 @@ if (!chapterId) {
 }
 
 if (
-  !commentBody ||
   typeof commentBody !== 'string' ||
-  !commentBody.trim()
+  (!commentBody.trim() && !stickerId) || commentBody.length > 10000
 ) {
   return NextResponse.json(
     {
@@ -188,6 +154,14 @@ if (!chapterStory || !(await isPublicStoryVisible(supabase, chapterStory.story_i
   return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404 });
 }
 
+if (parentId !== null) {
+  if (typeof parentId !== 'string' || !uuid.test(parentId)) {
+    return NextResponse.json({error: 'Comentário de origem inválido.'}, {status: 400});
+  }
+  const parent = await supabase.from('comments').select('id').eq('id', parentId).eq('chapter_id', chapterId).maybeSingle();
+  if (parent.error) throw parent.error;
+  if (!parent.data) return NextResponse.json({error: 'O comentário original não está disponível neste capítulo.'}, {status: 404});
+}
 let sticker = null;
 
 if (stickerId) {
@@ -219,6 +193,7 @@ const { data: comment, error } = await supabase
     selected_text: selectedText,
     start_offset: startOffset,
     sticker_id: stickerId,
+    parent_comment_id: parentId,
   })
   .select(`
     id,
@@ -265,7 +240,7 @@ return NextResponse.json(
   {
     comment,
   },
-  { status: 201 }
+  { status: 201, headers: privateHeaders }
 );
 
 } catch {
