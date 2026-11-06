@@ -14,19 +14,13 @@ export async function getPublicStaffBadges(
   supabase: SupabaseClient,
   userId: string
 ): Promise<PublicStaffBadge[]> {
-  const { data: rootAdmin, error: rootError } = await supabase
-    .from('platform_admins')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (rootError) throw rootError;
-
-  const { data: memberships, error: membershipsError } = await supabase
-    .from('team_memberships')
-    .select('role_id, department_id')
-    .eq('user_id', userId)
-    .eq('status', 'active');
-  if (membershipsError) throw membershipsError;
+  const [root, membershipResult] = await Promise.all([
+    supabase.from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle(),
+    supabase.from('team_memberships').select('role_id, department_id').eq('user_id', userId).eq('status', 'active'),
+  ]);
+  if (root.error || membershipResult.error) throw root.error || membershipResult.error;
+  const rootAdmin = root.data;
+  const memberships = membershipResult.data;
 
   const roleIds = Array.from(new Set((memberships || []).map((item) => item.role_id)));
   const departmentIds = Array.from(new Set((memberships || []).map((item) => item.department_id)));
