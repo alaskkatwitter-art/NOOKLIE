@@ -110,8 +110,11 @@ export default function ChatClient() {
     activeThread = useRef(selected),
     mounted = useRef(true),
     pinned = useRef(true);
+  const refreshing = useRef<AbortSignal | null>(null);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
+      if (signal?.aborted || (signal && refreshing.current === signal)) return;
+      if (signal) refreshing.current = signal;
       try {
         const [list, res] = await Promise.all([
           fetch("/api/chat", { cache: "no-store", signal }),
@@ -159,6 +162,8 @@ export default function ChatClient() {
       } catch (e) {
         if (!signal?.aborted && activeThread.current === selected)
           setError((e as Error).message);
+      } finally {
+        if (refreshing.current === signal) refreshing.current = null;
       }
     },
     [router, selected],
@@ -185,8 +190,13 @@ export default function ChatClient() {
     void refresh(c.signal);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh(c.signal);
-    }, 5000);
+    }, selected ? 10000 : 30000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh(c.signal);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       c.abort();
       clearInterval(timer);
     };

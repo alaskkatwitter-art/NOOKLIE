@@ -1,9 +1,10 @@
+import { imageMatchesType } from '@/lib/security/uploads';
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-process.env.NEXT_PUBLIC_SUPABASE_URL!,
+process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_SECRET_KEY!
 );
 
@@ -161,6 +162,10 @@ const fileName = `${crypto.randomUUID()}.${extension}`;
 const filePath = `${userId}/${fileName}`;
 
 const arrayBuffer = await file.arrayBuffer();
+    if (!imageMatchesType(new Uint8Array(arrayBuffer), file.type)) {
+      return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+    }
+
 
 const { error: uploadError } = await supabase.storage
   .from('stickers')

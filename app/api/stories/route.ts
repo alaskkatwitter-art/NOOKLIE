@@ -1,3 +1,4 @@
+import { imageMatchesType } from '@/lib/security/uploads';
 import { contentMediaUrl } from '@/lib/security/content-media';
 import { privateHeaders } from '@/lib/discovery/server';
 import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
@@ -376,6 +377,10 @@ export async function POST(
       Buffer.from(
         arrayBuffer
       );
+    if (!imageMatchesType(buffer, file.type)) {
+      return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+    }
+
 
     /*
      * Upload.

@@ -1,3 +1,4 @@
+import { imageMatchesType } from '@/lib/security/uploads';
 import { chapterKinds } from '@/lib/stories/metadata';
 import {chatActor} from '@/lib/chat/server';
 import {safeChapterHtml} from '@/lib/security/html';
@@ -7,7 +8,7 @@ import crypto from 'crypto';
 import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
@@ -947,6 +948,10 @@ export async function PUT(
     for (
       const file of mediaFiles
     ) {
+      if (!imageMatchesType(new Uint8Array(await file.arrayBuffer()), file.type)) {
+        return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+      }
+
       if (
         file.size >
         MAX_FILE_SIZE
@@ -1150,6 +1155,7 @@ export async function PUT(
         Buffer.from(
           await file.arrayBuffer()
         );
+
 
       const {
         error: uploadError,

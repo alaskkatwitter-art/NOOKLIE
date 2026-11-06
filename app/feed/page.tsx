@@ -656,6 +656,7 @@ function Avatar({
     >
       {profile?.avatar_url ? (
         <img
+          loading="lazy"
           src={contentMediaUrl(profile.avatar_url)}
           alt=""
           className="h-full w-full object-cover"
@@ -883,6 +884,7 @@ function StoryViewer({
             />
           ) : (
             <img
+              loading="lazy"
               key={currentStory.id}
               src={
                 contentMediaUrl(currentStory.media_url)
@@ -1505,6 +1507,7 @@ function SpotifyPreview({
     >
       {data.thumbnail_url ? (
         <img
+          loading="lazy"
           src={contentMediaUrl(data.thumbnail_url)}
           alt=""
           className="h-24 w-24 shrink-0 object-cover"
@@ -1597,6 +1600,7 @@ function PostMedia({
     return (
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
         <img
+          loading="lazy"
           src={contentMediaUrl(item.media_url)}
           alt=""
           className="max-h-[360px] w-full object-contain"
@@ -1613,6 +1617,7 @@ function PostMedia({
           className="aspect-[4/3] overflow-hidden bg-black/40"
         >
           <img
+            loading="lazy"
             src={contentMediaUrl(item.media_url)}
             alt=""
             className="h-full w-full object-cover"
