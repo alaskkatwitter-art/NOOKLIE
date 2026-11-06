@@ -638,3 +638,25 @@ test('anonymous readers cannot fetch a social Story image from the media proxy',
   assert.match(response.headers.get('cache-control'), /private/);
   assert.match(response.headers.get('cache-control'), /no-store/);
 });
+
+test('image upload endpoints reject executable bytes disguised as PNG before writing to Storage', async () => {
+  const token = 'upload-check-session';
+  state.sessions.push({user_id:userId,token_hash:hash(token),expires_at:new Date(Date.now()+60_000).toISOString()});
+  for (const endpoint of ['/api/profile/avatar','/api/profile/cover','/api/stickers']) {
+    const body = new FormData();
+    body.set('file',new File(['<svg onload="alert(1)"></svg>'],'fake.png',{type:'image/png'}));
+    const result = await fetch(baseUrl+endpoint,{method:'POST',headers:{Cookie:`toriland_session=${token}`},body});
+    assert.equal(result.status,415,endpoint);
+  }
+});
+
+test('creating a Portuguese catalogue tag reuses its existing English slug', async () => {
+  state.tags.push({id:'seed-thriller',name:'Suspense',slug:'thriller',category_id:categoryIds.genre});
+  const token = 'translated-tag-session';
+  state.sessions.push({user_id:userId,token_hash:hash(token),expires_at:new Date(Date.now()+60_000).toISOString()});
+  const before = state.tags.length;
+  const response = await fetch(baseUrl+'/api/tags',{method:'POST',headers:{'Content-Type':'application/json',Cookie:`toriland_session=${token}`},body:JSON.stringify({name:'suspense',category:'genre'})});
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.created,false);assert.equal(result.tag.slug,'thriller');assert.equal(state.tags.length,before);
+});

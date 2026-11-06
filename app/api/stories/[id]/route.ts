@@ -1,3 +1,5 @@
+import { imageMatchesType } from '@/lib/security/uploads';
+import { ensureCatalogTag } from '@/lib/stories/tags';
 import bcrypt from 'bcryptjs';
 import {chatActor,uuid,sameOrigin,privateHeaders} from '@/lib/chat/server';
 import {rateLimitKey} from '@/lib/security/rate-key';
@@ -25,14 +27,6 @@ type RouteContext = {
   }>;
 };
 
-function createSlug(text: string) {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 async function getSessionUserId() {
   const cookieStore = await cookies();
@@ -884,6 +878,10 @@ export async function PUT(
         );
       }
 
+
+      if (!imageMatchesType(new Uint8Array(await cover.arrayBuffer()), cover.type)) {
+        return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+      }
       let extension =
         'gif';
 
@@ -1099,34 +1097,6 @@ export async function PUT(
      * ==================================================
      */
 
-    const {
-      error:
-        deleteTagsError,
-    } = await supabase
-      .from('story_tags')
-      .delete()
-      .eq(
-        'story_id',
-        id
-      );
-
-    if (deleteTagsError) {
-      console.error(
-        'Erro ao remover tags antigas:',
-        deleteTagsError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'A história foi atualizada, mas houve um erro ao atualizar as tags.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
     /*
      * ==================================================
      * PREPARA TAGS
@@ -1215,117 +1185,39 @@ export async function PUT(
     const tagIds:
       string[] = [];
 
-    for (
-      const tagName of tagsToInsert
-    ) {
-      const slug =
-        createSlug(
-          tagName
-        );
+    for (const tagName of tagsToInsert) {
+      const isGenre = genre && tagName.toLowerCase() === genre.toLowerCase();
+      const categoryId = categoryMap.get(isGenre ? 'genre' : 'freeform') || null;
+      const tag = await ensureCatalogTag(supabase, tagName, categoryId, userId);
+      if (tag) tagIds.push(tag.id);
+    }
 
-      if (!slug) {
-        continue;
-      }
+    const {
+      error:
+        deleteTagsError,
+    } = await supabase
+      .from('story_tags')
+      .delete()
+      .eq(
+        'story_id',
+        id
+      );
 
-      let {
-        data:
-          existingTag,
-      } =
-        await supabase
-          .from('tags')
-          .select(
-            'id, category_id'
-          )
-          .eq(
-            'slug',
-            slug
-          )
-          .maybeSingle();
+    if (deleteTagsError) {
+      console.error(
+        'Erro ao remover tags antigas:',
+        deleteTagsError
+      );
 
-      if (!existingTag) {
-        const isGenre =
-          genre &&
-          tagName.toLowerCase() ===
-            genre.toLowerCase();
-
-        const categoryId =
-          isGenre
-            ? categoryMap.get(
-                'genre'
-              ) ||
-              null
-            : categoryMap.get(
-                'freeform'
-              ) ||
-              null;
-
-        const {
-          data: newTag,
+      return NextResponse.json(
+        {
           error:
-            createTagError,
-        } =
-          await supabase
-            .from('tags')
-            .insert({
-              name:
-                tagName,
-
-              slug:
-                slug,
-
-              category_id:
-                categoryId,
-
-              created_by:
-                userId,
-            })
-            .select(
-              'id, category_id'
-            )
-            .single();
-
-        if (
-          createTagError
-        ) {
-          const {
-            data:
-              retryTag,
-          } =
-            await supabase
-              .from('tags')
-              .select(
-                'id, category_id'
-              )
-              .eq(
-                'slug',
-                slug
-              )
-              .maybeSingle();
-
-          if (!retryTag) {
-            console.error(
-              'Erro ao criar tag:',
-              createTagError
-            );
-
-            continue;
-          }
-
-          existingTag =
-            retryTag;
-        } else {
-          existingTag =
-            newTag;
+            'A história foi atualizada, mas houve um erro ao atualizar as tags.',
+        },
+        {
+          status: 500,
         }
-      }
-
-      if (
-        existingTag?.id
-      ) {
-        tagIds.push(
-          existingTag.id
-        );
-      }
+      );
     }
 
     /*

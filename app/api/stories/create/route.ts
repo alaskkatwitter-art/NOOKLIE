@@ -1,3 +1,5 @@
+import { imageMatchesType } from '@/lib/security/uploads';
+import { ensureCatalogTag } from '@/lib/stories/tags';
 import { parseStoryMetadata } from '@/lib/stories/metadata';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -227,6 +229,10 @@ export async function POST(request: Request) {
         await coverValue.arrayBuffer();
 
       const fileBuffer = Buffer.from(arrayBuffer);
+      if (!imageMatchesType(fileBuffer, coverValue.type)) {
+        return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+      }
+
 
       const { error: uploadError } =
         await supabase.storage
@@ -352,33 +358,8 @@ export async function POST(request: Request) {
           ? genreCategory?.id || null
           : freeformCategory?.id || null;
 
-        const { data: existingTag } =
-          await supabase
-            .from('tags')
-            .select('id')
-            .eq('slug', tagSlug)
-            .maybeSingle();
-
-        if (existingTag) {
-          tagIds.push(existingTag.id);
-          continue;
-        }
-
-        const { data: newTag, error: tagError } =
-          await supabase
-            .from('tags')
-            .insert({
-              name: tagName,
-              slug: tagSlug,
-              category_id: categoryId,
-              created_by: session.user_id,
-            })
-            .select('id')
-            .single();
-
-        if (!tagError && newTag) {
-          tagIds.push(newTag.id);
-        }
+        const tag = await ensureCatalogTag(supabase, tagName, categoryId, session.user_id);
+        if (tag) tagIds.push(tag.id);
       }
 
       if (tagIds.length > 0) {

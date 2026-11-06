@@ -7,16 +7,11 @@ function route({ visible = true, owner = false, linked = true, missing = false }
   const tables = [];
   let downloads = 0;
   const db = {
-    from(table) {
-      tables.push(table);
-      const query = {
-        select() { return query; },
-        in() { return query; },
-        limit() {
-          return Promise.resolve({ data: linked ? [{ id: 'story', author_id: 'author' }] : [], error: null });
-        },
-      };
-      return query;
+    async rpc(name, args) {
+      assert.equal(name, 'content_media_allowed');
+      assert.equal(args.p_bucket, 'story-covers');
+      tables.push(name);
+      return {data: linked && (visible || owner), error: null};
     },
     storage: {
       from(bucket) {
@@ -37,9 +32,8 @@ function route({ visible = true, owner = false, linked = true, missing = false }
     if (name === '@/lib/discovery/server') return {
       discoveryDb: db, privateHeaders: { 'Cache-Control': 'no-store, private', Vary: 'Cookie' }, uuid: /^[a-f0-9-]{36}$/,
     };
-    if (name === '@/lib/moderation/content-visibility') return {
-      currentViewerProfileId: async () => owner ? 'author' : null,
-      isPublicStoryVisible: async () => visible,
+    if (name === '@/lib/auth/session') return {
+      getSessionTokenHash: async () => owner ? 'author-session-hash' : null,
     };
     throw new Error('Unexpected import: ' + name);
   }, exports);
@@ -52,7 +46,7 @@ test('a visible story cover loads without published chapters', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'image/jpeg');
   assert.equal(await response.text(), 'cover');
-  assert.deepEqual(fixture.tables, ['stories']);
+  assert.deepEqual(fixture.tables, ['content_media_allowed']);
 });
 
 test('hidden or inaccessible story covers remain unavailable to other readers', async () => {

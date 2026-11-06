@@ -1,3 +1,4 @@
+import { findCatalogTag, ensureCatalogTag } from '@/lib/stories/tags';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -142,14 +143,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Escolha uma categoria válida.' }, { status: 400, headers: noStore() });
     }
 
-    const { data: existing, error: existingError } = await supabase
-      .from('tags')
-      .select('id, name, slug, category_id, created_at')
-      .eq('slug', slug)
-      .maybeSingle();
-    if (existingError) {
-      return NextResponse.json({ error: 'Não foi possível verificar se a tag já existe.' }, { status: 503, headers: noStore() });
-    }
+    const existing = await findCatalogTag(supabase, name, slug);
     if (existing) {
       return NextResponse.json({
         created: false,
@@ -158,29 +152,8 @@ export async function POST(request: Request) {
       }, { status: 200, headers: noStore() });
     }
 
-    const { data: tag, error: insertError } = await supabase
-      .from('tags')
-      .insert({ name, slug, category_id: category.id, created_by: userId })
-      .select('id, name, slug, category_id, created_at')
-      .single();
-
-    if (insertError || !tag) {
-      // A concurrent request may have created the same normalized slug.
-      const { data: concurrentTag } = await supabase
-        .from('tags')
-        .select('id, name, slug, category_id, created_at')
-        .eq('slug', slug)
-        .maybeSingle();
-      if (concurrentTag) {
-        return NextResponse.json({
-          created: false,
-          message: 'Essa tag já existe no catálogo.',
-          tag: { ...concurrentTag, category: concurrentTag.category_id === category.id ? category : null },
-        }, { status: 200, headers: noStore() });
-      }
-      console.error('Erro ao publicar tag:', insertError);
-      return NextResponse.json({ error: 'Não foi possível publicar a tag.' }, { status: 503, headers: noStore() });
-    }
+    const tag = await ensureCatalogTag(supabase, name, category.id, userId);
+    if (!tag) throw new Error('Invalid tag');
 
     return NextResponse.json({
       created: true,

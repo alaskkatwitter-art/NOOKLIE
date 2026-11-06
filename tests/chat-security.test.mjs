@@ -23,3 +23,13 @@ test('inline chapter images preserve their position through repeated sanitizatio
   for(const src of ['https://tracker.example/pixel.png','data:image/svg+xml,evil','javascript:alert(1)','/api/content-media?bucket=story-covers&path=other'])assert.ok(!html.safeChapterHtml(`<img src="${src}">`).includes('<img'));
  }finally{if(old===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=old;}
 });
+
+test('image uploads reject empty files, spoofed MIME types and executable formats',()=>{
+ const source=readFileSync(new URL('../lib/security/uploads.ts',import.meta.url),'utf8');
+ const exports={};const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ new Function('require','exports',js)(name=>{assert.equal(name,'@/lib/chat/safety');return safety;},exports);
+ const png=Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]);
+ assert.equal(exports.imageMatchesType(png,'image/png'),true);
+ assert.equal(exports.imageMatchesType(png,'image/jpeg'),false);
+ for(const data of [Buffer.alloc(0),Buffer.from('<svg onload="alert(1)"></svg>'),Buffer.from('<html>not a PNG</html>')])assert.equal(exports.imageMatchesType(data,'image/png'),false);
+});

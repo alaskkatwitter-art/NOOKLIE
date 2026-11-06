@@ -1,3 +1,4 @@
+import { imageMatchesType } from '@/lib/security/uploads';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -99,6 +100,10 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
+    if (!imageMatchesType(fileBuffer, file.type)) {
+      return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
+    }
+
 
     const { error: uploadError } =
       await supabase.storage

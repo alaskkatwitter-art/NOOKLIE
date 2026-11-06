@@ -12,12 +12,15 @@ export type AuthenticatedUserContext = {
   sessionTokenHash: string;
 };
 
-export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
+export async function getSessionTokenHash(): Promise<string | null> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('toriland_session')?.value;
-  if (!sessionToken) return null;
+  return sessionToken ? crypto.createHash('sha256').update(sessionToken).digest('hex') : null;
+}
 
-  const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
+  const sessionTokenHash = await getSessionTokenHash();
+  if (!sessionTokenHash) return null;
   const { data: session, error } = await supabase
     .from('auth_sessions')
     .select('user_id, expires_at')
