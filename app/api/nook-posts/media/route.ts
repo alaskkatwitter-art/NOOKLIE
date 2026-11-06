@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
