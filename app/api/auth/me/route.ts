@@ -9,8 +9,9 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY!
 );
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const summary = new URL(request.url).searchParams.get('summary') === '1';
     const cookieStore = await cookies();
 
     const sessionToken =
@@ -113,6 +114,14 @@ export async function GET() {
         },
         { status: 401 }
       );
+    }
+
+    if (summary) {
+      const { id, username, display_name, avatar_url, verified, is_official } = profile;
+      return NextResponse.json({
+        authenticated: true,
+        user: { id, username, display_name, avatar_url, verified, is_official },
+      });
     }
 
     const staffBadges = await getPublicStaffBadges(supabase, session.user_id);

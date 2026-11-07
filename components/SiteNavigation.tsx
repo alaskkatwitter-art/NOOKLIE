@@ -76,7 +76,7 @@ export default function SiteNavigation() {
       if (authTransition) lastLoaded.current = 0;
       if (!authTransition && Date.now() - lastLoaded.current < 30000) return;
       try {
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch("/api/auth/me?summary=1", {
           cache: "no-store",
           signal: controller.signal,
         });

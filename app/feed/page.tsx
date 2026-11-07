@@ -3238,7 +3238,7 @@ export default function FeedPage() {
       try {
         const response =
           await fetch(
-            '/api/auth/me',
+            '/api/auth/me?summary=1',
             {
               cache: 'no-store',
             }
