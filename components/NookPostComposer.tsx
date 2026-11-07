@@ -1,6 +1,7 @@
 'use client';
 
 import { feedImageTypes, feedVideoTypes, maxFeedUploadBytes } from '@/lib/social/attachments';
+import { activeMention } from '@/lib/social/mentions';
 import LinkedNewsCard from './LinkedNewsCard';
 import {isNewsArticle, newsArticles, newsArticleSlugs} from '@/lib/news/articles';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -34,6 +35,41 @@ export default function NookPostComposer({
   initialBody = '',
 }: Props) {
   const [body, setBody] = useState(initialBody);
+  const [caret, setCaret] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
+  const [matches, setMatches] = useState<{ query: string; people: { id: string; username: string; display_name: string | null }[] }>();
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const mention = mentionDismissed ? null : activeMention(body, caret);
+  const query = open ? mention?.query : undefined;
+  const suggestions = query && matches?.query === query ? matches.people : [];
+
+  useEffect(() => {
+    if (!query) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/chat/people?q=' + encodeURIComponent(query), { signal: controller.signal });
+        if (!response.ok) return;
+        const { people } = await response.json();
+        if (!controller.signal.aborted) setMatches({ query, people: (people ?? []).slice(0, 5) });
+      } catch { /* Typing a full username works without suggestions. */ }
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [query]);
+
+  function selectMention(username: string) {
+    if (!mention) return;
+    const prefix = body.slice(0, mention.start) + '@' + username + ' ';
+    const updated = prefix + body.slice(mention.end);
+    if (updated.length > MAX_TEXT) return;
+    setBody(updated);
+    setCaret(prefix.length);
+    setMentionDismissed(true);
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(prefix.length, prefix.length);
+    });
+  }
   const [storyId, setStoryId] = useState(initialStoryId);
   const [newsSlug,setNewsSlug]=useState(isNewsArticle(initialNewsSlug)?initialNewsSlug:'');
   const [stories, setStories] = useState<Story[]>([]);
@@ -301,16 +337,36 @@ export default function NookPostComposer({
         <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
           {/* Texto */}
           <textarea
+            ref={textInput}
             value={body}
-            onChange={(event) =>
-              setBody(event.target.value.slice(0, MAX_TEXT))
-            }
+            maxLength={MAX_TEXT}
+            onChange={(event) => {
+              setBody(event.target.value);
+              setCaret(event.target.selectionStart);
+              setMentionDismissed(false);
+            }}
+            onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && suggestions.length) {
+                event.stopPropagation();
+                setMentionDismissed(true);
+              }
+            }}
             aria-label="Texto do aviso ou publicação"
-            placeholder="O que você quer compartilhar? Use # para marcar um assunto."
+            placeholder="O que você quer compartilhar? Use @ para mencionar alguém ou # para marcar um assunto."
             rows={5}
             autoFocus
             className="w-full resize-y rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-[15px] leading-7 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/35"
           />
+
+          {suggestions.length > 0 && <ul aria-label="Sugestões de menções" className="mt-2 rounded-xl border border-pink-200/20 bg-[#211520] p-1">
+            {suggestions.map(person => <li key={person.id}>
+              <button type="button" onClick={() => selectMention(person.username)} disabled={publishing}
+                className="block min-h-11 w-full rounded-lg px-3 text-left text-sm text-pink-200 hover:bg-white/10">
+                @{person.username}{person.display_name && <span className="ml-2 text-white/70">{person.display_name}</span>}
+              </button>
+            </li>)}
+          </ul>}
 
           {/* Contador */}
           <div className="mt-2 flex justify-end">

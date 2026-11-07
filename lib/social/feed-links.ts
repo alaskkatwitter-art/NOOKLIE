@@ -1,3 +1,5 @@
+import { mentionPattern } from './mentions';
+
 const hashtag = /^[\p{L}\p{N}_]{1,64}$/u;
 
 export function normalizeHashtag(value: string) {
@@ -5,7 +7,9 @@ export function normalizeHashtag(value: string) {
   return hashtag.test(tag) ? tag.toLocaleLowerCase('pt-BR') : '';
 }
 
-export const feedTokenPattern = /(https?:\/\/[^\s<>]+|(?<![\p{L}\p{N}_])#[\p{L}\p{N}_]{1,64}(?![\p{L}\p{N}_]))/gu;
+const linkToken = /https?:\/\/[^\s<>]+/;
+const hashtagToken = /(?<![\p{L}\p{N}_])#[\p{L}\p{N}_]{1,64}(?![\p{L}\p{N}_])/u;
+export const feedTokenPattern = new RegExp(`(${linkToken.source}|${hashtagToken.source}|${mentionPattern.source})`, 'gu');
 
 export function linkedVideoId(value: string, currentOrigin: string) {
   const url = URL.parse(value);

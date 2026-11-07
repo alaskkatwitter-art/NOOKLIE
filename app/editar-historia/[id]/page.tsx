@@ -1,4 +1,5 @@
 'use client';
+import ChapterBanner from '@/components/ChapterBanner';
 import StoryPublicationControls from '@/components/StoryPublicationControls';
 import type { StoryPublication } from '@/lib/stories/publication';
 import ChapterBannerEditor from '@/components/ChapterBannerEditor';
@@ -2235,6 +2236,8 @@ export default function EditarHistoriaPage() {
 
         .editor-toolbar-button {
           min-width: 34px;
+          flex-shrink: 0;
+          white-space: nowrap;
           height: 34px;
           display: inline-flex;
           align-items: center;
@@ -2254,6 +2257,7 @@ export default function EditarHistoriaPage() {
 
         .editor-toolbar-divider {
           width: 1px;
+          flex-shrink: 0;
           height: 24px;
           margin: 0 3px;
           background: rgba(255, 255, 255, 0.1);
@@ -2321,8 +2325,8 @@ export default function EditarHistoriaPage() {
         )}
 
         {!chapter ? (
-          <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)_350px]">
-            <aside className="lg:sticky lg:top-24 lg:self-start">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
+            <aside className="xl:sticky xl:top-24 xl:self-start">
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-black/20">
                   {coverPreview ? (
@@ -2594,7 +2598,7 @@ export default function EditarHistoriaPage() {
               </form>
             </section>
 
-            <aside className="lg:sticky lg:top-24 lg:self-start">
+            <aside className="xl:sticky xl:top-24 xl:self-start">
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -2713,7 +2717,7 @@ export default function EditarHistoriaPage() {
             </aside>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
               <ChapterBannerEditor key={chapter.id} chapterId={chapter.id} value={chapter.banner_url||null} onChange={banner=>setChapter(old=>old?{...old,banner_url:banner}:old)}/>
               <button type="button" onClick={clearChapterSelection} className="nook-choice w-full">Editar informações da obra</button>
@@ -2894,8 +2898,8 @@ export default function EditarHistoriaPage() {
 
                   {storyMetadata.story_kind === 'original' && !chapter.published && <BetaReadingInvite key={chapter.id} chapterId={chapter.id} />}
                   <details className="mb-5 rounded-2xl border border-[#ff9bca]/20 bg-[#ff9bca]/[.04] p-4" open={chapterStatus==='scheduled'||undefined}><summary className="min-h-9 cursor-pointer text-sm font-semibold text-[#ffb9da]">Agendar atualização</summary><div className="mt-4 flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 text-xs text-white/65">Dia e horário de publicação<input type="datetime-local" value={scheduledFor} onChange={e=>setScheduledFor(e.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-[#171018] px-3 text-sm text-white [color-scheme:dark]"/></label><button type="button" disabled={savingChapter||mediaUploading||!scheduledFor} onClick={()=>void saveChapter('scheduled')} className="nook-primary">Agendar capítulo</button></div><p className="mt-3 text-xs leading-6 text-white/50">Horário do seu dispositivo. A atualização fica visível no calendário de quem segue você e é liberada automaticamente no minuto marcado.</p>{chapterStatus==='scheduled'&&<button type="button" disabled={savingChapter} onClick={()=>void saveChapter('draft')} className="mt-2 min-h-11 text-xs text-rose-200">Cancelar agendamento e salvar como rascunho</button>}</details>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
-                    {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="max-h-80 w-full object-cover"/>}
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02]">
+                    {chapter.banner_url&&<ChapterBanner value={chapter.banner_url} className="max-h-80 w-full rounded-t-2xl"/>}
                     <div className="border-b border-white/10 bg-black/20 px-3 sm:px-6 py-3">
                       <label className="block text-sm font-semibold text-pink-200">No sumário
                         <select value={entryKind} onChange={event => setEntryKind(event.target.value as ChapterKind)} className="ml-3 min-h-11 rounded-xl border border-pink-300/20 bg-[#171018] px-3 text-white">
@@ -2945,8 +2949,8 @@ export default function EditarHistoriaPage() {
                       </article>
                     ) : (
                       <>
-                        <div className="sticky top-[61px] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
-                          <div className="flex flex-wrap items-center gap-1 p-2">
+                        <div className="sticky top-[var(--site-shell-height)] z-30 border-b border-white/10 bg-[#0d0a0e]/98 backdrop-blur">
+                          <div className="flex items-center gap-1 overflow-x-auto p-2 sm:flex-wrap">
                             <button
                               type="button"
                               onMouseDown={(

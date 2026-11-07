@@ -1,4 +1,5 @@
 'use client';
+import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ImageCropDialog from '@/components/ImageCropDialog';
@@ -292,7 +293,7 @@ function renderPostBody(
     <div className="whitespace-pre-wrap text-sm leading-7 text-white/70">
       {parts.map((part, index) => (
         <React.Fragment key={index}>
-          {part}
+          <PostMentions text={part} />
 
           {index < urls.length && (
             <SpotifyPreview

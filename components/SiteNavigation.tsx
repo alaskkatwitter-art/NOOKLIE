@@ -3,10 +3,11 @@
 import AccountBadge from '@/components/AccountBadge';
 import { contentMediaUrl } from "@/lib/security/content-media";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   Bell,
+  ArrowLeft,
   BookOpen,
   Compass,
   House,
@@ -20,12 +21,24 @@ import {
   Library,
   CalendarDays,
   HeartHandshake,
+  Heart,
   ShieldCheck,
   Sparkles,
   Briefcase,
   Users,
   LogOut,
 } from "lucide-react";
+
+import { notificationReturnParam, notificationsPath } from '@/lib/notifications/presentation';
+
+function NotificationsBackLink() {
+  const search = useSearchParams();
+  const pathname = usePathname();
+  if (pathname === notificationsPath || search.get(notificationReturnParam) !== 'notificacoes') return null;
+  return <Link href={notificationsPath} className="inline-flex min-h-11 items-center gap-2 px-4 text-sm font-semibold text-pink-200 hover:underline">
+    <ArrowLeft size={16} aria-hidden="true" /> Voltar às notificações
+  </Link>;
+}
 
 type User = {
   username: string;
@@ -49,6 +62,7 @@ const drawerLinks = [
   ["/fandoms", "Meus universos", Sparkles],
   ["/personagens", "Personagens favoritos", Sparkles],
   ["/solicitacoes", "Solicitações de seguidores", Users],
+  ["/doacoes", "Doação voluntária", Heart],
   ["/equipe", "Equipe do Nooklie", Users],
   ["/oportunidades", "Faça parte da equipe", Briefcase],
 ] as const;
@@ -268,7 +282,8 @@ export default function SiteNavigation() {
           </div>
         </div>
       </header>
-      <nav aria-label="Navegação principal" className="site-navigation">
+      <Suspense fallback={null}><NotificationsBackLink /></Suspense>
+      {!pathname.startsWith("/editar-historia/") && !pathname.endsWith("/novo-capitulo") && <nav aria-label="Navegação principal" className="site-navigation">
         {links.map(([href, label, Icon]) => (
           <Link
             key={href}
@@ -279,7 +294,7 @@ export default function SiteNavigation() {
             <span>{label}</span>
           </Link>
         ))}
-      </nav>
+      </nav>}
       <dialog
         ref={drawer}
         aria-labelledby="site-menu-title"

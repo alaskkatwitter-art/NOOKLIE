@@ -5,3 +5,14 @@ export function notificationHref(value: unknown): string | null {
     return url.origin === 'https://nooklie.vercel.app' ? url.pathname + url.search + url.hash : null;
   } catch { return null; }
 }
+
+export const notificationReturnParam = 'origem';
+export const notificationsPath = '/notificacoes';
+
+export function notificationDestination(value: unknown): string | null {
+  const href = notificationHref(value);
+  if (!href) return null;
+  const url = new URL(href, 'https://nooklie.vercel.app');
+  if (url.pathname !== notificationsPath) url.searchParams.set(notificationReturnParam, 'notificacoes');
+  return url.pathname + url.search + url.hash;
+}

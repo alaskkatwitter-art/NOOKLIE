@@ -1,7 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
-import { contentMediaUrl } from "@/lib/security/content-media";
+import ChapterBanner from "./ChapterBanner";
+import { chapterBannerTypes, maxChapterBannerBytes } from "@/lib/stories/chapter-banner";
 export default function ChapterBannerEditor({
   chapterId,
   value,
@@ -14,21 +15,29 @@ export default function ChapterBannerEditor({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  async function save(file?: File) {
+  const [youtube, setYoutube] = useState("");
+  async function save(media?: File | string) {
+    if (media instanceof File && media.size > maxChapterBannerBytes) {
+      setError("Escolha uma imagem ou vídeo de até 4 MB.");
+      if (input.current) input.current.value = "";
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const body = new FormData();
-      if (file) body.set("file", file);
+      if (typeof media === "string") body.set("youtube", media);
+      else if (media) body.set("file", media);
       else body.set("remove", "true");
       const r = await fetch(`/api/chapters/${chapterId}/banner`, {
         method: "PUT",
         body,
       });
-      const data = await r.json();
+      const data = await r.json().catch(() => null);
       if (!r.ok)
-        throw Error(data.error || "Não foi possível alterar o banner.");
+        throw Error(data?.error || "Não foi possível alterar o banner.");
       onChange(data.banner_url);
+      setYoutube("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tente novamente.");
     } finally {
@@ -42,21 +51,14 @@ export default function ChapterBannerEditor({
         <ImagePlus size={17} className="text-[#ff9bca]" />
         Banner do capítulo
       </h2>
-      <p className="mt-2 text-xs leading-6 text-white/50">
-        Aparece acima do título. Imagens no texto podem ser inseridas pela barra
-        do editor, na posição do cursor.
+      <p className="mt-2 text-xs leading-6 text-white/65">
+        Adicione uma imagem, um vídeo MP4 ou WebM de até 4 MB ou um link do YouTube. O banner aparece acima do título.
       </p>
-      {value && (
-        <img
-          src={contentMediaUrl(value)}
-          alt="Banner do capítulo"
-          className="mt-3 aspect-[3/1] w-full rounded-xl object-cover"
-        />
-      )}
+      {value && <ChapterBanner value={value} className="mt-3 max-h-40 w-full rounded-xl" />}
       <input
         ref={input}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={chapterBannerTypes.join(",")}
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.[0]) void save(e.target.files[0]);
@@ -68,7 +70,15 @@ export default function ChapterBannerEditor({
         disabled={busy}
         className="nook-choice mt-3 w-full"
       >
-        {busy ? "Salvando…" : value ? "Substituir banner" : "Adicionar banner"}
+        {busy ? "Salvando…" : "Enviar da galeria"}
+      </button>
+      <label className="mt-3 block text-xs text-white/75">
+        Link do YouTube
+        <input type="url" value={youtube} onChange={event => setYoutube(event.target.value)} maxLength={512}
+          className="nook-input mt-2 w-full" placeholder="https://youtu.be/…" />
+      </label>
+      <button type="button" disabled={busy || !youtube.trim()} onClick={() => void save(youtube)} className="nook-choice mt-2 w-full disabled:opacity-50">
+        Usar vídeo do YouTube
       </button>
       {value && (
         <button

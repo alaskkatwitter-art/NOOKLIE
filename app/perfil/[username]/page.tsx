@@ -1,4 +1,5 @@
 'use client';
+import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
@@ -1110,9 +1111,7 @@ export default function PublicProfilePage() {
 
                           {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>{post.body && (
                             <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
-                              {
-                                post.body
-                              }
+                              <PostMentions text={post.body} />
                             </p>
                           )}
 

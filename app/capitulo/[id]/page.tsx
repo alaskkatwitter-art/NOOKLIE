@@ -1,4 +1,5 @@
 'use client';
+import ChapterBanner from '@/components/ChapterBanner';
 
 import AccountBadge from '@/components/AccountBadge';
 import Link from 'next/link';
@@ -1087,7 +1088,7 @@ export default function CapituloPage() {
 
         {/* CABEÇALHO */}
 
-        {chapter.banner_url&&<img src={contentMediaUrl(chapter.banner_url)} alt="Banner do capítulo" className="mb-8 max-h-96 w-full rounded-3xl object-cover"/>}
+        {chapter.banner_url&&<ChapterBanner value={chapter.banner_url} className="mb-8 max-h-96 w-full rounded-3xl"/>}
         <header className="chapter-heading mb-10 border-b border-[#ff9bca]/15 pb-8 text-center">
           <p className="text-sm text-[#ff4f9a] mb-2">
             {chapter.entry_kind && chapter.entry_kind !== 'chapter' ? chapterKinds[chapter.entry_kind] : `Capítulo ${chapter.chapter_number}`}
@@ -1161,7 +1162,7 @@ export default function CapituloPage() {
             className="
               fixed
               inset-0
-              z-50
+              z-[80]
               bg-black/70
               flex
               items-end
@@ -1566,13 +1567,14 @@ export default function CapituloPage() {
             className="
               fixed
               inset-0
-              z-50
+              z-[80]
               bg-black/70
               flex
               items-end
               md:items-center
               justify-center
               p-4
+              pb-[max(1rem,env(safe-area-inset-bottom))]
             "
             onClick={() =>
               setActiveCommentGroup([])
@@ -1582,7 +1584,7 @@ export default function CapituloPage() {
               className="
                 w-full
                 max-w-xl
-                max-h-[80vh]
+                max-h-[80dvh]
                 overflow-y-auto
                 bg-[#151515]
                 border
