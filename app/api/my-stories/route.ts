@@ -1,3 +1,4 @@
+import { storyPublication } from '@/lib/stories/publication';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -175,7 +176,7 @@ export async function GET() {
             title,
             description,
             cover_url,
-            status,
+            status, fandom, release_at,
             created_at,
             updated_at,
             rating
@@ -234,7 +235,7 @@ export async function GET() {
       await supabase
         .from('chapters')
         .select(
-          'id, story_id'
+          'id, story_id, published'
         )
         .in(
           'story_id',
@@ -300,6 +301,8 @@ export async function GET() {
       );
     }
 
+    const publishedIds = new Set((chapters || []).filter(chapter => chapter.published).map(chapter => chapter.story_id));
+
     const likesCountByStory =
       new Map<string, number>();
 
@@ -329,8 +332,8 @@ export async function GET() {
             story.description,
           cover_url:
             story.cover_url,
-          status:
-            story.status,
+          status: storyPublication(story.release_at, publishedIds.has(story.id)),
+          editorial_status: story.status,
           created_at:
             story.created_at,
           updated_at:
@@ -354,8 +357,7 @@ export async function GET() {
           genre:
             null,
 
-          fandom:
-            null,
+          fandom: story.fandom,
         })
       );
 

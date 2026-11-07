@@ -15,6 +15,16 @@ const updates = [
   {title:'Navegação mais leve',body:'Também reduzimos consultas repetidas durante a navegação e deixamos os cartões de histórias mais leves, para que a troca de páginas faça menos trabalho desnecessário. Vamos continuar acompanhando o desempenho conforme mais pessoas chegarem.'},
   {title:'O Jornal agora também tem conversa',body:'As notícias ganharam uma seção de comentários, inclusive o guia de boas-vindas e a matéria sobre obras originais. Entre na sua conta para contar o que achou, fazer uma pergunta ou responder a outro comentário. A conversa fica vinculada à notícia em que foi publicada.'},
 ];
+const latestUpdates = [
+  { title: 'Salve a obra pelo resumo', body: 'Abra os três pontinhos no resumo da história para adicioná-la à Biblioteca ou a uma lista de leitura. Você também pode criar uma lista nesse mesmo menu ou pela aba Listas de leitura da Biblioteca.' },
+  { title: 'Publicação da obra e dos capítulos', body: 'Em Editar obra, veja se sua história está publicada, agendada, em rascunho ou fora do ar. Você pode publicar, agendar ou retirar a obra do ar. Os leitores só têm acesso quando há um capítulo publicado. Ao publicar um capítulo, você recebe uma confirmação com o atalho Compartilhar no feed. Também corrigimos o salvamento das informações da obra e das tags.' },
+  { title: 'Mais espaço para conversar no feed', body: 'Toque em uma publicação para abrir a conversa e rolar pelas respostas. Você pode curtir, nooklar, salvar e responder com uma imagem. As respostas que você salva aparecem em Respostas salvas no feed.' },
+  { title: 'Vídeos e hashtags no feed', body: 'Agora você pode anexar vídeos em MP4 ou WebM. Os arquivos de um post podem somar até 4 MB. Use Copiar link do vídeo e cole o endereço em outro post para reproduzir o mesmo arquivo. Digite uma hashtag no texto, como #Leitura, ou use a busca do feed para encontrar publicações sobre um assunto.' },
+  { title: 'Capas inteiras e fandoms no Explorar', body: 'No celular, as capas aparecem inteiras e as sinopses ficam mais curtas nos cartões. O fandom salvo na obra aparece nos detalhes e na busca, e o editor sugere fandoms já cadastrados pela comunidade.' },
+  { title: 'Personagens favoritos e wiki', body: 'Em Meus universos, abra Personagens favoritos para guardar seus personagens e contribuir com a wiki. Para cadastrar uma página ou sugerir uma edição, inclua uma fonte que a equipe possa conferir antes de aprovar.' },
+  { title: 'Conheça a equipe do Nooklie', body: 'A nova página Equipe do Nooklie mostra quem atua em cada área, com o cargo e o link para o perfil. O diretório acompanha as nomeações ativas do painel.' },
+];
+
 export default function CommunityUpdatePage(){
   return <main className="min-h-screen bg-[#100b12] px-5 py-10 text-white sm:py-16"><div className="mx-auto max-w-3xl">
     <Link href="/noticias" className="inline-flex min-h-11 items-center text-sm font-semibold text-pink-200 hover:underline">Voltar ao Jornal Nooklie</Link>
@@ -25,6 +35,14 @@ export default function CommunityUpdatePage(){
       <p className="mt-6 text-lg leading-8 text-pink-100">Novas opções para o perfil, correções na escrita e mais espaço para conversar.</p>
       <p className="mt-5 leading-8 text-white/80">Os primeiros testes do Nooklie trouxeram sugestões, dúvidas e relatos de erros que nos ajudaram a enxergar o que precisava melhorar. Obrigada a cada pessoa que explorou a plataforma e compartilhou sua experiência. As mudanças abaixo já estão disponíveis.</p>
       <div className="mt-9 space-y-9">{updates.map(update=><section key={update.title}><h2 className="text-xl font-bold text-pink-100 sm:text-2xl">{update.title}</h2><p className="mt-3 leading-8 text-white/80">{update.body}</p></section>)}</div>
+      <section className="mt-10 border-t border-pink-200/20 pt-7" aria-labelledby="novidades-7-novembro">
+        <p className="text-sm text-pink-200"><time dateTime="2026-11-07">Atualizado em 7 de novembro de 2026</time></p>
+        <h2 id="novidades-7-novembro" className="mt-2 text-2xl font-bold">Mais mudanças pedidas pela comunidade</h2>
+        <div className="mt-6 space-y-7">{latestUpdates.map(update => <section key={update.title}>
+          <h3 className="text-xl font-bold text-pink-100">{update.title}</h3>
+          <p className="mt-2 leading-8 text-white/80">{update.body}</p>
+        </section>)}</div>
+      </section>
       <footer className="mt-10 border-t border-pink-200/15 pt-6 leading-8 text-white/75"><p>Somos uma equipe reduzida e voluntária, e os relatos da comunidade ajudam a orientar os próximos passos. Se encontrar um erro, conte o que aconteceu na <Link href="/ouvidoria" className="font-semibold text-pink-200 underline">Ouvidoria</Link>. Para conversar sobre esta atualização, use os comentários logo abaixo.</p><p className="mt-4 font-bold text-pink-200">Equipe Nooklie</p></footer>
     </article>
     <ShareNews slug="atualizacao-6-novembro-2026"/><NewsComments article="atualizacao-6-novembro-2026" />

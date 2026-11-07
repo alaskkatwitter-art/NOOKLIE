@@ -1,7 +1,20 @@
 'use client';
+import { useEffect, useId, useState } from 'react';
 import { StoryMetadata, storyFormats, storyKinds } from '@/lib/stories/metadata';
 
 export function StoryKindFields({ value, onChange }: { value: StoryMetadata; onChange: (value: StoryMetadata) => void }) {
+  const fandomListId = useId();
+  const [fandoms, setFandoms] = useState<{ id: string; name: string }[]>([]);
+  const isOriginal = value.story_kind === 'original';
+  useEffect(() => {
+    if (isOriginal) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch('/api/tags?category=fandom&q=' + encodeURIComponent(value.fandom.slice(0, 100)), { signal: controller.signal })
+        .then(response => response.json()).then(data => setFandoms(data.tags ?? [])).catch(() => {});
+    }, 200);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [isOriginal, value.fandom]);
   return (
     <fieldset className="space-y-4 rounded-2xl border border-pink-300/20 bg-gradient-to-br from-[#33172a] to-[#160e18] p-4 sm:p-5">
       <legend className="px-2 text-sm font-bold text-pink-200">Que tipo de história você vai publicar?</legend>
@@ -36,7 +49,8 @@ export function StoryKindFields({ value, onChange }: { value: StoryMetadata; onC
         </label>
       ) : (
         <label className="block text-sm font-semibold">Fandom ou universo
-          <input value={value.fandom} onChange={e => onChange({ ...value, fandom: e.target.value })} maxLength={200} placeholder="Ex.: Harry Potter, BTS…" className="mt-2 w-full rounded-xl border border-white/20 bg-[#100b12] p-3" />
+          <input list={fandomListId} value={value.fandom} onChange={e => onChange({ ...value, fandom: e.target.value })} maxLength={200} placeholder="Ex.: Harry Potter, BTS…" className="mt-2 w-full rounded-xl border border-white/20 bg-[#100b12] p-3" />
+          <datalist id={fandomListId}>{fandoms.map(fandom => <option key={fandom.id} value={fandom.name} />)}</datalist>
         </label>
       )}
     </fieldset>

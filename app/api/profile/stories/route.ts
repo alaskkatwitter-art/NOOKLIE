@@ -19,7 +19,7 @@ export async function GET() {
      * Não depende de capítulos publicados.
      */
     const { data: stories, error: storiesError } = await supabase
-      .from('stories')
+      .from('released_stories')
       .select(`
         id,
         author_id,
@@ -47,7 +47,6 @@ export async function GET() {
       );
     }
 
-    console.log('HISTÓRIAS ENCONTRADAS:', stories);
 
     return NextResponse.json({
       stories: stories || [],

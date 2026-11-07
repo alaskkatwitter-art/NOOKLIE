@@ -395,7 +395,7 @@ export async function POST(request: Request) {
         data: story,
         error: storyError,
       } = await supabase
-        .from('stories')
+        .from('released_stories')
         .select('id')
         .eq('id', storyId)
         .eq('author_id', userId)

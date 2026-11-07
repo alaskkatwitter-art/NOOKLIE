@@ -91,3 +91,64 @@ test('beta drafts and notes are visible only to the author and the accepted read
     assert.equal((await rows(`select has_function_privilege('${role}','public.beta_reading_action(uuid,text,uuid,uuid,text,text,text)','EXECUTE') ok`))[0].ok, false);
   }
 });
+
+test('release gates, durable lists, feed media and wiki reviews preserve ownership', async () => {
+  const author = id(102), reader = id(101), story = id(204), chapter = id(304);
+  await db.exec(`
+    alter table stories add column accepts_translation boolean default false;
+    alter table chapters add column publication_status text default 'draft', add column updated_at timestamptz default now(), add column banner_url text;
+    create table scheduled_chapters(id uuid primary key default gen_random_uuid(),chapter_id uuid,scheduled_for timestamptz);
+    alter table reading_lists add column name text, add column description text, add column is_public boolean default false, add column created_at timestamptz default now();
+    alter table reading_lists alter column id set default gen_random_uuid();
+    alter table reading_list_items add unique(list_id,story_id);
+    alter table nook_posts add column image_url text, add column moderation_hidden_at timestamptz, add column news_slug text, add column pinned boolean;
+    alter table nook_comments add constraint nook_comments_content_check check (char_length(trim(content))>0);
+    alter table nook_post_media add column post_id uuid, add column media_url text,
+      add column media_type text, add column position int,
+      add constraint nook_post_media_media_type_check check (media_type in ('image','gif'));
+    alter table chapter_media add column chapter_id uuid, add column media_url text;
+    alter table social_stories add column user_id uuid, add column media_url text, add column expires_at timestamptz;
+    create schema storage;
+    create table storage.buckets(id text primary key,allowed_mime_types text[]);
+    insert into storage.buckets values('nook-media','{image/png}');
+    update profiles set is_private=false where id='${author}';
+  `);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261107030000_reading_lists_publication_feed_and_character_wiki.sql', import.meta.url), 'utf8'));
+  assert.deepEqual(await rows(`select id from released_stories where id='${story}'`), []);
+  assert.equal((await rows(`select set_story_release('${story}','${reader}','publish',null) state`))[0].state, null);
+  assert.equal((await rows(`select set_story_release('${story}','${author}','publish',null) state`))[0].state, 'no_chapter');
+  assert.equal((await rows(`select set_story_release('${story}','${author}','unpublish',null) state`))[0].state, 'unpublished');
+  await db.exec(`update chapters set published=true,publication_status='published' where id='${chapter}'`);
+  assert.deepEqual(await rows(`select id from released_stories where id='${story}'`), []);
+  assert.equal((await rows(`select set_story_release('${story}','${author}','publish',null) state`))[0].state, 'published');
+  assert.equal((await rows(`select count(*)::int total from user_notifications where source_key='chapter-published:${chapter}'`))[0].total, 1);
+  const [{ details }] = await rows(`select save_story_details('${story}','${author}','{"title":"A nova edição","fandom":"Nookverso"}',array['${id(402)}']::uuid[]) details`);
+  assert.equal(details.title, 'A nova edição');
+  assert.equal(details.fandom, 'Nookverso');
+  assert.equal(details.tags[0].slug, 'romance');
+  assert.equal((await rows(`select count(*)::int total from search_catalog_stories(p_include_slugs=>array['nookverso'])`))[0].total, 1);
+  const [{ list }] = await rows(`select save_reading_list('${reader}',null,'${story}','Leituras','') list`);
+  assert.ok(list);
+  assert.equal((await rows(`select save_reading_list('${author}','${list}','${story}','','') list`))[0].list, null);
+  await rows(`select save_reading_list('${reader}','${list}','${story}','','')`);
+  assert.equal((await rows(`select count(*)::int total from reading_list_items where list_id='${list}'`))[0].total, 1);
+  assert.equal((await rows(`select set_story_release('${story}','${author}','schedule',now()+interval '1 hour') state`))[0].state, 'scheduled');
+  assert.deepEqual(await rows(`select id from released_stories where id='${story}'`), []);
+  assert.deepEqual(await rows("select id from search_catalog_stories(p_include_slugs=>array['nookverso'])"), []);
+
+  const [{ post }] = await rows(`select create_feed_media_post('${author}','#Leitura #Ficção #leitura',null,null,'[{"media_url":"test-video","media_type":"video"}]') post`);
+  assert.deepEqual(new Set((await rows(`select hashtags from nook_posts where id='${post}'`))[0].hashtags), new Set(['ficção','leitura']));
+  await db.exec(`insert into nook_comments(post_id,author_id,content,image_url) values('${post}','${reader}','','test-image')`);
+  assert.equal((await rows("select content_media_allowed(null,'nook-media',array['test-image']) allowed"))[0].allowed, true);
+  await db.exec(`update nook_posts set moderation_hidden_at=now() where id='${post}'`);
+  assert.equal((await rows("select content_media_allowed(null,'nook-media',array['test-image']) allowed"))[0].allowed, false);
+  const [{ character_id: character }] = await rows(`select submit_character_edit('${author}',null,'Personagem QA','Universo QA','Descrição de personagem para teste','https://example.invalid/wiki') as character_id`);
+  assert.ok(character);
+  assert.deepEqual(await rows(`select id from wiki_characters where id='${character}' and approved_at is not null`), []);
+  const [{ id: edit }] = await rows(`select id from wiki_character_edits where character_id='${character}'`);
+  assert.equal((await rows(`select review_character_edit('${edit}','approved') approved`))[0].approved, true);
+  assert.equal((await rows(`select count(*)::int total from wiki_characters where id='${character}' and approved_at is not null`))[0].total, 1);
+  for (const table of ['released_stories', 'wiki_character_favorites', 'nook_saved_replies']) {
+    await assertFalse(`select has_table_privilege('anon','public.${table}','SELECT')`);
+  }
+});

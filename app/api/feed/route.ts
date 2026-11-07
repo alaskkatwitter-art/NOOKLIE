@@ -1,3 +1,4 @@
+import { normalizeHashtag } from '@/lib/social/feed-links';
 import { visibleReposts } from '@/lib/social/posts';
 import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
 import { NextResponse } from 'next/server';
@@ -20,7 +21,7 @@ const ALLOWED_REACTIONS = [
 ];
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const userId = await currentViewerProfileId(supabase);
 
@@ -39,10 +40,10 @@ export async function GET() {
      * O Feed é global, então não filtramos
      * pelo usuário atual.
      */
-    const {
-      data: rawPosts,
-      error: postsError,
-    } = await supabase
+    const rawTag = new URL(request.url).searchParams.get('tag');
+    const tag = rawTag ? normalizeHashtag(rawTag) : '';
+    if (rawTag && !tag) return NextResponse.json({ error: 'Hashtag inválida.' }, { status: 400 });
+    let query = supabase
       .from('nook_posts')
       .select(`
         id,
@@ -59,6 +60,8 @@ export async function GET() {
       .order('created_at', {
         ascending: false,
       });
+    if (tag) query = query.contains('hashtags', [tag]);
+    const { data: rawPosts, error: postsError } = await query;
 
     if (postsError) {
       console.error(

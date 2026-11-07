@@ -47,7 +47,9 @@ const drawerLinks = [
   ["/noticias", "Jornal Nooklie", Newspaper],
   ["/eventos", "Eventos literários", CalendarDays],
   ["/fandoms", "Meus universos", Sparkles],
+  ["/personagens", "Personagens favoritos", Sparkles],
   ["/solicitacoes", "Solicitações de seguidores", Users],
+  ["/equipe", "Equipe do Nooklie", Users],
   ["/oportunidades", "Faça parte da equipe", Briefcase],
 ] as const;
 

@@ -146,7 +146,7 @@ export async function GET() {
       data: stories,
       error: storiesError,
     } = await supabase
-      .from('stories')
+      .from('released_stories')
       .select(`
         id,
         author_id,

@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!uuid.test(id)) return unavailable;
   try {
     const [story, chapter] = await Promise.all([
-      discoveryDb.from('stories').select('title,description,cover_url,author_id').eq('id',id).is('moderation_hidden_at',null).maybeSingle(),
+      discoveryDb.from('released_stories').select('title,description,cover_url,author_id').eq('id',id).is('moderation_hidden_at',null).maybeSingle(),
       discoveryDb.from('chapters').select('id').eq('story_id',id).eq('published',true).limit(1),
     ]);
     if (story.error || chapter.error) throw story.error || chapter.error;

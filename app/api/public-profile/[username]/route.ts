@@ -109,7 +109,7 @@ export async function GET(
 
     const { data: stories, error: storiesError } =
       await supabase
-        .from("stories")
+        .from("released_stories")
         .select("*")
         .eq("author_id", profile.id)
         .is("moderation_hidden_at", null)
@@ -325,7 +325,7 @@ export async function GET(
         data: storiesData,
         error: listStoriesError,
       } = await supabase
-        .from("stories")
+        .from("released_stories")
         .select(
           `
           id,
@@ -481,7 +481,7 @@ export async function GET(
         data: clubStoriesData,
         error: clubStoriesError,
       } = await supabase
-        .from("stories")
+        .from("released_stories")
         .select(
           `
           id,

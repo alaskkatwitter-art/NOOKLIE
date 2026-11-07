@@ -22,6 +22,7 @@ type ExploreUser = {
 type ExploreStory = {
   story_kind?: keyof typeof storyKinds;
   story_format?: keyof typeof storyFormats;
+  fandom?: string;
   id: string;
   title: string;
   description: string | null;
@@ -694,16 +695,16 @@ export default function ExplorarContent() {
                             key={story.id}
                             className="group overflow-hidden rounded-2xl border border-white/10 bg-[#171018] transition hover:-translate-y-0.5 hover:border-[#ff78b9]/30"
                           >
-                            <div className="flex min-h-36">
+                            <div className="flex items-start gap-3 p-3 sm:gap-4 sm:p-4">
                               <Link
                                 href={`/historia/${story.id}`}
-                                className="w-28 shrink-0 overflow-hidden bg-[#21151e]"
+                                className="h-36 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#21151e] sm:h-44 sm:w-28"
                               >
                                 {story.cover_url ? (
                                   <img
                                     src={contentMediaUrl(story.cover_url)}
                                     alt=""
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                    className="h-full w-full object-contain transition duration-500 sm:group-hover:scale-105"
                                   />
                                 ) : (
                                   <div className="flex h-full min-h-36 items-center justify-center bg-gradient-to-br from-[#4d203c] to-[#1a1016]">
@@ -712,7 +713,7 @@ export default function ExplorarContent() {
                                 )}
                               </Link>
 
-                              <div className="min-w-0 flex-1 p-5">
+                              <div className="min-w-0 flex-1">
                                 <Link
                                   href={`/historia/${story.id}`}
                                 >
@@ -745,14 +746,15 @@ export default function ExplorarContent() {
                                   </div>
                                 )}
 
+                                {story.fandom && <Link href={'/explorar?fandom=' + encodeURIComponent(story.fandom)} className="mt-2 block truncate text-xs font-medium text-pink-200">{story.fandom}</Link>}
                                 {story.description && (
-                                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/35">
+                                  <p className="mt-2 line-clamp-2 text-sm leading-5 text-white/55">
                                     {story.description}
                                   </p>
                                 )}
 
                                 {story.tags && story.tags.length > 0 && (
-                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                  <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
                                     {story.tags.slice(0, 5).map((tag) => (
                                       <Link key={tag.slug} href={`/tag/${encodeURIComponent(tag.slug)}`} className="rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/5 px-2.5 py-1 text-[10px] font-medium text-[#ff9bca]/80 transition hover:border-[#ff78b9]/40 hover:text-[#ffb7d5]">
                                         {tag.name}

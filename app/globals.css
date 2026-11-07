@@ -1653,3 +1653,26 @@ body:has(.site-drawer[open]) {
 .writer-studio .bg-pink-500 { background-image:linear-gradient(110deg,#ed69a7,#b77cd5); }
 .writer-studio .chapter-editor { caret-color:#ff9bca; }
 .writer-studio .chapter-editor:focus { box-shadow:inset 0 0 0 1px #ff9bca15; }
+
+.nook-dialog.feed-detail {
+  width: min(96vw, 48rem);
+  max-height: 94dvh;
+  padding: 0;
+}
+.feed-detail .feed-post {
+  border: 0;
+  border-radius: 0;
+}
+@media (max-width: 639px) {
+  .nook-dialog.feed-detail {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+}
