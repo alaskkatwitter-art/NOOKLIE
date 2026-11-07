@@ -90,7 +90,18 @@ function fixture({
           body = value;
           return q;
         },
+        delete() {
+          action = 'delete';
+          return q;
+        },
         async maybeSingle() {
+          if (action === 'delete') {
+            const tableRows = rows[table] || [];
+            const index = tableRows.findIndex((row) => matches.every((filter) => filter(row)));
+            if (index < 0) return { data: null, error: null };
+            const [deleted] = tableRows.splice(index, 1);
+            return { data: deleted, error: null };
+          }
           if (action) {
             writes.push({ table, action, body });
             return { data: race ? null : { id: id(10), ...body }, error: null };
@@ -410,6 +421,26 @@ test('news-only posts retain their article on edit and invalid article links can
     ).status,
     400,
   );
+});
+test('deleting a feed post requires its authenticated owner and a same-origin request', async () => {
+  const posts = [{ id: id(10), user_id: id(1) }, { id: id(20), user_id: id(2) }];
+  const options = { rows: { nook_posts: posts } };
+  const owner = fixture(options);
+  const anonymous = fixture({ ...options, actor: false });
+  const route = load('app/api/nook-posts/[id]/route.ts', owner.modules);
+  const guestRoute = load('app/api/nook-posts/[id]/route.ts', anonymous.modules);
+  const request = owner.request('DELETE');
+
+  assert.equal((await guestRoute.DELETE(request, anonymous.context)).status, 401);
+  assert.equal((await route.DELETE(owner.request('DELETE', undefined, 'https://other.example'), owner.context)).status, 403);
+  assert.equal((await route.DELETE(request, { params: Promise.resolve({ id: id(20) }) })).status, 404);
+  assert.deepEqual(posts.map(post => post.id), [id(10), id(20)]);
+
+  const result = await route.DELETE(request, owner.context);
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).postId, id(10));
+  assert.deepEqual(posts.map(post => post.id), [id(20)]);
+  assert.equal((await route.DELETE(request, owner.context)).status, 404);
 });
 test('database constrains article links and group photos while keeping the bucket private', async () => {
   const db = new PGlite();

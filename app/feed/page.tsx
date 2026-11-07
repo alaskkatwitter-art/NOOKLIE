@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
+import { Ellipsis, Trash2 } from 'lucide-react';
 import NookPostComposer from '@/components/NookPostComposer';
 import StoryComposer from '@/components/StoryComposer';
 
@@ -1708,10 +1709,14 @@ function CommentItem({ comment, children, onReply, onChange }: {
 function FeedPost({
   post,
   onPostUpdated,
+  onPostDeleted,
+  viewerId,
   expanded=false,
 }: {
   post: Post;
   expanded?:boolean;
+  viewerId?: string;
+  onPostDeleted: (postId: string) => void;
   onPostUpdated: (
     postId: string,
     changes: Partial<Post>
@@ -1741,6 +1746,26 @@ function FeedPost({
     replyingTo,
     setReplyingTo,
   ] = useState<Comment | null>(null);
+
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  async function deletePost() {
+    if (deleting || !window.confirm('Apagar esta publicação? As respostas e as nookladas dela também serão removidas.')) return;
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      const response = await fetch('/api/nook-posts/' + encodeURIComponent(post.id), { method: 'DELETE' });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error || 'Não foi possível apagar a publicação.');
+      }
+      onPostDeleted(post.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Não foi possível apagar a publicação.');
+      setDeleting(false);
+    }
+  }
 
   const [commentImage, setCommentImage] = useState<File | null>(null);
   const [commentError, setCommentError] = useState('');
@@ -2085,7 +2110,7 @@ function FeedPost({
   }
 
   return (
-    <article className="feed-post" onClick={e=>{if(!expanded && e.target instanceof Element && !e.target.closest('a,button,input,textarea,dialog,video,audio,summary,label'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
+    <article className="feed-post" onClick={e=>{if(!expanded && e.target instanceof Element && !e.target.closest('a,button,input,textarea,dialog,video,audio,details,label'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
       {post.repost&&<div className="border-b border-white/10 px-5 py-4"><RepostAttribution author={post.repost.author} comment={post.repost.comment}/></div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
@@ -2141,15 +2166,29 @@ function FeedPost({
                 </Link>
               </div>
 
-              <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();if(!expanded) window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
-                {formatPostDateTime(
-                  post.created_at
-                )}
-              </a>
+              <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();if(!expanded) window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
+                  {formatPostDateTime(
+                    post.created_at
+                  )}
+                </a>
+                {viewerId === post.user_id && !post.repost && <details className="relative">
+                  <summary aria-label="Opções da publicação" className="grid size-10 cursor-pointer list-none place-items-center rounded-full text-white/65 hover:bg-white/10 hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-300 [&::-webkit-details-marker]:hidden">
+                    <Ellipsis aria-hidden="true" className="size-5" />
+                  </summary>
+                  <div className="absolute right-0 top-full z-20 w-52 rounded-xl border border-pink-200/20 bg-[#221521] p-1 shadow-xl">
+                    <button type="button" disabled={deleting} onClick={() => void deletePost()} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-rose-200 hover:bg-rose-300/10 disabled:opacity-50">
+                      <Trash2 aria-hidden="true" className="size-4 shrink-0" />
+                      {deleting ? 'Apagando…' : 'Apagar publicação'}
+                    </button>
+                  </div>
+                </details>}
+              </div>
             </div>
           </div>
         </div>
 
+        {deleteError && <p role="alert" className="mt-2 text-sm text-rose-200">{deleteError}</p>}
         <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>
 
         <PostMedia post={post} />
@@ -3030,6 +3069,8 @@ function FeedSearchModal({
 
 export default function FeedPage() {
   const detailDialog = useRef<HTMLDialogElement>(null);
+  const deletedPostIds = useRef(new Set<string>());
+  const [deleteNotice, setDeleteNotice] = useState('');
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -3512,9 +3553,8 @@ export default function FeedPage() {
             );
           }
 
-          setPosts(
-            data.posts || []
-          );
+          const incoming: Post[] = data.posts || [];
+          setPosts(incoming.filter(post => !deletedPostIds.current.has(post.id)));
         } catch (err) {
           console.error(err);
 
@@ -3701,6 +3741,14 @@ export default function FeedPage() {
     );
   }
 
+  function removePost(postId: string) {
+    deletedPostIds.current.add(postId);
+    setPosts(current => current.filter(post => post.id !== postId));
+    setDetailPost(current => current?.id === postId ? null : current);
+    if (detailDialog.current?.dataset.postId === postId) detailDialog.current.close();
+    setDeleteNotice('Publicação apagada.');
+  }
+
   const greetingName =
     currentUser?.username ||
     currentUser?.display_name ||
@@ -3783,6 +3831,7 @@ export default function FeedPage() {
           ================================================= */}
 
           <header className="mb-6 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-[#ffb7da]">Comunidade</p><h1 className="mt-2 text-2xl font-bold">Seu Feed</h1></div><div className="flex gap-2"><button type="button" aria-label="Pesquisar pessoas" onClick={()=>setSearchOpen(true)} className="shell-icon"><SearchIcon /></button><button type="button" aria-label="Atualizar Feed" onClick={()=>{loadFeed(true);loadStories();loadUpcomingUpdates();}} disabled={refreshing} className="shell-icon"><RefreshIcon /></button></div></header>
+          <p role="status" className={deleteNotice ? 'mb-3 text-sm text-pink-200' : 'sr-only'}>{deleteNotice}</p>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <form className="flex min-w-0 items-center gap-2" action="/feed">
               <input name="tag" aria-label="Buscar hashtag no feed" maxLength={65} placeholder="# Buscar hashtag" value={tagInput} onChange={event => setTagInput(event.target.value)} className="nook-input min-w-0" />
@@ -3910,6 +3959,8 @@ export default function FeedPage() {
                       <FeedPost
                         key={post.repost?.id||post.id}
                         post={post}
+                        viewerId={currentUser?.id}
+                        onPostDeleted={removePost}
                         onPostUpdated={
                           updatePost
                         }
@@ -4045,7 +4096,7 @@ export default function FeedPage() {
         }}
       />
 
-      <dialog ref={detailDialog} className="nook-dialog feed-detail" aria-labelledby="feed-detail-title" onClose={() => {
+      <dialog ref={detailDialog} data-post-id={detailPost?.id} className="nook-dialog feed-detail" aria-labelledby="feed-detail-title" onClose={() => {
         const url = new URL(window.location.href);
         url.searchParams.delete('post'); url.searchParams.delete('reply'); url.hash = '';
         window.history.replaceState(null, '', url);
@@ -4054,7 +4105,7 @@ export default function FeedPage() {
           <button type="button" onClick={() => detailDialog.current?.close()} className="min-h-11 rounded-full border border-white/15 px-4 text-sm">← Voltar</button>
           <h2 id="feed-detail-title" className="font-bold">Publicação</h2>
         </header>
-        {detailLoading&&<p role="status">Carregando publicação…</p>}{detailError&&<p role="alert">{detailError}</p>}{detailPost&&<FeedPost key={detailPost.id} expanded post={detailPost} onPostUpdated={(id,changes)=>{setDetailPost(old=>old?{...old,...changes}:old);updatePost(id,changes);}}/>}
+        {detailLoading&&<p role="status">Carregando publicação…</p>}{detailError&&<p role="alert">{detailError}</p>}{detailPost&&<FeedPost key={detailPost.id} expanded post={detailPost} viewerId={currentUser?.id} onPostDeleted={removePost} onPostUpdated={(id,changes)=>{setDetailPost(old=>old?{...old,...changes}:old);updatePost(id,changes);}}/>}
       </dialog>
     </main>
   );
