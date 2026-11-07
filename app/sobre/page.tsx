@@ -67,6 +67,7 @@ export default function Page() {
         >
           {[
             ["/sobre", "Sobre"],
+            ["/equipe", "Equipe do Nooklie"],
             ["/termos", "Termos"],
             ["/privacidade", "Privacidade"],
             ["/politicas", "Políticas da comunidade"],

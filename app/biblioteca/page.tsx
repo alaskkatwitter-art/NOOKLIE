@@ -444,6 +444,10 @@ export default function BibliotecaPage() {
 
           </div>
 
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href="/listas-de-leitura" className="rounded-xl border border-pink-300/25 px-3 py-3 text-center text-xs font-bold text-pink-200">
+              Listas de leitura
+            </Link>
           <button
             type="button"
             onClick={() =>
@@ -466,6 +470,7 @@ export default function BibliotecaPage() {
               <RefreshIcon />
             </span>
           </button>
+          </div>
         </header>
 
         {/* HERO */}

@@ -322,11 +322,11 @@ export async function GET(request: Request) {
       (story) => publishedStoryIds.has(story.id)
     );
 
-    const tagsByStory = new Map<string, Array<{ name: string; slug: string; category: string | null }>>();
+    const tagsByStory = new Map<string, Array<{ name: string; slug: string; category: string | null; category_slug: string | null }>>();
     if (publicStoryRows.length > 0) {
       const { data: tagRows, error: tagError } = await supabase
         .from('story_tags')
-        .select('story_id, tags(name, slug, tag_categories(name))')
+        .select('story_id, tags(name, slug, tag_categories(name,slug))')
         .in('story_id', publicStoryRows.map((story) => story.id))
         .limit(1000);
 
@@ -338,7 +338,7 @@ export async function GET(request: Request) {
           if (!tag) continue;
           const category = Array.isArray(tag.tag_categories) ? tag.tag_categories[0] : tag.tag_categories;
           const current = tagsByStory.get(row.story_id) || [];
-          current.push({ name: tag.name, slug: tag.slug, category: category?.name || null });
+          current.push({ name: tag.name, slug: tag.slug, category: category?.name || null, category_slug: category?.slug || null });
           tagsByStory.set(row.story_id, current);
         }
       }
@@ -360,7 +360,8 @@ export async function GET(request: Request) {
         await supabase
           .from('reading_lists')
           .select('id')
-          .eq('user_id', currentProfileId);
+          .eq('user_id', currentProfileId)
+          .eq('name', 'Biblioteca');
 
       if (!listsError && lists?.length) {
         const listIds = lists.map(
@@ -394,12 +395,20 @@ export async function GET(request: Request) {
       }
     }
 
+    const fandomByStory = new Map<string, string>();
+    if (publicStoryRows.length) {
+      const fandoms = await supabase.from('released_stories').select('id,fandom').in('id', publicStoryRows.map(story => story.id));
+      if (fandoms.error) throw fandoms.error;
+      for (const story of fandoms.data) fandomByStory.set(story.id, story.fandom);
+    }
+
     const publicStories = publicStoryRows.map(
       (story) => ({
         id: story.id,
         title: story.title,
         story_kind: story.story_kind,
         story_format: story.story_format,
+        fandom: fandomByStory.get(story.id) || (tagsByStory.get(story.id) || []).filter(tag => tag.category_slug === 'fandom').map(tag => tag.name).join(', '),
         description: story.description,
         cover_url: story.cover_url,
         status: story.status,

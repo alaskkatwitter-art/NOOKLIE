@@ -1,4 +1,5 @@
 import { imageMatchesType } from '@/lib/security/uploads';
+import { storyPublication } from '@/lib/stories/publication';
 import { ensureCatalogTag } from '@/lib/stories/tags';
 import bcrypt from 'bcryptjs';
 import {chatActor,uuid,sameOrigin,privateHeaders} from '@/lib/chat/server';
@@ -129,7 +130,7 @@ export async function GET(
         story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
         created_at,
         updated_at,
-        moderation_hidden_at
+        moderation_hidden_at, release_at
       `)
       .eq(
         'id',
@@ -167,6 +168,14 @@ export async function GET(
       );
     }
 
+    await publishDueScheduledChapters(id);
+    const isOwner = currentUserId === story.author_id;
+    const released = await supabase.from('released_stories').select('id').eq('id', id).maybeSingle();
+    if (released.error) throw released.error;
+    if (!released.data && !isOwner) {
+      return NextResponse.json({ error: 'História não encontrada.' }, { status: 404, headers: privateHeaders });
+    }
+
     if (new URL(request.url).searchParams.get('summary') === '1') {
       return NextResponse.json({ story: {
         id: story.id, title: story.title, description: story.description, cover_url: story.cover_url,
@@ -179,9 +188,6 @@ export async function GET(
      * ==================================================
      */
 
-    await publishDueScheduledChapters(
-      id
-    );
 
     /*
      * ==================================================
@@ -223,9 +229,6 @@ export async function GET(
      * pelo editor de capítulos.
      */
 
-    const isOwner =
-      currentUserId ===
-      story.author_id;
 
     let chaptersQuery =
       supabase
@@ -520,6 +523,9 @@ export async function GET(
       {
         story: {
           ...story,
+          genre: tags.find(tag => tag?.category_slug === 'genre')?.name ?? '',
+          fandom: story.fandom || tags.filter(tag => tag?.category_slug === 'fandom').map(tag => tag?.name).join(', '),
+          publication: storyPublication(story.release_at, chaptersWithSchedule.some(chapter => chapter.published)),
           series_books: series?.data ?? [],
 
           author:
@@ -707,33 +713,10 @@ export async function PUT(
     let storyMetadata;
     try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
 
-    const title =
-      String(
-        formData.get(
-          'title'
-        ) || ''
-      ).trim();
-
-    const description =
-      String(
-        formData.get(
-          'description'
-        ) || ''
-      ).trim();
-
-    const status =
-      String(
-        formData.get(
-          'status'
-        ) || ''
-      ).trim();
-
-    const rating =
-      String(
-        formData.get(
-          'rating'
-        ) || ''
-      ).trim();
+    const title = String(formData.get('title') ?? existingStory.title ?? '').trim();
+    const description = String(formData.get('description') ?? existingStory.description ?? '').trim();
+    const status = String(formData.get('status') ?? existingStory.status ?? '').trim();
+    const rating = String(formData.get('rating') ?? existingStory.rating ?? '').trim();
 
     const genre =
       String(
@@ -742,12 +725,14 @@ export async function PUT(
         ) || ''
       ).trim();
 
-    const tagsText =
-      String(
-        formData.get(
-          'tags'
-        ) || ''
-      );
+    const tagNames = [...new Map(
+      formData.getAll('tags').flatMap(value => typeof value === 'string' ? value.split(',') : [])
+        .map(value => value.trim().replace(/^#+/, '').trim())
+        .filter(Boolean).map(value => [value.toLocaleLowerCase('pt-BR'), value] as const)
+    ).values()].slice(0, 30);
+    if (tagNames.some(tag => tag.length > 80)) {
+      return NextResponse.json({ error: 'Cada tag deve ter até 80 caracteres.' }, { status: 400 });
+    }
 
     const cover =
       formData.get(
@@ -976,318 +961,37 @@ export async function PUT(
      * ==================================================
      */
 
-    const {
-      data: updatedStory,
-      error: updateError,
-    } = await supabase
-      .from('stories')
-      .update({
+    let tagIds: string[] | null = null;
+    if (formData.has('tags') || formData.has('genre')) {
+      const categories = await supabase.from('tag_categories').select('id,slug');
+      if (categories.error) throw categories.error;
+      const categoryBySlug = new Map(categories.data.map(category => [category.slug, category.id]));
+      const requestedTags = genre ? [genre, ...tagNames.filter(tag => tag.toLowerCase() !== genre.toLowerCase())] : tagNames;
+      tagIds = [];
+      for (const name of requestedTags) {
+        const category = name === genre ? 'genre' : 'freeform';
+        const tag = await ensureCatalogTag(supabase, name, categoryBySlug.get(category) ?? null, userId);
+        if (tag) tagIds.push(tag.id);
+      }
+      tagIds = [...new Set(tagIds)];
+    }
+
+    const { data: updatedStory, error: updateError } = await supabase.rpc('save_story_details', {
+      p_story: id,
+      p_author: userId,
+      p_changes: {
         ...storyMetadata,
-        title,
-
-        description:
-          description ||
-          null,
-
-        cover_url:
-          coverUrl,
-
-        status:
-          status ||
-          null,
-
-        rating:
-          rating ||
-          null,
-
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq(
-        'id',
-        id
-      )
-      .eq(
-        'author_id',
-        userId
-      )
-      .select(`
-        id,
-        author_id,
-        title,
-        description,
-        cover_url,
-        status,
-        rating,
-        story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
-        created_at,
-        updated_at
-      `)
-      .single();
-
-    if (updateError) {
-      console.error(
-        'Erro ao atualizar história:',
-        updateError
-      );
-
-      if (
-        uploadedFilePath
-      ) {
-        await supabase.storage
-          .from(
-            'story-covers'
-          )
-          .remove([
-            uploadedFilePath,
-          ]);
-      }
-
-      return NextResponse.json(
-        {
-          error:
-            updateError.code === '23505' ? 'Já existe um livro com esse número nesta série.' : 'Não foi possível atualizar a história.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * ==================================================
-     * ORGANIZA TAGS
-     * ==================================================
-     */
-
-    let finalTags =
-      tagsText
-        .split(',')
-        .map(
-          (tag) =>
-            tag.trim()
-        )
-        .filter(Boolean);
-
-    const uniqueTags:
-      string[] = [];
-
-    for (
-      const tag of finalTags
-    ) {
-      const normalized =
-        tag.toLowerCase();
-
-      if (
-        !uniqueTags.some(
-          (existing) =>
-            existing.toLowerCase() ===
-            normalized
-        )
-      ) {
-        uniqueTags.push(
-          tag
-        );
-      }
-    }
-
-    finalTags =
-      uniqueTags.slice(
-        0,
-        30
-      );
-
-    /*
-     * ==================================================
-     * REMOVE TAGS ANTIGAS
-     * ==================================================
-     */
-
-    /*
-     * ==================================================
-     * PREPARA TAGS
-     * ==================================================
-     */
-
-    const tagsToInsert:
-      string[] = [];
-
-    if (genre) {
-      tagsToInsert.push(
-        genre
-      );
-    }
-
-    for (
-      const tag of finalTags
-    ) {
-      if (
-        !tagsToInsert.some(
-          (existing) =>
-            existing.toLowerCase() ===
-            tag.toLowerCase()
-        )
-      ) {
-        tagsToInsert.push(
-          tag
-        );
-      }
-    }
-
-    /*
-     * ==================================================
-     * CATEGORIAS
-     * ==================================================
-     */
-
-    const {
-      data: categories,
-      error:
-        categoriesError,
-    } = await supabase
-      .from(
-        'tag_categories'
-      )
-      .select(
-        'id, slug'
-      );
-
-    if (categoriesError) {
-      console.error(
-        'Erro ao buscar categorias:',
-        categoriesError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'História atualizada, mas não foi possível atualizar as tags.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    const categoryMap =
-      new Map(
-        (
-          categories ||
-          []
-        ).map(
-          (category) => [
-            category.slug,
-            category.id,
-          ]
-        )
-      );
-
-    /*
-     * ==================================================
-     * CRIA / RECUPERA TAGS
-     * ==================================================
-     */
-
-    const tagIds:
-      string[] = [];
-
-    for (const tagName of tagsToInsert) {
-      const isGenre = genre && tagName.toLowerCase() === genre.toLowerCase();
-      const categoryId = categoryMap.get(isGenre ? 'genre' : 'freeform') || null;
-      const tag = await ensureCatalogTag(supabase, tagName, categoryId, userId);
-      if (tag) tagIds.push(tag.id);
-    }
-
-    const {
-      error:
-        deleteTagsError,
-    } = await supabase
-      .from('story_tags')
-      .delete()
-      .eq(
-        'story_id',
-        id
-      );
-
-    if (deleteTagsError) {
-      console.error(
-        'Erro ao remover tags antigas:',
-        deleteTagsError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'A história foi atualizada, mas houve um erro ao atualizar as tags.',
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * ==================================================
-     * RELACIONA TAGS À HISTÓRIA
-     * ==================================================
-     */
-
-    if (
-      tagIds.length >
-      0
-    ) {
-      const rows =
-        [
-          ...new Set(
-            tagIds
-          ),
-        ].map(
-          (tagId) => ({
-            story_id:
-              id,
-
-            tag_id:
-              tagId,
-          })
-        );
-
-      const {
-        error:
-          insertTagsError,
-      } =
-        await supabase
-          .from(
-            'story_tags'
-          )
-          .insert(
-            rows
-          );
-
-      if (
-        insertTagsError
-      ) {
-        console.error(
-          'Erro ao relacionar tags:',
-          insertTagsError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              'História atualizada, mas houve um erro ao salvar as tags.',
-          },
-          {
-            status: 500,
-          }
-        );
-      }
-    }
-
-    /*
-     * ==================================================
-     * RETORNO
-     * ==================================================
-     */
+        ...(formData.has('title') && { title }),
+        ...(formData.has('description') && { description: description || null }),
+        ...(formData.has('status') && { status: status || null }),
+        ...(formData.has('rating') && { rating: rating || null }),
+        ...(uploadedFilePath && { cover_url: coverUrl }),
+      },
+      p_tags: tagIds,
+    });
+    if (updateError) throw updateError;
+    if (!updatedStory) throw new Error('Obra indisponível.');
+    uploadedFilePath = null;
 
     return NextResponse.json({
       success:
@@ -1324,7 +1028,9 @@ export async function PUT(
     return NextResponse.json(
       {
         error:
-          'Erro interno do servidor.',
+          (error as { code?: string } | null)?.code === '23505'
+            ? 'Já existe um livro com esse número nesta série.'
+            : 'Não foi possível salvar as alterações da obra.' ,
       },
       {
         status: 500,

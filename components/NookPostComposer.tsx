@@ -1,9 +1,10 @@
 'use client';
 
+import { feedImageTypes, feedVideoTypes, maxFeedUploadBytes } from '@/lib/social/attachments';
 import LinkedNewsCard from './LinkedNewsCard';
 import {isNewsArticle, newsArticles, newsArticleSlugs} from '@/lib/news/articles';
 import {contentMediaUrl} from '@/lib/security/content-media';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Story = {
   id: string;
@@ -14,33 +15,31 @@ type Story = {
 type Props = {
   open: boolean;
   initialNewsSlug?: string;
+  initialStoryId?: string;
+  initialBody?: string;
   onClose: () => void;
   onPublished?: () => void;
 };
 
 const MAX_TEXT = 5000;
 const MAX_MEDIA = 4;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-const ACCEPTED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-];
+const ACCEPTED_TYPES = [...feedImageTypes, ...feedVideoTypes];
 
 export default function NookPostComposer({
   open,
   onClose,
   onPublished,
   initialNewsSlug,
+  initialStoryId = '',
+  initialBody = '',
 }: Props) {
-  const [body, setBody] = useState('');
-  const [storyId, setStoryId] = useState('');
+  const [body, setBody] = useState(initialBody);
+  const [storyId, setStoryId] = useState(initialStoryId);
   const [newsSlug,setNewsSlug]=useState(isNewsArticle(initialNewsSlug)?initialNewsSlug:'');
   const [stories, setStories] = useState<Story[]>([]);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const previewUrls = useRef(new Set<string>());
   const [loadingStories, setLoadingStories] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
@@ -103,12 +102,9 @@ export default function NookPostComposer({
    * quando o componente for desmontado.
    */
   useEffect(() => {
-    return () => {
-      mediaPreviews.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
-    };
-  }, [mediaPreviews]);
+    const urls = previewUrls.current;
+    return () => { urls.forEach(url => URL.revokeObjectURL(url)); };
+  }, []);
 
   /*
    * Fecha com ESC.
@@ -135,6 +131,7 @@ export default function NookPostComposer({
   function resetComposer() {
     mediaPreviews.forEach((url) => {
       URL.revokeObjectURL(url);
+      previewUrls.current.delete(url);
     });
 
     setBody('');
@@ -166,7 +163,7 @@ export default function NookPostComposer({
 
     if (mediaFiles.length + selected.length > MAX_MEDIA) {
       setError(
-        `Você pode adicionar no máximo ${MAX_MEDIA} imagens ou GIFs.`
+        `Você pode adicionar no máximo ${MAX_MEDIA} arquivos.`
       );
 
       event.target.value = '';
@@ -175,24 +172,24 @@ export default function NookPostComposer({
 
     for (const file of selected) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
-        setError('Use apenas JPG, PNG, WEBP ou GIF.');
+        setError('Use JPG, PNG, WebP, GIF, MP4 ou WebM.');
 
         event.target.value = '';
         return;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
-        setError('Cada arquivo pode ter no máximo 10 MB.');
-
-        event.target.value = '';
-        return;
-      }
+    }
+    if ([...mediaFiles, ...selected].reduce((size, file) => size + file.size, 0) > maxFeedUploadBytes) {
+      setError('Os arquivos podem somar até 4 MB.');
+      event.target.value = '';
+      return;
     }
 
     const previews = selected.map((file) =>
       URL.createObjectURL(file)
     );
 
+    previews.forEach(url => previewUrls.current.add(url));
     setMediaFiles((current) => [...current, ...selected]);
     setMediaPreviews((current) => [...current, ...previews]);
 
@@ -207,6 +204,7 @@ export default function NookPostComposer({
 
     if (preview) {
       URL.revokeObjectURL(preview);
+      previewUrls.current.delete(preview);
     }
 
     setMediaFiles((current) =>
@@ -218,35 +216,6 @@ export default function NookPostComposer({
     );
   }
 
-  /*
-   * Faz upload dos arquivos depois que o post já foi criado.
-   */
-  async function uploadPostMedia(postId: string) {
-    for (const file of mediaFiles) {
-      const formData = new FormData();
-
-      formData.append('file', file);
-      formData.append('post_id', postId);
-
-      const response = await fetch('/api/nook-posts/media', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Não foi possível enviar uma das imagens.'
-        );
-      }
-    }
-  }
-
-  /*
-   * Publica o post.
-   */
   async function handlePublish() {
     if (!canPublish || publishing) return;
 
@@ -254,50 +223,21 @@ export default function NookPostComposer({
     setError('');
 
     try {
-      /*
-       * Primeiro criamos o post.
-       */
-      const response = await fetch('/api/nook-posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          body: body.trim() || null,
-          image_url: null,
-          story_id: storyId || null,
-          news_slug: newsSlug || null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Não foi possível criar a publicação.'
-        );
+      const fields = { body: body.trim(), story_id: storyId || null, news_slug: newsSlug || null };
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) {
+        if (value) form.set(key, value);
       }
-
-      /*
-       * Depois enviamos as imagens/GIFs.
-       */
-      if (data.post?.id && mediaFiles.length > 0) {
-        try {
-          await uploadPostMedia(data.post.id);
-        } catch (mediaError) {
-          console.error(mediaError);
-
-          setError(
-            mediaError instanceof Error
-              ? mediaError.message
-              : 'A publicação foi criada, mas não foi possível enviar todas as imagens.'
-          );
-
-          setPublishing(false);
-          return;
-        }
-      }
+      for (const file of mediaFiles) form.append('files', file);
+      const response = mediaFiles.length
+        ? await fetch('/api/nook-posts/attachments', { method: 'POST', body: form })
+        : await fetch('/api/nook-posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fields),
+        });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || 'Não foi possível criar a publicação.');
 
       /*
        * Sucesso.
@@ -366,7 +306,7 @@ export default function NookPostComposer({
               setBody(event.target.value.slice(0, MAX_TEXT))
             }
             aria-label="Texto do aviso ou publicação"
-            placeholder="O que você quer compartilhar?"
+            placeholder="O que você quer compartilhar? Use # para marcar um assunto."
             rows={5}
             autoFocus
             className="w-full resize-y rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-[15px] leading-7 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/35"
@@ -387,18 +327,22 @@ export default function NookPostComposer({
                   key={`${preview}-${index}`}
                   className="group relative aspect-square overflow-hidden rounded-2xl border border-white/[0.08] bg-black/30"
                 >
+                  {feedVideoTypes.includes(mediaFiles[index]?.type) ? (
+                    <video src={preview} muted playsInline preload="metadata" className="h-full w-full object-contain" />
+                  ) : (
                   <img
                     src={contentMediaUrl(preview)}
                     alt=""
                     className="h-full w-full object-cover"
                   />
+                  )}
 
                   <button
                     type="button"
                     onClick={() => removeMedia(index)}
                     disabled={publishing}
                     className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-[#ff78b9] hover:text-[#190d16] disabled:opacity-30"
-                    aria-label="Remover imagem"
+                    aria-label="Remover arquivo"
                   >
                     ×
                   </button>
@@ -411,11 +355,11 @@ export default function NookPostComposer({
           <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-bold text-white/75">
-                Adicionar imagens ou GIFs
+                Adicionar imagens, GIFs ou vídeos
               </p>
 
               <p className="mt-1 text-xs text-white/30">
-                Até 4 arquivos • 10 MB cada
+                Até 4 arquivos que somem 4 MB
               </p>
             </div>
 
@@ -424,7 +368,7 @@ export default function NookPostComposer({
 
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={ACCEPTED_TYPES.join(',')}
                 multiple
                 onChange={handleMediaSelection}
                 disabled={

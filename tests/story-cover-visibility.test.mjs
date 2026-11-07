@@ -40,7 +40,7 @@ function route({ visible = true, owner = false, linked = true, missing = false }
   return { get: () => exports.GET(new Request('https://nooklie.vercel.app/api/content-media?bucket=story-covers&path=author%2Fcover.jpg')), tables, downloads: () => downloads };
 }
 
-test('a visible story cover loads without published chapters', async () => {
+test('a released story cover loads for readers', async () => {
   const fixture = route();
   const response = await fixture.get();
   assert.equal(response.status, 200);

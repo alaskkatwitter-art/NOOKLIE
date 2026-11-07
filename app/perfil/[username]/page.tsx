@@ -1,4 +1,5 @@
 'use client';
+import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import Republicados from '@/components/Republicados';
@@ -56,9 +57,7 @@ type PostMedia = {
   id: string;
   post_id: string;
   media_url: string;
-  media_type:
-    | 'image'
-    | 'gif';
+  media_type: 'image' | 'gif' | 'video';
   created_at?: string;
 };
 
@@ -1149,7 +1148,7 @@ export default function PublicProfilePage() {
                                   .map(
                                     (
                                       media
-                                    ) => (
+                                    ) => media.media_type === 'video' ? <FeedVideo key={media.id} id={media.id} /> : (
                                       <div
                                         key={
                                           media.id

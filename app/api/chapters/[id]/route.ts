@@ -223,7 +223,11 @@ export async function GET(
       );
     }
 
-    if (!(await isPublicStoryVisible(supabase, chapter.story_id))) {
+    const actor = await chatActor();
+    const owner = actor && await supabase.from('stories').select('id').eq('id', chapter.story_id)
+      .eq('author_id', actor.profileId).maybeSingle();
+    if (owner && owner.error) throw owner.error;
+    if (!owner?.data && (!chapter.published || !(await isPublicStoryVisible(supabase, chapter.story_id)))) {
       return NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
     }
 

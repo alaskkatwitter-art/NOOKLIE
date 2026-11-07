@@ -252,6 +252,8 @@ function getStoryStatus(status?: string | null) {
     };
   }
 
+  if (normalized === 'scheduled') return { label: 'Agendada', className: 'border-amber-300/30 bg-amber-300/10 text-amber-200' };
+
   if (
     normalized === 'unpublished' ||
     normalized === 'unpublished_story'

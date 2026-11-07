@@ -111,7 +111,7 @@ export async function isPublicStoryVisible(
   storyId: string
 ): Promise<boolean> {
   const { data: story, error } = await supabase
-    .from('stories')
+    .from('released_stories')
     .select('id, author_id, moderation_hidden_at')
     .eq('id', storyId)
     .maybeSingle();

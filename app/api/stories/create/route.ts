@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const statusValue = formData.get('status');
     const genreValue = formData.get('genre');
     const ratingValue = formData.get('rating');
-    const tagsValue = formData.get('tags');
+    const tagsValues = formData.getAll('tags');
     const coverValue = formData.get('cover');
 
     const title =
@@ -114,10 +114,7 @@ export async function POST(request: Request) {
         ? ratingValue.trim()
         : '';
 
-    const tagsText =
-      typeof tagsValue === 'string'
-        ? tagsValue.trim()
-        : '';
+    const tagsText = tagsValues.filter((value): value is string => typeof value === 'string').join(',');
 
     if (!title) {
       return NextResponse.json(
@@ -299,7 +296,7 @@ export async function POST(request: Request) {
 
     const tagNames = tagsText
       .split(',')
-      .map((tag) => tag.trim())
+      .map(tag => tag.trim().replace(/^#+/, '').trim())
       .filter(Boolean);
 
     const uniqueTagNames = Array.from(

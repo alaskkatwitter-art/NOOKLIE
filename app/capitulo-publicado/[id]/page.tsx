@@ -1,5 +1,6 @@
 'use client';
 
+import NookPostComposer from '@/components/NookPostComposer';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -21,6 +22,7 @@ type Story = {
   id: string;
   title: string;
   cover_url: string | null;
+  publication?: string;
 };
 
 type ChapterResponse = {
@@ -47,6 +49,8 @@ export default function CapituloPublicadoPage() {
   const [error, setError] =
     useState('');
 
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shared, setShared] = useState(false);
   const [copied, setCopied] =
     useState(false);
 
@@ -139,6 +143,7 @@ export default function CapituloPublicadoPage() {
           setStory({
             id:
               storyData.story.id,
+            publication: storyData.story.publication,
             title:
               storyData.story.title ||
               'História',
@@ -211,29 +216,6 @@ export default function CapituloPublicadoPage() {
     }
   }
 
-  function handleShareToMural() {
-    if (!chapter) {
-      return;
-    }
-
-    const url =
-      `${window.location.origin}/capitulo/${chapter.id}`;
-
-    const shareText =
-      `Acabei de publicar o capítulo ${chapter.chapter_number} de "${story?.title || 'minha história'}" no Nooklie.`;
-
-    const muralUrl =
-      `/mural?share_url=${encodeURIComponent(
-        url
-      )}&share_text=${encodeURIComponent(
-        shareText
-      )}`;
-
-    router.push(
-      muralUrl
-    );
-  }
-
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0b090c] text-white flex items-center justify-center">
@@ -268,12 +250,11 @@ export default function CapituloPublicadoPage() {
         <section className="w-full text-center">
           <div className="mx-auto max-w-lg">
             <p className="text-xs font-medium uppercase tracking-[0.25em] text-pink-300/70">
-              Publicação concluída
+              {story?.publication === 'published' ? 'Publicação concluída' : 'Capítulo salvo'}
             </p>
 
             <h1 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
-              Parabéns, você postou o capítulo{' '}
-              {chapter.chapter_number}!
+              {story?.publication === 'published' ? 'Parabéns, você publicou o capítulo' : 'Capítulo preparado para publicação'} {chapter.chapter_number}!
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-gray-500">
@@ -281,6 +262,9 @@ export default function CapituloPublicadoPage() {
             </p>
           </div>
 
+          {story?.publication !== 'published' && <p className="mt-4 text-sm text-pink-200">
+            O capítulo ficará disponível aos leitores quando a obra estiver no ar.
+          </p>}
           {story?.cover_url ? (
             <div className="mx-auto mt-9 w-36 overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:w-40">
               <div className="aspect-[2/3]">
@@ -301,18 +285,18 @@ export default function CapituloPublicadoPage() {
             <button
               type="button"
               onClick={
-                handleShareToMural
+                () => setShareOpen(true)
               }
               className="w-full rounded-xl bg-pink-500 px-5 py-3.5 text-sm font-medium text-white hover:bg-pink-400 transition"
+              disabled={story?.publication !== 'published'}
             >
-              Compartilhar no Mural
+              Compartilhar no feed
             </button>
 
             <button
               type="button"
-              onClick={
-                handleCopyLink
-              }
+              onClick={handleCopyLink}
+              disabled={story?.publication !== 'published'}
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition"
             >
               {copied
@@ -334,6 +318,11 @@ export default function CapituloPublicadoPage() {
           </button>
         </section>
       </div>
+      {shared && <p role="status" className="mx-auto my-4 max-w-md text-center text-pink-200">Capítulo compartilhado no feed.</p>}
+      {shareOpen && <NookPostComposer open initialStoryId={chapter.story_id}
+        initialBody={`Acabei de publicar o capítulo ${chapter.chapter_number} de “${story?.title || 'minha história'}”.
+${window.location.origin}/capitulo/${chapter.id}`}
+        onClose={() => setShareOpen(false)} onPublished={() => setShared(true)} />}
     </main>
   );
 }

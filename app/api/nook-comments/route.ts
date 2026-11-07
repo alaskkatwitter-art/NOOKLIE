@@ -1,436 +1,108 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
-import { isPublicPostVisible } from '@/lib/moderation/content-visibility';
+import { chatActor, chatDb, privateHeaders, uuid } from '@/lib/chat/server';
+import { getPublicProfileIds, isPublicPostVisible } from '@/lib/moderation/content-visibility';
+import { AttachmentError, uploadFeedAttachments } from '@/lib/social/upload-attachments';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+const fields = 'id,post_id,author_id,content,parent_id,image_url,created_at,updated_at';
+const authorFields = 'id,username,display_name,avatar_url,verified,is_official';
+const respond = (data: object, status = 200) => Response.json(data, { status, headers: privateHeaders });
 
-async function getCurrentUserId() {
-  const cookieStore = await cookies();
-
-  const sessionToken =
-    cookieStore.get('toriland_session')?.value;
-
-  if (!sessionToken) {
-    return null;
-  }
-
-  const tokenHash = crypto
-    .createHash('sha256')
-    .update(sessionToken)
-    .digest('hex');
-
-  const { data: session, error } =
-    await supabase
-      .from('auth_sessions')
-      .select('user_id, expires_at')
-      .eq('token_hash', tokenHash)
-      .maybeSingle();
-
-  if (error) {
-    console.error(
-      'ERRO AO VERIFICAR SESSÃO:',
-      error
-    );
-
-    return null;
-  }
-
-  if (!session) {
-    return null;
-  }
-
-  if (
-    new Date(session.expires_at).getTime() <=
-    Date.now()
-  ) {
-    await supabase
-      .from('auth_sessions')
-      .delete()
-      .eq('token_hash', tokenHash);
-
-    return null;
-  }
-
-  return session.user_id as string;
-}
-
-export async function GET(
-  request: Request
-) {
+export async function GET(request: Request) {
   try {
-    const { searchParams } =
-      new URL(request.url);
-
-    const postId =
-      searchParams.get('post_id')?.trim() || '';
-
-    if (!postId) {
-      return NextResponse.json(
-        {
-          error:
-            'ID do post não informado.',
-        },
-        { status: 400 }
-      );
+    const params = new URL(request.url).searchParams;
+    const postId = params.get('post_id') ?? '';
+    const replyId = params.get('reply_id');
+    if (replyId && !uuid.test(replyId)) return respond({ error: 'Resposta indisponível.' }, 404);
+    const actor = await chatActor();
+    if (params.get('saved') === '1') {
+      if (!actor) return respond({ error: 'Entre para ver suas respostas salvas.' }, 401);
+      const result = await chatDb.from('nook_saved_replies').select('nook_comments(id,post_id,author_id,content)').eq('user_id', actor.profileId).order('created_at', { ascending: false }).limit(100);
+      if (result.error) throw result.error;
+      const rows = result.data.flatMap(row => row.nook_comments);
+      const authors = await getPublicProfileIds(chatDb, rows.map(row => row.author_id), actor.profileId);
+      const posts = new Map(await Promise.all([...new Set(rows.map(row => row.post_id))].map(async id =>
+        [id, await isPublicPostVisible(chatDb, id)] as const)));
+      return respond({ comments: rows.filter(row => authors.has(row.author_id) && posts.get(row.post_id)).map(({ id, post_id, content }) => ({ id, post_id, content })) });
     }
-
-    if (!(await isPublicPostVisible(supabase, postId))) {
-      return NextResponse.json({ comments: [] });
+    if (!uuid.test(postId) || !(await isPublicPostVisible(chatDb, postId))) return respond({ error: 'Publicação indisponível.' }, 404);
+    let query = chatDb.from('nook_comments').select(fields).eq('post_id', postId).order('created_at').limit(300);
+    if (replyId) query = query.eq('id', replyId);
+    const result = await query;
+    if (result.error) throw result.error;
+    if (!result.data.length) return respond({ comments: [] });
+    const ids = result.data.map(row => row.id);
+    const authorIds = [...new Set(result.data.map(row => row.author_id))];
+    const [visible, profiles, reactions, saves] = await Promise.all([
+      getPublicProfileIds(chatDb, authorIds, actor?.profileId ?? null),
+      chatDb.from('profiles').select(authorFields).in('id', authorIds),
+      chatDb.from('nook_comment_reactions').select('comment_id,user_id').in('comment_id', ids).eq('emoji', '❤️'),
+      actor ? chatDb.from('nook_saved_replies').select('comment_id').eq('user_id', actor.profileId).in('comment_id', ids)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (profiles.error || reactions.error || saves.error) throw profiles.error || reactions.error || saves.error;
+    const authors = new Map(profiles.data.map(profile => [profile.id, profile]));
+    const saved = new Set(saves.data.map(save => save.comment_id));
+    const likes = new Map<string, number>();
+    const liked = new Set<string>();
+    for (const row of reactions.data) {
+      likes.set(row.comment_id, (likes.get(row.comment_id) ?? 0) + 1);
+      if (row.user_id === actor?.profileId) liked.add(row.comment_id);
     }
-
-    const {
-      data: comments,
-      error,
-    } = await supabase
-      .from('nook_comments')
-      .select(`
-        id,
-        post_id,
-        author_id,
-        content,
-        parent_id,
-        created_at,
-        updated_at
-      `)
-      .eq('post_id', postId)
-      .order('created_at', {
-        ascending: true,
-      });
-
-    if (error) {
-      console.error(
-        'ERRO AO BUSCAR COMENTÁRIOS:',
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Erro ao buscar comentários.',
-        },
-        { status: 500 }
-      );
-    }
-
-    const authorIds = [
-      ...new Set(
-        (comments || []).map(
-          (comment) =>
-            comment.author_id
-        )
-      ),
-    ];
-
-    let profiles: Array<{
-      id: string;
-      username: string;
-      display_name: string | null;
-      is_official?: boolean;
-      verified?: boolean;
-      avatar_url: string | null;
-    }> = [];
-
-    if (authorIds.length > 0) {
-      const {
-        data,
-        error: profilesError,
-      } = await supabase
-        .from('profiles')
-        .select(
-          'id, username, display_name, avatar_url, verified, is_official'
-        )
-        .in('id', authorIds);
-
-      if (profilesError) {
-        console.error(
-          'ERRO AO BUSCAR AUTORES:',
-          profilesError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              'Erro ao buscar autores dos comentários.',
-          },
-          { status: 500 }
-        );
-      }
-
-      profiles = data || [];
-    }
-
-    const commentsWithAuthors =
-      (comments || []).map(
-        (comment) => ({
-          ...comment,
-          author:
-            profiles.find(
-              (profile) =>
-                profile.id ===
-                comment.author_id
-            ) || null,
-        })
-      );
-
-    return NextResponse.json({
-      comments:
-        commentsWithAuthors,
-    });
+    const rows = result.data.filter(row => visible.has(row.author_id));
+    const visibleIds = new Set(rows.map(row => row.id));
+    return respond({ comments: rows.map(row => ({
+      ...row,
+      parent_id: row.parent_id && visibleIds.has(row.parent_id) ? row.parent_id : null,
+      author: authors.get(row.author_id) ?? null,
+      likes: likes.get(row.id) ?? 0,
+      liked: liked.has(row.id),
+      saved: saved.has(row.id),
+    })) });
   } catch (error) {
-    console.error(
-      'ERRO AO BUSCAR COMENTÁRIOS:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          'Erro interno do servidor.',
-      },
-      { status: 500 }
-    );
+    console.error('feed replies GET', error);
+    return respond({ error: 'Não foi possível carregar as respostas.' }, 500);
   }
 }
 
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
+  let uploaded: string[] = [];
   try {
-    const userId =
-      await getCurrentUserId();
-
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error:
-            'Não autenticado.',
-        },
-        { status: 401 }
-      );
+    const actor = await chatActor();
+    if (!actor) return respond({ error: 'Entre para responder à publicação.' }, 401);
+    const form = request.headers.get('content-type')?.includes('multipart/form-data') ? await request.formData() : null;
+    const body = form ? Object.fromEntries(form.entries()) : await request.json().catch(() => null);
+    if (!body || typeof body.post_id !== 'string' || !uuid.test(body.post_id)) return respond({ error: 'Publicação inválida.' }, 400);
+    const postId: string = body.post_id;
+    const content = typeof body.content === 'string' ? body.content.trim() : '';
+    const image = form?.get('image');
+    const parentId = body.parent_id || null;
+    if ((!content && !(image instanceof File)) || content.length > 2000 || (parentId && (typeof parentId !== 'string' || !uuid.test(parentId)))) {
+      return respond({ error: 'Escreva uma resposta de até 2.000 caracteres ou anexe uma imagem.' }, 400);
     }
-
-    let body: any;
-
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        {
-          error:
-            'Dados da requisição inválidos.',
-        },
-        { status: 400 }
-      );
-    }
-
-    const postId =
-      typeof body.post_id ===
-      'string'
-        ? body.post_id.trim()
-        : '';
-
-    const content =
-      typeof body.content ===
-      'string'
-        ? body.content.trim()
-        : '';
-
-    const parentId =
-      typeof body.parent_id ===
-        'string' &&
-      body.parent_id.trim()
-        ? body.parent_id.trim()
-        : null;
-
-    if (!postId) {
-      return NextResponse.json(
-        {
-          error:
-            'ID do post não informado.',
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!content) {
-      return NextResponse.json(
-        {
-          error:
-            'O comentário não pode estar vazio.',
-        },
-        { status: 400 }
-      );
-    }
-
-    if (content.length > 2000) {
-      return NextResponse.json(
-        {
-          error:
-            'O comentário pode ter no máximo 2000 caracteres.',
-        },
-        { status: 400 }
-      );
-    }
-
-    const {
-      data: post,
-      error: postError,
-    } = await supabase
-      .from('nook_posts')
-      .select('id')
-      .eq('id', postId)
-      .maybeSingle();
-
-    if (postError) {
-      console.error(
-        'ERRO AO VALIDAR POST:',
-        postError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Erro ao validar o post.',
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!post || !(await isPublicPostVisible(supabase, postId))) {
-      return NextResponse.json(
-        {
-          error:
-            'Post não encontrado.',
-        },
-        { status: 404 }
-      );
-    }
-
+    if (!(await isPublicPostVisible(chatDb, postId))) return respond({ error: 'Publicação indisponível.' }, 404);
     if (parentId) {
-      const {
-        data: parentComment,
-        error: parentError,
-      } = await supabase
-        .from('nook_comments')
-        .select(
-          'id, post_id'
-        )
-        .eq('id', parentId)
-        .maybeSingle();
-
-      if (parentError) {
-        console.error(
-          'ERRO AO VALIDAR COMENTÁRIO PAI:',
-          parentError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              'Erro ao validar o comentário pai.',
-          },
-          { status: 500 }
-        );
-      }
-
-      if (!parentComment) {
-        return NextResponse.json(
-          {
-            error:
-              'O comentário ao qual você está respondendo não existe.',
-          },
-          { status: 400 }
-        );
-      }
-
-      if (
-        parentComment.post_id !==
-        postId
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'O comentário pertence a outro post.',
-          },
-          { status: 400 }
-        );
+      const parent = await chatDb.from('nook_comments').select('id,author_id').eq('id', parentId).eq('post_id', postId).maybeSingle();
+      if (parent.error) throw parent.error;
+      if (!parent.data || !(await getPublicProfileIds(chatDb, [parent.data.author_id], actor.profileId)).has(parent.data.author_id)) {
+        return respond({ error: 'Resposta indisponível.' }, 404);
       }
     }
-
-    const {
-      data: comment,
-      error,
-    } = await supabase
-      .from('nook_comments')
-      .insert({
-        post_id: postId,
-        author_id: userId,
-        content,
-        parent_id: parentId,
-      })
-      .select(`
-        id,
-        post_id,
-        author_id,
-        content,
-        parent_id,
-        created_at,
-        updated_at
-      `)
-      .single();
-
-    if (error) {
-      console.error(
-        'ERRO AO CRIAR COMENTÁRIO:',
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível criar o comentário.',
-        },
-        { status: 500 }
-      );
+    let imageUrl: string | null = null;
+    if (image instanceof File) {
+      const upload = await uploadFeedAttachments([image], actor.profileId, true);
+      uploaded = upload.paths;
+      imageUrl = upload.media[0].media_url;
     }
-
-    const {
-      data: author,
-    } = await supabase
-      .from('profiles')
-      .select(
-        'id, username, display_name, avatar_url, verified, is_official'
-      )
-      .eq('id', userId)
-      .maybeSingle();
-
-    return NextResponse.json(
-      {
-        comment: {
-          ...comment,
-          author:
-            author || null,
-        },
-      },
-      { status: 201 }
-    );
+    const result = await chatDb.from('nook_comments').insert({
+      post_id: postId, author_id: actor.profileId, parent_id: parentId, content, image_url: imageUrl,
+    }).select(fields).single();
+    if (result.error) throw result.error;
+    uploaded = [];
+    const author = await chatDb.from('profiles').select(authorFields).eq('id', actor.profileId).maybeSingle();
+    return respond({ comment: { ...result.data, author: author.data ?? null, likes: 0, liked: false, saved: false } }, 201);
   } catch (error) {
-    console.error(
-      'ERRO GERAL AO CRIAR COMENTÁRIO:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          'Erro interno do servidor.',
-      },
-      { status: 500 }
-    );
+    if (uploaded.length) await chatDb.storage.from('nook-media').remove(uploaded);
+    if (error instanceof AttachmentError) return respond({ error: error.message }, 400);
+    console.error('feed replies POST', error);
+    return respond({ error: 'Não foi possível enviar a resposta.' }, 500);
   }
 }

@@ -1,4 +1,5 @@
 'use client';
+import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileStats from '@/components/ProfileStats';
@@ -57,7 +58,7 @@ type PostMedia = {
   id: string;
   post_id: string;
   media_url: string;
-  media_type: 'image' | 'gif';
+  media_type: 'image' | 'gif' | 'video';
   created_at?: string;
 };
 
@@ -1636,7 +1637,7 @@ export default function PerfilPage() {
         }`}
       >
         {media.map(
-          (item, index) => (
+          (item, index) => item.media_type === 'video' ? <FeedVideo key={item.id} id={item.id} /> : (
             <div
               key={item.id}
               className={`relative overflow-hidden bg-[#191219] ${

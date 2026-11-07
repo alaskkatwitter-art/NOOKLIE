@@ -4,6 +4,7 @@ import AccountBadge from '@/components/AccountBadge';
 import Link from 'next/link';
 import { chapterKinds, ChapterKind, SeriesBook, storyFormats, storyKinds } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
+import StoryReadingActions from '@/components/StoryReadingActions';
 import FormattedSynopsis from '@/components/FormattedSynopsis';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -288,11 +289,15 @@ export default function HistoriaPage() {
               </button>
             )}
 
-            {story.description && (
-              <div className="mb-7 max-w-3xl text-base leading-7 text-white/60">
-                <FormattedSynopsis text={story.description} />
+            <section aria-label="Resumo da obra" className="mb-7 max-w-3xl">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">Resumo</h2>
+                {firstChapter && <StoryReadingActions storyId={story.id} />}
               </div>
-            )}
+              {story.description ? <div className="text-base leading-7 text-white/65">
+                <FormattedSynopsis text={story.description} />
+              </div> : <p className="text-white/60">Esta obra ainda não tem sinopse.</p>}
+            </section>
 
             {story.tags &&
               story.tags.length > 0 && (

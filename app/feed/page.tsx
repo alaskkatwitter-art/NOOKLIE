@@ -1,4 +1,8 @@
 'use client';
+import QuotedReply from '@/components/QuotedReply';
+import FeedVideo from '@/components/FeedVideo';
+import { feedImageTypes, maxFeedUploadBytes } from '@/lib/social/attachments';
+import { feedTokenPattern, linkedVideoId, normalizeHashtag } from '@/lib/social/feed-links';
 import AccountBadge from '@/components/AccountBadge';
 import RepostActions from '@/components/RepostActions';
 
@@ -55,7 +59,7 @@ type Media = {
   id: string;
   post_id: string;
   media_url: string;
-  media_type: 'image' | 'gif';
+  media_type: 'image' | 'gif' | 'video';
   created_at: string;
 };
 
@@ -68,6 +72,10 @@ type Comment = {
   created_at: string;
   updated_at: string;
   author: Profile | null;
+  image_url?: string | null;
+  likes: number;
+  liked: boolean;
+  saved: boolean;
 };
 
 type Post = {
@@ -1554,29 +1562,29 @@ function PostBody({
     return null;
   }
 
-  const pieces =
-    body.split(SPOTIFY_URL_REGEX);
-
-  const urls =
-    body.match(SPOTIFY_URL_REGEX) || [];
-
   return (
     <div className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
-      {pieces.map(
-        (piece, index) => (
-          <span key={index}>
-            {piece}
-
-            {index <
-              pieces.length - 1 &&
-              urls[index] && (
-                <SpotifyPreview
-                  url={urls[index]}
-                />
-              )}
-          </span>
-        )
-      )}
+      {body.split(feedTokenPattern).map((piece, index) => {
+        if (index % 2 === 0) return piece;
+        if (piece.startsWith('#')) return <a key={index} href={'/feed?tag=' + encodeURIComponent(normalizeHashtag(piece))} className="font-semibold text-pink-200 hover:underline">{piece}</a>;
+        const url = URL.parse(piece);
+        if (!url || !['http:', 'https:'].includes(url.protocol)) return piece;
+        const origin = typeof window === 'undefined' ? 'https://nooklie.vercel.app' : window.location.origin;
+        const videoId = linkedVideoId(piece, origin);
+        if (videoId) return <FeedVideo key={index} id={videoId} />;
+        if (url.hostname === 'open.spotify.com' && piece.match(SPOTIFY_URL_REGEX)) return <SpotifyPreview key={index} url={piece} />;
+        const internal = url.origin === origin || url.origin === 'https://nooklie.vercel.app';
+        const replyId = internal && url.pathname === '/feed' ? url.searchParams.get('reply') : null;
+        const replyPostId = replyId ? url.searchParams.get('post') : null;
+        if (replyId && replyPostId && [replyId, replyPostId].every(id => /^[0-9a-f-]{36}$/i.test(id))) {
+          return <QuotedReply key={index} postId={replyPostId} replyId={replyId} />;
+        }
+        const chapter = internal && url.pathname.startsWith('/capitulo/');
+        return <a key={index} href={internal ? url.pathname + url.search + url.hash : url.href}
+          target={internal ? undefined : '_blank'} rel={internal ? undefined : 'noreferrer'} className="text-pink-200 underline">
+          {chapter ? 'Ler capítulo no Nooklie' : piece}
+        </a>;
+      })}
     </div>
   );
 }
@@ -1599,6 +1607,7 @@ function PostMedia({
 
   if (media.length === 1) {
     const item = media[0];
+    if (item.media_type === 'video') return <FeedVideo id={item.id} />;
 
     return (
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
@@ -1614,7 +1623,9 @@ function PostMedia({
 
   return (
     <div className="mt-4 grid grid-cols-2 gap-1 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-      {media.map((item) => (
+      {media.map((item) => item.media_type === 'video' ? (
+        <FeedVideo key={item.id} id={item.id} />
+      ) : (
         <div
           key={item.id}
           className="aspect-[4/3] overflow-hidden bg-black/40"
@@ -1635,87 +1646,59 @@ function PostMedia({
    COMMENTS
 ========================================================= */
 
-function CommentItem({
-  comment,
-  replies,
-  onReply,
-}: {
+function CommentItem({ comment, children, onReply, onChange }: {
   comment: Comment;
-  replies: Comment[];
-  onReply: (
-    comment: Comment
-  ) => void;
+  children?: React.ReactNode;
+  onReply: (comment: Comment) => void;
+  onChange: (comment: Comment) => void;
 }) {
-  return (
-    <div>
-      <div className="flex gap-3">
-        <Avatar
-          profile={comment.author}
-          size="small"
-        />
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
 
-        <div className="min-w-0 flex-1">
-          <div className="rounded-2xl bg-white/[0.045] px-4 py-3">
-            <Link
-              href={
-                comment.author
-                  ? `/perfil/${encodeURIComponent(
-                      comment.author.username
-                    )}`
-                  : '#'
-              }
-              className="text-sm font-bold text-white transition hover:text-[#ff78b9]"
-            >
-              {comment.author
-                ?.display_name ||
-                comment.author
-                  ?.username ||
-                'Usuário'}<AccountBadge account={comment.author} />
-            </Link>
+  async function toggle(action: 'like' | 'save') {
+    const enabled = action === 'like' ? !comment.liked : !comment.saved;
+    setPending(true);
+    setError('');
+    try {
+      const response = await fetch('/api/nook-comments/actions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: comment.id, action, enabled }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      onChange(action === 'like' ? { ...comment, liked: enabled, likes: Math.max(0, comment.likes + (enabled ? 1 : -1)) }
+        : { ...comment, saved: enabled });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Não foi possível atualizar a resposta.');
+    } finally {
+      setPending(false);
+    }
+  }
 
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/75">
-              {comment.content}
-            </p>
-          </div>
-
-          <div className="mt-1 flex items-center gap-3 px-2 text-[11px] text-white/35">
-            <span>
-              {formatPostDateTime(
-                comment.created_at
-              )}
-            </span>
-
-            <button
-              type="button"
-              onClick={() =>
-                onReply(comment)
-              }
-              className="font-semibold transition hover:text-[#ff78b9]"
-            >
-              Responder
-            </button>
-          </div>
-
-          {replies.length > 0 && (
-            <div className="mt-3 space-y-3 border-l border-white/10 pl-4">
-              {replies.map(
-                (reply) => (
-                  <CommentItem
-                    key={reply.id}
-                    comment={reply}
-                    replies={[]}
-                    onReply={
-                      onReply
-                    }
-                  />
-                )
-              )}
-            </div>
-          )}
+  return <article id={'reply-' + comment.id} className="scroll-mt-16 border-b border-white/10 py-4">
+    <div className="flex gap-3">
+      <Avatar profile={comment.author} size="small" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          {comment.author ? <Link href={'/perfil/' + encodeURIComponent(comment.author.username)} className="font-bold hover:text-pink-200">
+            {comment.author.display_name || comment.author.username}<AccountBadge account={comment.author} />
+            <span className="ml-2 text-xs font-normal text-white/60">@{comment.author.username}</span>
+          </Link> : <span>Usuário</span>}
+          <span className="text-xs text-white/55">{formatPostDateTime(comment.created_at)}</span>
         </div>
+        <PostBody body={comment.content} />
+        {comment.image_url && <img loading="lazy" src={contentMediaUrl(comment.image_url)} alt="Imagem anexada à resposta" className="mt-3 max-h-80 w-full rounded-xl object-contain" />}
+        <div className="mt-2 flex flex-wrap gap-x-4 text-sm text-white/70">
+          <button type="button" className="min-h-10 hover:text-pink-200" onClick={() => onReply(comment)}>Responder</button>
+          <button type="button" className="min-h-10 hover:text-pink-200 aria-pressed:text-pink-300" disabled={pending} aria-pressed={comment.liked} onClick={() => void toggle('like')}>{comment.liked ? 'Curtido' : 'Curtir'}{comment.likes > 0 && ' · ' + comment.likes}</button>
+          <a className="inline-flex min-h-10 items-center hover:text-pink-200" href={`/feed?quotePost=${comment.post_id}&quoteReply=${comment.id}`}>Nooklar</a>
+          <button type="button" className="min-h-10 hover:text-pink-200 aria-pressed:text-pink-300" disabled={pending} aria-pressed={comment.saved} onClick={() => void toggle('save')}>{comment.saved ? 'Salva' : 'Salvar'}</button>
+        </div>
+        {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}
       </div>
     </div>
-  );
+    {children}
+  </article>;
 }
 
 /* =========================================================
@@ -1758,6 +1741,10 @@ function FeedPost({
     replyingTo,
     setReplyingTo,
   ] = useState<Comment | null>(null);
+
+  const [commentImage, setCommentImage] = useState<File | null>(null);
+  const [commentError, setCommentError] = useState('');
+  const replyInput = useRef<HTMLTextAreaElement>(null);
 
   const [
     sendingComment,
@@ -1814,7 +1801,7 @@ function FeedPost({
           data.comments || []
         );
       } catch (error) {
-        console.error(error);
+        setCommentError(error instanceof Error ? error.message : 'Não foi possível carregar as respostas.');
       } finally {
         setCommentsLoading(false);
       }
@@ -2003,34 +1990,17 @@ function FeedPost({
     const content =
       commentText.trim();
 
-    if (
-      !content ||
-      sendingComment
-    ) {
-      return;
-    }
+    if ((!content && !commentImage) || sendingComment) return;
 
     setSendingComment(true);
-
+    setCommentError('');
     try {
-      const response =
-        await fetch(
-          '/api/nook-comments',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              post_id: post.id,
-              content,
-              parent_id:
-                replyingTo?.id ||
-                null,
-            }),
-          }
-        );
+      const form = new FormData();
+      form.set('post_id', post.id);
+      form.set('content', content);
+      if (replyingTo) form.set('parent_id', replyingTo.id);
+      if (commentImage) form.set('image', commentImage);
+      const response = await fetch('/api/nook-comments', { method: 'POST', body: form });
 
       const data =
         await response.json();
@@ -2061,16 +2031,11 @@ function FeedPost({
       }
 
       setCommentText('');
+      setCommentImage(null);
       setReplyingTo(null);
       setCommentsOpen(true);
     } catch (error) {
-      console.error(error);
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível comentar.'
-      );
+      setCommentError(error instanceof Error ? error.message : 'Não foi possível enviar a resposta.');
     } finally {
       setSendingComment(false);
     }
@@ -2100,11 +2065,27 @@ function FeedPost({
       return map;
     }, [comments]);
 
-  const mainComments =
-    commentsByParent.get(null) || [];
+  const mainComments = commentsByParent.get(null) || [];
+
+  useEffect(() => {
+    if (!expanded || !comments.length) return;
+    const reply = new URL(window.location.href).searchParams.get('reply');
+    if (reply) document.getElementById('reply-' + reply)?.scrollIntoView({ block: 'start' });
+  }, [expanded, comments.length]);
+
+  function renderComment(comment: Comment, depth = 0): React.ReactNode {
+    const replies = commentsByParent.get(comment.id) || [];
+    return <CommentItem key={comment.id} comment={comment}
+      onChange={updated => setComments(current => current.map(item => item.id === updated.id ? updated : item))}
+      onReply={target => { setReplyingTo(target); replyInput.current?.focus(); }}>
+      {replies.length > 0 && <div className={depth < 2 ? 'ml-4 border-l border-pink-200/20 pl-3 sm:ml-6' : ''}>
+        {replies.map(reply => renderComment(reply, depth + 1))}
+      </div>}
+    </CommentItem>;
+  }
 
   return (
-    <article className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
+    <article className="feed-post" onClick={e=>{if(!expanded && e.target instanceof Element && !e.target.closest('a,button,input,textarea,dialog,video,audio,summary,label'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
       {post.repost&&<div className="border-b border-white/10 px-5 py-4"><RepostAttribution author={post.repost.author} comment={post.repost.comment}/></div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
@@ -2160,7 +2141,7 @@ function FeedPost({
                 </Link>
               </div>
 
-              <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
+              <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();if(!expanded) window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
                 {formatPostDateTime(
                   post.created_at
                 )}
@@ -2199,11 +2180,8 @@ function FeedPost({
             type="button"
             aria-label="Comentários da publicação"
             aria-expanded={commentsOpen}
-            onClick={() =>
-              setCommentsOpen(
-                (value) => !value
-              )
-            }
+            onClick={() => expanded ? replyInput.current?.focus() :
+              window.dispatchEvent(new CustomEvent('nooklie:open-post', { detail: post.id }))}
             className="group flex h-11 min-w-[64px] items-center justify-center gap-1.5 rounded-xl px-3 text-white/45 transition hover:bg-white/[0.04] hover:text-[#ff78b9]"
           >
             <CommentIcon />
@@ -2262,13 +2240,17 @@ function FeedPost({
             </div>
           )}
 
-          <div className="mb-5 flex gap-3">
+          <h2 className="mb-4 text-lg font-bold">Respostas</h2>
+          {commentError && <p role="alert" className="mb-2 text-sm text-rose-200">{commentError}</p>}
+          <div className="mb-3 flex gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9]/20 text-xs font-black text-[#ff78b9]">
               N
             </div>
 
             <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-2">
               <textarea
+                ref={replyInput}
+                aria-label="Escrever resposta"
                 value={commentText}
                 onChange={(event) =>
                   setCommentText(
@@ -2301,7 +2283,7 @@ function FeedPost({
                 type="button"
                 onClick={submitComment}
                 disabled={
-                  !commentText.trim() ||
+                  (!commentText.trim() && !commentImage) ||
                   sendingComment
                 }
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff78b9] text-[#190d16] transition hover:brightness-110 disabled:opacity-30"
@@ -2311,6 +2293,19 @@ function FeedPost({
             </div>
           </div>
 
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer rounded-xl border border-white/15 px-3 py-2 text-sm text-pink-200">
+              Anexar imagem
+              <input type="file" className="sr-only" accept={feedImageTypes.join(',')} disabled={sendingComment} onChange={event => {
+                const image = event.target.files?.[0];
+                if (image && (!feedImageTypes.includes(image.type) || image.size > maxFeedUploadBytes)) {
+                  setCommentError('Escolha uma imagem JPG, PNG, WebP ou GIF de até 4 MB.');
+                } else if (image) { setCommentImage(image); setCommentError(''); }
+                event.target.value = '';
+              }} />
+            </label>
+            {commentImage && <button type="button" disabled={sendingComment} onClick={() => setCommentImage(null)} className="break-all text-sm text-pink-200">{commentImage.name} · Remover</button>}
+          </div>
           {commentsLoading ? (
             <div className="py-6 text-center text-xs text-white/30">
               Carregando comentários...
@@ -2328,22 +2323,7 @@ function FeedPost({
             </div>
           ) : (
             <div className="space-y-5">
-              {mainComments.map(
-                (comment) => (
-                  <CommentItem
-                    key={comment.id}
-                    comment={comment}
-                    replies={
-                      commentsByParent.get(
-                        comment.id
-                      ) || []
-                    }
-                    onReply={
-                      setReplyingTo
-                    }
-                  />
-                )
-              )}
+              {mainComments.map(comment => renderComment(comment))}
             </div>
           )}
         </div>
@@ -3049,20 +3029,59 @@ function FeedSearchModal({
 ========================================================= */
 
 export default function FeedPage() {
-  const detailDialog=useRef<HTMLDialogElement>(null);
-  const [detailPost,setDetailPost]=useState<Post|null>(null);
-  const [detailError,setDetailError]=useState('');
-  const [detailLoading,setDetailLoading]=useState(false);
-  useEffect(()=>{
-    let controller:AbortController|undefined;
-    async function open(id:string){controller?.abort();controller=new AbortController();setDetailLoading(true);setDetailError('');setDetailPost(null);detailDialog.current?.showModal();
-      try{const response=await fetch('/api/nook-posts/detail?id='+encodeURIComponent(id),{cache:'no-store',signal:controller.signal});const data=await response.json();if(!response.ok)throw Error(data.error||'Publicação indisponível.');setDetailPost(data.post);const url=new URL(window.location.href);url.searchParams.set('post',id);window.history.replaceState(null,'',url);}
-      catch(error){if(!controller.signal.aborted)setDetailError(error instanceof Error?error.message:'Não foi possível abrir.');}finally{if(!controller.signal.aborted)setDetailLoading(false);}}
-    const handler=(event:Event)=>void open((event as CustomEvent<string>).detail);
-    window.addEventListener('nooklie:open-post',handler);
-    const url=new URL(window.location.href);const initial=url.searchParams.get('post')||url.hash.match(/^#post-(.+)$/)?.[1];if(initial)void open(initial);
-    return()=>{controller?.abort();window.removeEventListener('nooklie:open-post',handler);};
-  },[]);
+  const detailDialog = useRef<HTMLDialogElement>(null);
+  const [detailPost, setDetailPost] = useState<Post | null>(null);
+  const [detailError, setDetailError] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [activeTag, setActiveTag] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [quoteBody, setQuoteBody] = useState('');
+  useEffect(() => {
+    let controller: AbortController | undefined;
+    async function open(id: string) {
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      setDetailLoading(true);
+      setDetailError('');
+      setDetailPost(null);
+      if (!detailDialog.current?.open) detailDialog.current?.showModal();
+      try {
+        const response = await fetch('/api/nook-posts/detail?id=' + encodeURIComponent(id), { cache: 'no-store', signal: request.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Publicação indisponível.');
+        setDetailPost(data.post);
+        const url = new URL(window.location.href);
+        url.searchParams.set('post', id);
+        window.history.replaceState(null, '', url);
+      } catch (error) {
+        if (!request.signal.aborted) setDetailError(error instanceof Error ? error.message : 'Não foi possível abrir.');
+      } finally {
+        if (!request.signal.aborted) setDetailLoading(false);
+      }
+    }
+    const handler = (event: Event) => void open((event as CustomEvent<string>).detail);
+    window.addEventListener('nooklie:open-post', handler);
+    const url = new URL(window.location.href);
+    const tag = normalizeHashtag(url.searchParams.get('tag') || '');
+    setActiveTag(tag);
+    setTagInput(tag);
+    const post = url.searchParams.get('post') || url.hash.match(/^#post-(.+)$/)?.[1];
+    if (post) void open(post);
+    const quotePost = url.searchParams.get('quotePost');
+    const quoteReply = url.searchParams.get('quoteReply');
+    if (quotePost && quoteReply && [quotePost, quoteReply].every(value => /^[0-9a-f-]{36}$/i.test(value))) {
+      const link = new URL('/feed', url.origin);
+      link.searchParams.set('post', quotePost);
+      link.searchParams.set('reply', quoteReply);
+      setQuoteBody(link.href);
+      setComposerOpen(true);
+      url.searchParams.delete('quotePost');
+      url.searchParams.delete('quoteReply');
+      window.history.replaceState(null, '', url);
+    }
+    return () => { controller?.abort(); window.removeEventListener('nooklie:open-post', handler); };
+  }, []);
 
   const [posts, setPosts] =
     useState<Post[]>([]);
@@ -3477,7 +3496,7 @@ export default function FeedPage() {
         try {
           const response =
             await fetch(
-              '/api/feed',
+              '/api/feed' + (activeTag ? '?tag=' + encodeURIComponent(activeTag) : ''),
               {
                 cache: 'no-store',
               }
@@ -3509,7 +3528,7 @@ export default function FeedPage() {
           setRefreshing(false);
         }
       },
-      []
+      [activeTag]
     );
 
   /* =======================================================
@@ -3764,6 +3783,14 @@ export default function FeedPage() {
           ================================================= */}
 
           <header className="mb-6 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-[#ffb7da]">Comunidade</p><h1 className="mt-2 text-2xl font-bold">Seu Feed</h1></div><div className="flex gap-2"><button type="button" aria-label="Pesquisar pessoas" onClick={()=>setSearchOpen(true)} className="shell-icon"><SearchIcon /></button><button type="button" aria-label="Atualizar Feed" onClick={()=>{loadFeed(true);loadStories();loadUpcomingUpdates();}} disabled={refreshing} className="shell-icon"><RefreshIcon /></button></div></header>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <form className="flex min-w-0 items-center gap-2" action="/feed">
+              <input name="tag" aria-label="Buscar hashtag no feed" maxLength={65} placeholder="# Buscar hashtag" value={tagInput} onChange={event => setTagInput(event.target.value)} className="nook-input min-w-0" />
+              <button className="discovery-secondary">Buscar</button>
+            </form>
+            <Link href="/respostas-salvas" className="text-sm text-pink-200 hover:underline">Respostas salvas</Link>
+            {activeTag && <a href="/feed" className="rounded-full border border-pink-300/30 px-3 py-2 text-sm text-pink-200">#{activeTag} · Limpar filtro</a>}
+          </div>
 
           <button
             type="button"
@@ -3991,10 +4018,10 @@ export default function FeedPage() {
       ===================================================== */}
 
       <NookPostComposer
+        key={quoteBody || 'feed-composer'}
+        initialBody={quoteBody}
         open={composerOpen}
-        onClose={() =>
-          setComposerOpen(false)
-        }
+        onClose={() => { setComposerOpen(false); setQuoteBody(''); }}
         onPublished={() => {
           setComposerOpen(false);
           loadFeed(true);
@@ -4018,8 +4045,15 @@ export default function FeedPage() {
         }}
       />
 
-      <dialog ref={detailDialog} className="nook-dialog" style={{width:'min(96vw,48rem)'}} aria-label="Publicação" onClose={()=>{const url=new URL(window.location.href);url.searchParams.delete('post');url.hash='';window.history.replaceState(null,'',url);}} onClick={e=>{if(e.target===e.currentTarget)detailDialog.current?.close();}}>
-        <button type="button" onClick={()=>detailDialog.current?.close()} className="mb-4 min-h-11 rounded-full border border-white/15 px-5 text-sm">Fechar publicação</button>
+      <dialog ref={detailDialog} className="nook-dialog feed-detail" aria-labelledby="feed-detail-title" onClose={() => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('post'); url.searchParams.delete('reply'); url.hash = '';
+        window.history.replaceState(null, '', url);
+      }}>
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-[#1b121c] p-3">
+          <button type="button" onClick={() => detailDialog.current?.close()} className="min-h-11 rounded-full border border-white/15 px-4 text-sm">← Voltar</button>
+          <h2 id="feed-detail-title" className="font-bold">Publicação</h2>
+        </header>
         {detailLoading&&<p role="status">Carregando publicação…</p>}{detailError&&<p role="alert">{detailError}</p>}{detailPost&&<FeedPost key={detailPost.id} expanded post={detailPost} onPostUpdated={(id,changes)=>{setDetailPost(old=>old?{...old,...changes}:old);updatePost(id,changes);}}/>}
       </dialog>
     </main>

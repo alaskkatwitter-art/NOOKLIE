@@ -55,7 +55,7 @@ export async function GET(
 
     const { data: stories, error: storiesError } =
       await supabase
-        .from('stories')
+        .from('released_stories')
         .select(
           `
           id,

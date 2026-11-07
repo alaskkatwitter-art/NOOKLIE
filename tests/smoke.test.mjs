@@ -221,7 +221,7 @@ before(async () => {
       const rows = state.storyTags.map((relation) => {
         const tag = state.tags.find((item) => item.id === relation.tag_id);
         const category = state.categories.find((item) => item.id === tag?.category_id);
-        return { ...relation, tags: tag ? { ...tag, tag_categories: category ? { name: category.name } : null } : null };
+        return { ...relation, tags: tag ? { ...tag, tag_categories: category ? { name: category.name, slug: category.slug } : null } : null };
       });
       return respondRows(request, response, rows);
     }
@@ -264,6 +264,12 @@ before(async () => {
       );
       response.writeHead(204);
       return response.end();
+    }
+
+    if (path === 'released_stories' && request.method === 'GET') {
+      const ids = (url.searchParams.get('id') || '').slice(4, -1).split(',');
+      return respondRows(request, response, state.discoveryStories.filter(story => ids.includes(story.id))
+        .map(({ id, fandom }) => ({ id, fandom: fandom || '' })));
     }
 
     if (path === 'stories' && request.method === 'GET') {

@@ -24,7 +24,7 @@ export async function POST(request:Request) {
       const now=new Date().toISOString();
       const [event,story]=await Promise.all([
         discoveryDb.from('story_events').select('id').eq('id',body.event_id).eq('active',true).lte('starts_at',now).gt('ends_at',now).maybeSingle(),
-        discoveryDb.from('stories').select('id').eq('id',body.story_id).eq('author_id',reader.profile.id).is('moderation_hidden_at',null).maybeSingle(),
+        discoveryDb.from('released_stories').select('id').eq('id',body.story_id).eq('author_id',reader.profile.id).is('moderation_hidden_at',null).maybeSingle(),
       ]);
       if(event.error||story.error)throw event.error||story.error;
       if(!event.data||!story.data)return NextResponse.json({error:'Evento indisponível ou obra não pertence a esta conta.'},{status:403,headers:privateHeaders});

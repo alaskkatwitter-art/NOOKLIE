@@ -1,4 +1,6 @@
 'use client';
+import StoryPublicationControls from '@/components/StoryPublicationControls';
+import type { StoryPublication } from '@/lib/stories/publication';
 import ChapterBannerEditor from '@/components/ChapterBannerEditor';
 import DeleteStoryButton from '@/components/DeleteStoryButton';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -42,6 +44,8 @@ type StoryChapter = {
 };
 
 type Story = {
+  publication?: StoryPublication;
+  release_at?: string | null;
   has_content_warnings?: boolean;
   series_name?: string;
   series_volume?: number | null;
@@ -887,10 +891,10 @@ export default function EditarHistoriaPage() {
 
     if (
       file.size >
-      10 * 1024 * 1024
+      4 * 1024 * 1024
     ) {
       setError(
-        'A capa pode ter no máximo 10 MB.'
+        'A capa pode ter no máximo 4 MB.'
       );
       return;
     }
@@ -1097,7 +1101,7 @@ export default function EditarHistoriaPage() {
         genre
       );
 
-      tags.forEach((tag) => {
+      [...tags, ...(tagInput.trim() ? [tagInput.trim()] : [])].forEach((tag) => {
         formData.append(
           'tags',
           tag
@@ -1129,6 +1133,7 @@ export default function EditarHistoriaPage() {
       if (updatedStory) {
         const normalizedStory: Story =
           {
+            ...story,
             ...updatedStory,
             chapters:
               Array.isArray(
@@ -1201,6 +1206,7 @@ export default function EditarHistoriaPage() {
         );
       }
 
+      setTagInput('');
       setSuccess(
         'Informações da obra salvas com sucesso.'
       );
@@ -1513,6 +1519,12 @@ export default function EditarHistoriaPage() {
       chapterStatus;
 
     if(finalStatus==='scheduled'&&(!scheduledFor||!Number.isFinite(new Date(scheduledFor).getTime())||new Date(scheduledFor).getTime()<=Date.now())){setError('Escolha uma data e um horário no futuro.');return;}
+    if (finalStatus === 'published' && !chapter.published) {
+      const message = story?.publication === 'unpublished' || story?.publication === 'scheduled'
+        ? 'Publicar o capítulo? Os leitores terão acesso quando a obra estiver no ar.'
+        : 'Publicar o capítulo e disponibilizá-lo para os leitores?';
+      if (!window.confirm(message)) return;
+    }
     const body = syncEditorBody();
 
     const sanitizedBody =
@@ -1912,7 +1924,7 @@ export default function EditarHistoriaPage() {
 
         return updatedStory;
       });
-      if (finalStatus === 'published') {
+      if (finalStatus === 'published' && !chapter.published) {
         router.push(`/capitulo-publicado/${normalizedSavedChapter.id}`);
         router.refresh();
       }
@@ -2363,6 +2375,10 @@ export default function EditarHistoriaPage() {
                   Edite as informações da obra ou escolha um capítulo para editar.
                 </p>
               </div>
+
+              <StoryPublicationControls storyId={story.id} publication={story.publication ?? 'draft'}
+                releaseAt={story.release_at} hasPublishedChapter={story.chapters.some(chapter => chapter.published)}
+                onChange={(publication, release_at) => setStory(current => current ? { ...current, publication, release_at } : current)} />
 
               <form
                 onSubmit={

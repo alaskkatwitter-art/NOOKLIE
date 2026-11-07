@@ -85,6 +85,7 @@ export async function GET() {
         .from('reading_lists')
         .select('id, name, description, is_public, created_at')
         .eq('user_id', profileId)
+        .eq('name', 'Biblioteca')
         .order('created_at', {
           ascending: true,
         });
@@ -156,7 +157,7 @@ export async function GET() {
 
     const { data: stories, error: storiesError } =
       await supabase
-        .from('stories')
+        .from('released_stories')
         .select(
           'id, author_id, title, description, cover_url, status, rating, created_at, updated_at'
         )
@@ -355,7 +356,7 @@ export async function POST(
      */
     const { data: story, error: storyError } =
       await supabase
-        .from('stories')
+        .from('released_stories')
         .select('id, author_id')
         .eq('id', storyId)
         .maybeSingle();
@@ -384,103 +385,16 @@ export async function POST(
       );
     }
 
-    /*
-     * Procura a lista principal "Biblioteca".
-     */
-    let { data: libraryList } =
-      await supabase
-        .from('reading_lists')
-        .select('id, name')
-        .eq('user_id', profileId)
-        .eq('name', 'Biblioteca')
-        .limit(1)
-        .maybeSingle();
-
-    /*
-     * Se ainda não existir, cria.
-     */
-    if (!libraryList) {
-      const { data: createdList, error: createError } =
-        await supabase
-          .from('reading_lists')
-          .insert({
-            user_id: profileId,
-            name: 'Biblioteca',
-            description:
-              'Histórias salvas para ler.',
-            is_public: false,
-          })
-          .select('id, name')
-          .single();
-
-      if (createError || !createdList) {
-        console.error(
-          'ERRO AO CRIAR BIBLIOTECA:',
-          createError
-        );
-
-        return NextResponse.json(
-          {
-            error:
-              'Não foi possível criar sua biblioteca.',
-          },
-          { status: 500 }
-        );
-      }
-
-      libraryList = createdList;
-    }
-
-    /*
-     * Verifica se já está salva.
-     */
-    const { data: existingItem } =
-      await supabase
-        .from('reading_list_items')
-        .select('id')
-        .eq('list_id', libraryList.id)
-        .eq('story_id', storyId)
-        .maybeSingle();
-
-    if (existingItem) {
-      return NextResponse.json({
-        saved: true,
-        already_saved: true,
-        story_id: storyId,
-      });
-    }
-
-    const { data: insertedItem, error: insertError } =
-      await supabase
-        .from('reading_list_items')
-        .insert({
-          list_id: libraryList.id,
-          story_id: storyId,
-        })
-        .select('id, list_id, story_id, added_at')
-        .single();
-
-    if (insertError) {
-      console.error(
-        'ERRO AO SALVAR HISTÓRIA:',
-        insertError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            'Não foi possível adicionar a história à biblioteca.',
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      saved: true,
-      already_saved: false,
-      story_id: storyId,
-      item: insertedItem,
+    const { data, error } = await supabase.rpc('save_reading_list', {
+      p_owner: profileId,
+      p_list: null,
+      p_story: storyId,
+      p_name: 'Biblioteca',
+      p_description: 'Histórias salvas para ler.',
     });
+    if (error) throw error;
+    if (!data) return NextResponse.json({ error: 'História não encontrada.' }, { status: 404 });
+    return NextResponse.json({ saved: true, story_id: storyId });
   } catch (error) {
     console.error(
       'POST /api/library:',
