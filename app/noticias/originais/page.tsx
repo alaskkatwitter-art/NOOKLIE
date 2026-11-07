@@ -1,3 +1,4 @@
+import ShareNews from '@/components/ShareNews';
 import NewsComments from '@/components/NewsComments';
 import Link from 'next/link';
 import OriginalsShelf from '@/components/OriginalsShelf';
@@ -22,7 +23,7 @@ export default function OriginalsNewsPage() {
           <Link href="/escrever" className="nook-primary mt-6 inline-flex">Publicar minha história</Link>
         </article>
         <OriginalsShelf />
-        <NewsComments article="originais" />
+        <ShareNews slug="originais"/><NewsComments article="originais" />
       </div>
     </main>
   );

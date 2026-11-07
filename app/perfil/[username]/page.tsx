@@ -6,6 +6,7 @@ import {contentMediaUrl} from '@/lib/security/content-media';
 import MuralActions from '@/components/MuralActions';
 import {Pin,BookOpen,MessageCircle} from 'lucide-react';
 import MessageProfileButton from '@/components/MessageProfileButton';
+import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 
 
@@ -67,6 +68,7 @@ type NookPost = {
   body: string;
   image_url: string | null;
   story_id: string | null;
+  news_slug?: string | null;
   pinned: boolean;
   created_at: string;
   updated_at: string;
@@ -1107,7 +1109,7 @@ export default function PublicProfilePage() {
                             )}
                           </div>
 
-                          {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}{post.body && (
+                          {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>{post.body && (
                             <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
                               {
                                 post.body

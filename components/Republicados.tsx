@@ -1,4 +1,6 @@
 "use client";
+import RepostAttribution, {type RepostAuthor} from './RepostAttribution';
+import {isNewsArticle,newsArticles} from '@/lib/news/articles';
 import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -8,10 +10,11 @@ import RepostActions from "./RepostActions";
 type Post = {
   id: string;
   body: string | null;
+  news_slug?:string|null;
   image_url: string | null;
   author: { username: string; display_name: string | null; verified?: boolean; is_official?: boolean };
   media: { id: string; media_url: string }[];
-  repost: { id: string; comment: string | null; created_at: string };
+  repost: { id: string; comment: string | null; created_at: string; author:RepostAuthor };
 };
 export default function Republicados({
   profileId,
@@ -122,11 +125,7 @@ export default function Republicados({
               Nooklado em{" "}
               {new Date(p.repost.created_at).toLocaleDateString("pt-BR")}
             </p>
-            {p.repost.comment && (
-              <p className="mb-5 whitespace-pre-wrap break-words leading-7">
-                {p.repost.comment}
-              </p>
-            )}
+            <RepostAttribution author={p.repost.author} comment={p.repost.comment}/>
             <Link
               href={"/feed?post=" + p.id}
               className="block rounded-2xl border border-white/10 p-4 hover:border-[#ff9bca]/40"
@@ -139,6 +138,7 @@ export default function Republicados({
               </strong>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-white/80">
                 {p.body}
+                {isNewsArticle(p.news_slug)&&<span className="mt-3 block rounded-xl border border-pink-300/20 p-3"><span className="block text-xs text-pink-200">Jornal Nooklie</span>{newsArticles[p.news_slug].title}</span>}
               </p>
               {(p.media?.length
                 ? p.media

@@ -3,6 +3,8 @@ import AccountBadge from '@/components/AccountBadge';
 import RepostActions from '@/components/RepostActions';
 
 import {contentMediaUrl} from '@/lib/security/content-media';
+import RepostAttribution from '@/components/RepostAttribution';
+import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 import {
   useCallback,
@@ -75,6 +77,7 @@ type Post = {
   body: string | null;
   image_url: string | null;
   story_id: string | null;
+  news_slug?: string | null;
   pinned: boolean;
   created_at: string;
   updated_at: string;
@@ -2102,7 +2105,7 @@ function FeedPost({
 
   return (
     <article className="feed-post" onClick={e=>{if(!(e.target as HTMLElement).closest('a,button,input,textarea,dialog,video,audio,summary'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
-      {post.repost&&<div className="border-b border-white/10 px-5 py-4"><p className="text-xs text-[#ffb9da]">Nooklado por <Link href={'/perfil/'+encodeURIComponent(post.repost.author.username)} className="font-bold hover:underline">{post.repost.author.display_name||post.repost.author.username}<AccountBadge account={post.repost.author} /></Link></p>{post.repost.comment&&<p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{post.repost.comment}</p>}</div>}
+      {post.repost&&<div className="border-b border-white/10 px-5 py-4"><RepostAttribution author={post.repost.author} comment={post.repost.comment}/></div>}
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Link
@@ -2166,7 +2169,7 @@ function FeedPost({
           </div>
         </div>
 
-        <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}
+        <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>
 
         <PostMedia post={post} />
 

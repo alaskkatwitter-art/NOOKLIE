@@ -1,4 +1,6 @@
 "use client";
+import MemberPicker, {type Person} from '@/components/MemberPicker';
+import GroupPhoto from '@/components/GroupPhoto';
 import GroupInvites from "@/components/GroupInvites";
 import AccountBadge from '@/components/AccountBadge';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,6 +35,7 @@ type Thread = {
   id: string;
   kind: "direct" | "group";
   name: string | null;
+  avatar_path?:string|null;
   initiator_id: string;
   recipient_id: string | null;
   status: string;
@@ -55,13 +58,16 @@ type Member = { profile_id: string; status: string; profile: Peer | null };
 function Avatar({
   peer,
   group = false,
+  groupPhoto,
 }: {
   peer?: Peer | null;
   group?: boolean;
+  groupPhoto?:string;
 }) {
+  const [failed,setFailed]=useState('');
   return (
     <span className="chat-avatar">
-      {group ? (
+      {group && groupPhoto && failed!==groupPhoto ? <img src={groupPhoto} alt="Foto do grupo" onError={()=>setFailed(groupPhoto)}/> : group ? (
         <Users size={20} />
       ) : peer?.avatar_url ? (
         <img src={contentMediaUrl(peer.avatar_url)} alt="" />
@@ -72,6 +78,7 @@ function Avatar({
   );
 }
 export default function ChatClient() {
+  const [groupPeople,setGroupPeople]=useState<Person[]>([]);
   const router = useRouter();
   const params = useSearchParams();
   const selected = params.get("thread") || "";
@@ -507,7 +514,7 @@ export default function ChatClient() {
                   "chat-thread " + (selected === t.id ? "is-active" : "")
                 }
               >
-                <Avatar peer={t.peer} group={t.kind === "group"} />
+                <Avatar peer={t.peer} group={t.kind === "group"} groupPhoto={t.avatar_path?`/api/chat/groups/${t.id}/avatar?v=${encodeURIComponent(t.avatar_path)}`:undefined} />
                 <div className="min-w-0">
                   <p>
                     {t.kind === "group"
@@ -561,7 +568,7 @@ export default function ChatClient() {
                 >
                   <MessageCircle size={21} />
                 </Link>
-                <Avatar peer={thread.peer} group={groupChat} />
+                <Avatar peer={thread.peer} group={groupChat} groupPhoto={thread.avatar_path?`/api/chat/groups/${thread.id}/avatar?v=${encodeURIComponent(thread.avatar_path)}`:undefined} />
                 <div className="min-w-0 flex-1">
                   {groupChat ? (
                     <h2 className="truncate font-bold text-sm">{peerName}{!groupChat && <AccountBadge account={thread?.peer} />}</h2>
@@ -623,7 +630,7 @@ export default function ChatClient() {
                   </div>
                 </details>
               </header>
-              {groupChat && thread.initiator_id === me && thread.status === 'accepted' && !thread.blocked && <GroupInvites key={thread.id} threadId={thread.id} onInvited={() => void refresh()} />}
+              {groupChat && thread.initiator_id === me && thread.status === 'accepted' && !thread.blocked && <div key={thread.id}><GroupPhoto threadId={thread.id} hasPhoto={!!thread.avatar_path} onSaved={()=>void refresh()}/><GroupInvites threadId={thread.id} remaining={15-members.length} onInvited={() => void refresh()} /></div>}
               {groupChat && members.length > 0 && (
                 <details className="chat-members">
                   <summary>
@@ -1109,6 +1116,7 @@ export default function ChatClient() {
               const d = await r.json();
               if (!r.ok) throw Error(d.error);
               group.current?.close();
+              setGroupPeople([]);
               setTab("inbox");
               router.push("/chat?thread=" + d.thread_id);
             } catch (e) {
@@ -1143,26 +1151,13 @@ export default function ChatClient() {
               placeholder="O nome desse cantinho"
             />
           </label>
-          <label className="nook-field">
-            Quem você quer convidar?
-            <textarea
-              name="people"
-              required
-              maxLength={450}
-              className="nook-input"
-              rows={3}
-              placeholder="@username, @outrapessoa"
-            />
-          </label>
-          <p className="nook-muted text-xs">
-            Informe até 14 usernames separados por vírgula.
-          </p>
+          <MemberPicker value={groupPeople} onChange={setGroupPeople} disabled={busy}/>
           {error && (
             <p role="alert" className="nook-status">
               {error}
             </p>
           )}
-          <button disabled={busy} className="nook-primary">
+          <button disabled={busy||!groupPeople.length} className="nook-primary">
             <Users size={17} />
             {busy ? "Criando…" : "Criar e enviar convites"}
           </button>

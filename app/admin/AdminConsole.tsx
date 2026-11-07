@@ -150,8 +150,8 @@ export default function AdminConsole({
     const data = await request<{ opportunities: Opportunity[] }>('/api/admin/manage?resource=opportunities');
     setOpportunities(data.opportunities);
   }, []);
-  const loadApplications = useCallback(async () => {
-    const data = await request<{ applications: AdminApplication[] }>('/api/admin/applications');
+  const loadApplications = useCallback(async (opportunityId?: string) => {
+    const data = await request<{ applications: AdminApplication[] }>('/api/admin/applications' + (opportunityId ? '?opportunity_id=' + encodeURIComponent(opportunityId) : ''));
     setApplications(data.applications);
   }, []);
   async function changeUserStatus(user: AdminUser) {
@@ -386,10 +386,24 @@ export default function AdminConsole({
     finally { setBusy(false); }
   }
 
+  const [expandedVacancy,setExpandedVacancy]=useState('');
+  async function toggleVacancyApplications(id: string) {
+    setSelectedApplication(null);
+    if (expandedVacancy === id) { setExpandedVacancy(''); return; }
+    setBusy(true); setError('');
+    try {
+      await Promise.all([loadApplications(id), loadRoles()]);
+      setExpandedVacancy(id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Falha ao carregar candidaturas.');
+    } finally { setBusy(false); }
+  }
+
   function openApplication(item: AdminApplication) {
     setSelectedApplication(selectedApplication?.id === item.id ? null : item);
     setInternalNotes(item.internal_notes || '');
-    setApplicationRoleId('');
+    const matches=roles.filter(role=>role.status==='active'&&role.department_id===item.opportunity?.department_id);
+    setApplicationRoleId(matches.length===1?matches[0].id:'');
   }
 
   async function reviewApplication(status: 'in_review' | 'approved' | 'rejected') {
@@ -404,10 +418,41 @@ export default function AdminConsole({
         confirm: status === 'approved' || status === 'rejected',
       }) });
       setMessage(status === 'approved' ? 'Candidatura aprovada e nomeação registrada.' : status === 'rejected' ? 'Candidatura recusada.' : 'Candidatura movida para análise.');
-      setSelectedApplication(null); await loadApplications(); await loadOverview();
+      setSelectedApplication(null); await loadApplications(tab === 'opportunities' ? expandedVacancy : undefined); await loadOverview();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao analisar candidatura.'); }
     finally { setBusy(false); }
   }
+
+  function renderApplication(item: AdminApplication) {
+              const departmentId = item.opportunity?.department_id || '';
+              const canReview = canReviewInDepartment(departmentId);
+              const canAppoint = canManageInDepartment(departmentId);
+              const canDecide = canReview && ['submitted', 'in_review'].includes(item.status);
+              const opened = selectedApplication?.id === item.id;
+              return <article key={item.id} className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-5">
+                <button type="button" aria-expanded={opened} onClick={() => openApplication(item)} className="flex w-full flex-wrap items-center justify-between gap-3 text-left">
+                  <span className="min-w-0"><span className="block font-bold">{item.applicant?.display_name || item.applicant?.username || 'Candidata/o'}</span>
+                    <span className="mt-1 block text-xs text-white/40">@{item.applicant?.username || 'usuário'} · {item.opportunity?.title || 'Oportunidade'} · {dateLabel(item.created_at)}</span></span>
+                  <span className="rounded-full border border-[#ff78b9]/20 px-3 py-2 text-xs font-semibold text-[#ff9aca]">{item.status === 'submitted' ? 'Enviada' : item.status === 'in_review' ? 'Em análise' : item.status === 'approved' ? 'Aprovada' : item.status === 'rejected' ? 'Recusada' : 'Cancelada'}</span>
+                </button>
+                {opened && <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
+                  <div className="space-y-3">{Object.entries(item.answers || {}).map(([questionId, answer]) => {
+                    const question = item.opportunity?.questions?.find((candidate) => candidate.id === questionId);
+                    return <div key={questionId} className="rounded-xl bg-[#100b12] p-4"><p className="text-xs font-bold text-[#ff9aca]">{question?.prompt || 'Resposta'}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/75">{answer}</p></div>;
+                  })}</div>
+                  <label className="block text-xs font-semibold text-white/60">Observações internas<textarea maxLength={8000} rows={4} className={inputClass + ' mt-2'} value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} /></label>
+                  {canDecide && <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('in_review')}>Salvar análise</button>
+                    <button type="button" disabled={busy || !canAppoint || !applicationRoleId} className={primaryButton} onClick={() => void reviewApplication('approved')}>Aprovar e nomear</button>
+                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('rejected')}>Recusar</button>
+                  </div>}
+                  {canDecide && <label className="block text-xs text-white/55">Cargo para nomeação<select className={inputClass + ' mt-1'} value={applicationRoleId} onChange={(event) => setApplicationRoleId(event.target.value)}><option value="">Escolha um cargo no departamento</option>{roles.filter((role) => role.status === 'active' && role.department_id === departmentId && canAppoint).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
+                    {!canAppoint && <span className="mt-1 block text-[11px] text-white/35">Seu cargo permite analisar, mas a nomeação exige members.manage neste departamento.</span>}
+                  </label>}
+                  {!canDecide && <p className="text-xs text-white/35">Esta candidatura já recebeu uma decisão final ou foi cancelada.</p>}
+                </div>}
+              </article>;
+            }
 
   const visibleTabs = tabs.filter(([key]) =>
     (key !== 'users' || canViewUsers) &&
@@ -662,6 +707,17 @@ export default function AdminConsole({
                     </div>}
                   </div>
                   {item.description && <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-white/45">{item.description}</p>}
+                  {(canViewApplications || canReviewInDepartment(item.department_id)) && (
+                    <div className="mt-4">
+                      <button type="button" disabled={busy} aria-expanded={expandedVacancy === item.id} className={secondaryButton} onClick={() => void toggleVacancyApplications(item.id)}>
+                        {expandedVacancy === item.id ? 'Ocultar candidaturas' : canManageInDepartment(item.department_id) && canReviewInDepartment(item.department_id) ? 'Ver candidaturas e nomear' : 'Ver candidaturas'}
+                      </button>
+                      {expandedVacancy === item.id && <div className="mt-4 space-y-3">
+                        {applications.filter(candidate => candidate.opportunity_id === item.id).map(renderApplication)}
+                        {!applications.some(candidate => candidate.opportunity_id === item.id) && <p className="text-sm text-white/50">Nenhuma candidatura nesta vaga.</p>}
+                      </div>}
+                    </div>
+                  )}
                 </article>)}
                 {!opportunities.length && <p className="rounded-xl border border-dashed border-white/10 p-5 text-sm text-white/40">Nenhuma vaga cadastrada nos departamentos acessíveis.</p>}
               </div>
@@ -700,36 +756,7 @@ export default function AdminConsole({
         {tab === 'applications' && (
           <section className="space-y-4">
             <div><h2 className="text-xl font-bold">Candidaturas</h2><p className="mt-1 text-sm text-white/45">Respostas e observações internas são visíveis somente à equipe autorizada.</p></div>
-            {applications.map((item) => {
-              const departmentId = item.opportunity?.department_id || '';
-              const canReview = canReviewInDepartment(departmentId);
-              const canAppoint = canManageInDepartment(departmentId);
-              const canDecide = canReview && ['submitted', 'in_review'].includes(item.status);
-              const opened = selectedApplication?.id === item.id;
-              return <article key={item.id} className="rounded-2xl border border-white/10 bg-[#191219] p-4 sm:p-5">
-                <button type="button" onClick={() => openApplication(item)} className="flex w-full flex-wrap items-center justify-between gap-3 text-left">
-                  <span className="min-w-0"><span className="block font-bold">{item.applicant?.display_name || item.applicant?.username || 'Candidata/o'}</span>
-                    <span className="mt-1 block text-xs text-white/40">@{item.applicant?.username || 'usuário'} · {item.opportunity?.title || 'Oportunidade'} · {dateLabel(item.created_at)}</span></span>
-                  <span className="rounded-full border border-[#ff78b9]/20 px-3 py-2 text-xs font-semibold text-[#ff9aca]">{item.status === 'submitted' ? 'Enviada' : item.status === 'in_review' ? 'Em análise' : item.status === 'approved' ? 'Aprovada' : item.status === 'rejected' ? 'Recusada' : 'Cancelada'}</span>
-                </button>
-                {opened && <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
-                  <div className="space-y-3">{Object.entries(item.answers || {}).map(([questionId, answer]) => {
-                    const question = item.opportunity?.questions?.find((candidate) => candidate.id === questionId);
-                    return <div key={questionId} className="rounded-xl bg-[#100b12] p-4"><p className="text-xs font-bold text-[#ff9aca]">{question?.prompt || 'Resposta'}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/75">{answer}</p></div>;
-                  })}</div>
-                  <label className="block text-xs font-semibold text-white/60">Observações internas<textarea maxLength={8000} rows={4} className={inputClass + ' mt-2'} value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} /></label>
-                  {canDecide && <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('in_review')}>Salvar análise</button>
-                    <button type="button" disabled={busy || !canAppoint || !applicationRoleId} className={primaryButton} onClick={() => void reviewApplication('approved')}>Aprovar e nomear</button>
-                    <button type="button" disabled={busy} className={secondaryButton} onClick={() => void reviewApplication('rejected')}>Recusar</button>
-                  </div>}
-                  {canDecide && <label className="block text-xs text-white/55">Cargo para nomeação<select className={inputClass + ' mt-1'} value={applicationRoleId} onChange={(event) => setApplicationRoleId(event.target.value)}><option value="">Escolha um cargo no departamento</option>{roles.filter((role) => role.status === 'active' && role.department_id === departmentId && canAppoint).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-                    {!canAppoint && <span className="mt-1 block text-[11px] text-white/35">Seu cargo permite analisar, mas a nomeação exige members.manage neste departamento.</span>}
-                  </label>}
-                  {!canDecide && <p className="text-xs text-white/35">Esta candidatura já recebeu uma decisão final ou foi cancelada.</p>}
-                </div>}
-              </article>;
-            })}
+            {applications.map(renderApplication)}
             {!applications.length && <p className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/40">Não há candidaturas nos departamentos disponíveis.</p>}
           </section>
         )}
