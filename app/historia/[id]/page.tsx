@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { chapterKinds, ChapterKind, SeriesBook, storyFormats, storyKinds } from '@/lib/stories/metadata';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import StoryReadingActions from '@/components/StoryReadingActions';
-import FormattedSynopsis from '@/components/FormattedSynopsis';
+import StorySynopsis from '@/components/StorySynopsis';
+import { BookOpen } from 'lucide-react';
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -67,6 +68,7 @@ export default function HistoriaPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [savedReading, setSavedReading] = useState<{ storyId: string; chapterId: string } | null>(null);
 
 
   useEffect(() => {
@@ -137,6 +139,32 @@ export default function HistoriaPage() {
   }, []);
 
 
+  const publishedChapters = story?.chapters?.filter((chapter) => chapter.published) ?? [];
+  const firstChapterId = publishedChapters[0]?.id;
+
+  useEffect(() => {
+    if (!currentUserId || !firstChapterId || story?.id !== id) return;
+
+    const controller = new AbortController();
+    async function loadSavedReading() {
+      try {
+        const response = await fetch(`/api/reading-progress?chapter=${firstChapterId}&resume=1`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const { chapter_id: chapterId } = await response.json();
+        if (!controller.signal.aborted && typeof chapterId === 'string') {
+          setSavedReading({ storyId: id, chapterId });
+        }
+      } catch {
+        // The first published chapter stays available if progress cannot be loaded.
+      }
+    }
+    void loadSavedReading();
+    return () => controller.abort();
+  }, [currentUserId, firstChapterId, id, story?.id]);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0b0710] text-white">
@@ -178,16 +206,18 @@ export default function HistoriaPage() {
     );
   }
 
-  const isOwner =
-    Boolean(currentUserId) &&
-    currentUserId === story.author_id;
-
-  const publishedChapters =
-    story.chapters?.filter(
-      (chapter) => chapter.published
-    ) || [];
-
-  const firstChapter = publishedChapters[0];
+  const isOwner = currentUserId === story.author_id;
+  const savedChapter = currentUserId && savedReading?.storyId === story.id
+    ? publishedChapters.find((chapter) => chapter.id === savedReading.chapterId)
+    : undefined;
+  const readingChapterId = savedChapter?.id ?? firstChapterId;
+  const chapterCount = `${publishedChapters.length} ${publishedChapters.length === 1 ? 'capítulo' : 'capítulos'}`;
+  const workLabels = [
+    story.story_kind && storyKinds[story.story_kind],
+    story.fandom || story.series_name ||
+      story.tags?.find((tag) => tag.category_slug === 'genre')?.name ||
+      (story.story_format && storyFormats[story.story_format]),
+  ].filter(Boolean).join(' · ');
 
   return (
     <main className="min-h-screen bg-[#0b0710] text-white">
@@ -205,10 +235,10 @@ export default function HistoriaPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid gap-10 lg:grid-cols-[320px_1fr]">
-          <div>
-            <div className="aspect-[2/3] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-pink-500/20 via-purple-500/10 to-[#120b16] shadow-2xl">
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-4 rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_top_left,#42203a_0%,#211222_42%,#130d18_78%)] p-4 min-[380px]:grid-cols-[6rem_minmax(0,1fr)] sm:p-7 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-9 lg:p-9">
+          <div className="contents lg:flex lg:flex-col lg:gap-4">
+            <div className="col-start-1 row-span-2 row-start-1 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-[#29172b] shadow-xl lg:rounded-2xl">
               {story.cover_url ? (
                 <img
                   src={contentMediaUrl(story.cover_url)}
@@ -216,189 +246,128 @@ export default function HistoriaPage() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center">
-                    <div className="mb-3 text-6xl">
-                      ☁️
-                    </div>
-
-                    <p className="px-8 text-sm text-white/30">
-                      Esta história ainda não possui uma capa.
-                    </p>
-                  </div>
+                <div className="flex flex-col items-center gap-2 p-2 text-center text-xs text-pink-100/75">
+                  <BookOpen size={24} aria-hidden="true" />
+                  <span>Sem capa</span>
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="flex flex-col justify-center">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              {story.status && (
-                <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
-                  {story.status}
-                </span>
-              )}
-
-              {story.rating && (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60">
-                  {story.rating === "Livre"
-                    ? "Livre"
-                    : `${story.rating}+`}
-                </span>
-              )}
-            </div>
-
-            <h1 className="mb-5 text-4xl font-bold tracking-tight sm:text-5xl">
-              {story.title}
-            </h1>
 
             {story.author && (
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `/perfil/${story.author?.id}`
-                  )
-                }
-                className="mb-6 flex w-fit items-center gap-3 text-left"
+              <Link
+                href={`/perfil/${story.author.id}`}
+                className="col-start-2 row-start-2 flex min-w-0 items-center gap-2 rounded-xl text-pink-50 hover:text-pink-200 lg:gap-3 lg:border lg:border-white/10 lg:bg-black/20 lg:p-3"
               >
                 {story.author.avatar_url ? (
                   <img
                     src={contentMediaUrl(story.author.avatar_url)}
-                    alt={story.author.username}
-                    className="h-10 w-10 rounded-full object-cover"
+                    alt=""
+                    className="size-8 shrink-0 rounded-full object-cover lg:size-10"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/20 text-sm font-semibold text-pink-300">
-                    {story.author.username
-                      ?.charAt(0)
-                      .toUpperCase() || "?"}
-                  </div>
+                  <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pink-500/20 text-sm font-semibold text-pink-200 lg:size-10">
+                    {story.author.username?.charAt(0).toUpperCase() || '?'}
+                  </span>
                 )}
-
-                <div>
-                  <p className="text-xs text-white/40">
-                    Escrito por
-                  </p>
-
-                  <p className="font-medium text-white/80 transition hover:text-pink-300">
-                    {story.author.display_name ||
-                      story.author.username}<AccountBadge account={story.author} />
+                <div className="min-w-0">
+                  <p className="text-xs text-white/65">Escrito por</p>
+                  <p className="wrap-anywhere text-sm font-semibold">
+                    {story.author.display_name || story.author.username}<AccountBadge account={story.author} />
                   </p>
                 </div>
-              </button>
+              </Link>
             )}
+          </div>
 
-            <section aria-label="Resumo da obra" className="mb-7 max-w-3xl">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Resumo</h2>
-                {firstChapter && <StoryReadingActions storyId={story.id} />}
-              </div>
-              {story.description ? <div className="text-base leading-7 text-white/65">
-                <FormattedSynopsis text={story.description} />
-              </div> : <p className="text-white/60">Esta obra ainda não tem sinopse.</p>}
-            </section>
+          <div className="contents lg:block lg:min-w-0">
+            <div className="col-start-2 row-start-1 min-w-0">
+              {workLabels && (
+                <p className="mb-2 wrap-anywhere text-xs font-semibold text-pink-200 sm:text-sm">{workLabels}</p>
+              )}
+              <h1 className="wrap-anywhere text-2xl leading-tight font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                {story.title}
+              </h1>
+              <ul aria-label="Detalhes da obra" className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/75 sm:text-sm">
+                {story.status && (
+                  <li className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-emerald-200">{story.status}</li>
+                )}
+                {story.rating && (
+                  <li className="rounded-full bg-white/10 px-2.5 py-1" aria-label={`Classificação indicativa: ${story.rating}`}>
+                    {/^[0-9]+$/.test(story.rating) ? `${story.rating}+` : story.rating}
+                  </li>
+                )}
+                <li className="px-1">{chapterCount}</li>
+              </ul>
+            </div>
 
-            {story.tags &&
-              story.tags.length > 0 && (
-                <div className="mb-8 flex flex-wrap gap-2">
+            <div className="col-span-2 row-start-3 min-w-0 border-t border-white/10 pt-4 lg:mt-6 lg:pt-5">
+              <section aria-labelledby="sinopse-obra">
+                <h2 id="sinopse-obra" className="mb-2 text-lg font-semibold text-pink-50">Sinopse</h2>
+                {story.description?.trim() ? (
+                  <StorySynopsis key={story.id} text={story.description} />
+                ) : (
+                  <p className="text-sm text-white/70">Esta obra ainda não tem sinopse.</p>
+                )}
+              </section>
+
+              {!!story.tags?.length && (
+                <ul aria-label="Tags da obra" className="mt-4 flex flex-wrap gap-2">
                   {story.tags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="rounded-full border border-pink-400/10 bg-pink-500/5 px-3 py-1.5 text-xs text-pink-200/70"
-                    >
+                    <li key={tag.id} className="max-w-full rounded-full border border-pink-300/15 bg-pink-300/5 px-3 py-1 wrap-anywhere text-xs text-pink-100/85">
                       #{tag.name}
-                    </span>
+                    </li>
                   ))}
+                </ul>
+              )}
+
+              {(story.has_content_warnings || story.content_warnings) && (
+                <section aria-labelledby="avisos-obra" className="mt-5 rounded-xl border border-amber-300/25 bg-amber-300/5 p-3 text-sm text-amber-100">
+                  <h2 id="avisos-obra" className="font-semibold">Avisos de conteúdo e gatilhos</h2>
+                  <p className="mt-2 wrap-anywhere whitespace-pre-wrap">{story.content_warnings || 'O autor sinalizou temas sensíveis sem detalhar os avisos.'}</p>
+                </section>
+              )}
+
+              {readingChapterId && (
+                <div className="mt-5 flex items-start gap-2">
+                  <Link
+                    href={`/capitulo/${readingChapterId}`}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-pink-300 px-5 py-3 text-center text-sm font-bold text-[#291020] transition hover:bg-pink-200 sm:flex-none"
+                  >
+                    <BookOpen size={18} aria-hidden="true" />
+                    {savedChapter ? 'Continuar leitura' : 'Começar a ler'}
+                  </Link>
+                  <StoryReadingActions storyId={story.id} />
                 </div>
               )}
 
-            <div className="flex flex-wrap gap-3">
-              {firstChapter && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/capitulo/${firstChapter.id}`
-                    )
-                  }
-                  className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-pink-500/10 transition hover:bg-pink-400"
-                >
-                  Começar a ler
-                </button>
-              )}
-
               {isOwner && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!story) return;
-
-                    router.push(
-                      `/editar-historia/${story.id}`
-                    );
-                  }}
-                  className="rounded-xl border border-pink-400/30 bg-pink-500/10 px-5 py-3 text-sm font-medium text-pink-300 transition hover:border-pink-400/50 hover:bg-pink-500/20"
-                >
-                  Editar obra
-                </button>
-              )}
-
-              {isOwner && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/historia/${story.id}/novo-capitulo`
-                    )
-                  }
-                  className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
-                >
-                  Novo capítulo
-                </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href={`/editar-historia/${story.id}`} className="rounded-xl border border-pink-300/25 bg-pink-300/10 px-4 py-2.5 text-sm font-medium text-pink-100 hover:bg-pink-300/20">
+                    Editar obra
+                  </Link>
+                  <Link href={`/historia/${story.id}/novo-capitulo`} className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white/80 hover:bg-white/10">
+                    Novo capítulo
+                  </Link>
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        <section aria-label="Informações e avisos da obra" className="mt-8 space-y-3 rounded-2xl border border-pink-400/20 bg-pink-400/5 p-5 text-sm leading-7">
-{story.story_kind && <p><strong>Tipo de obra</strong> · {storyKinds[story.story_kind]}{story.story_format && ` · ${storyFormats[story.story_format]}`}</p>}
-{story.fandom && <p><strong>Fandom:</strong> {story.fandom}</p>}
-{story.work_has_ai && <p className="text-pink-200">✦ Esta obra tem IA</p>}
-{story.cover_has_ai && <p className="text-pink-200">✦ Esta capa tem IA</p>}
-{(story.has_content_warnings || story.content_warnings) && <div className="rounded-xl border border-amber-300/30 bg-amber-300/5 p-4"><h2 className="font-bold text-amber-200">Avisos de conteúdo e gatilhos</h2><p className="whitespace-pre-wrap">{story.content_warnings || 'O autor sinalizou temas sensíveis sem detalhar os avisos.'}</p></div>}
-<p>{story.accepts_translation ? 'O autor aceita propostas de tradução. Solicite autorização antes de publicar.' : 'Traduções não autorizadas. Consulte o autor antes de traduzir.'}</p>
-</section>
-        {!!story.series_books?.length && (
-          <section aria-label="Ordem de leitura da série" className="mt-8 rounded-2xl border border-pink-300/20 bg-gradient-to-br from-[#321729] to-[#171018] p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Ordem de leitura</p>
-            <h2 className="mt-2 text-xl font-bold">{story.series_name}</h2>
-            <ol className="mt-4 space-y-2">
-              {story.series_books.map(book => <li key={book.id}>{book.id === story.id ? (
-                <span aria-current="page" className="block rounded-xl bg-pink-300/10 p-3 text-pink-100">Volume {book.series_volume} · {book.title}</span>
-              ) : (
-                <Link href={`/historia/${book.id}`} className="block rounded-xl border border-white/10 p-3 hover:border-pink-300/50">Volume {book.series_volume} · {book.title}</Link>
-              )}</li>)}
-            </ol>
-          </section>
-        )}
-        <section className="mt-16">
+        <section aria-labelledby="sumario-obra" className="mt-9 sm:mt-12">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-pink-300/60">
-                História
+                Sumário
               </p>
 
-              <h2 className="text-2xl font-semibold">
+              <h2 id="sumario-obra" className="text-2xl font-semibold">
                 Capítulos
               </h2>
             </div>
 
             <span className="text-sm text-white/30">
-              {publishedChapters.length}{" "}
-              {publishedChapters.length === 1
-                ? "capítulo"
-                : "capítulos"}
+              {chapterCount}
             </span>
           </div>
 
@@ -466,6 +435,26 @@ export default function HistoriaPage() {
               ))}
             </div>
           )}
+        </section>
+        {!!story.series_books?.length && (
+          <section aria-label="Ordem de leitura da série" className="mt-8 rounded-2xl border border-pink-300/20 bg-gradient-to-br from-[#321729] to-[#171018] p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Ordem de leitura</p>
+            <h2 className="mt-2 text-xl font-bold">{story.series_name}</h2>
+            <ol className="mt-4 space-y-2">
+              {story.series_books.map(book => <li key={book.id}>{book.id === story.id ? (
+                <span aria-current="page" className="block rounded-xl bg-pink-300/10 p-3 text-pink-100">Volume {book.series_volume} · {book.title}</span>
+              ) : (
+                <Link href={`/historia/${book.id}`} className="block rounded-xl border border-white/10 p-3 hover:border-pink-300/50">Volume {book.series_volume} · {book.title}</Link>
+              )}</li>)}
+            </ol>
+          </section>
+        )}
+        <section aria-label="Informações da obra" className="mt-8 space-y-2 rounded-2xl border border-white/10 bg-white/[0.025] p-4 text-sm leading-6 text-white/75">
+          {story.story_kind && <p><strong>Tipo de obra</strong> · {storyKinds[story.story_kind]}{story.story_format && ` · ${storyFormats[story.story_format]}`}</p>}
+          {story.fandom && <p><strong>Fandom</strong> · {story.fandom}</p>}
+          {story.work_has_ai && <p className="text-pink-200">Esta obra tem IA</p>}
+          {story.cover_has_ai && <p className="text-pink-200">Esta capa tem IA</p>}
+          <p>{story.accepts_translation ? 'O autor aceita propostas de tradução. Solicite autorização antes de publicar.' : 'Traduções não autorizadas. Consulte o autor antes de traduzir.'}</p>
         </section>
       </section>
     </main>

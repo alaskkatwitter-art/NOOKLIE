@@ -6,13 +6,20 @@ export async function GET(request: Request) {
   try {
     const reader = await getDiscoveryReader();
     if (!reader) return NextResponse.json({ error: 'Entre para sincronizar a leitura.' }, { status: 401, headers: privateHeaders });
-    const chapterId = new URL(request.url).searchParams.get('chapter') || '';
+    const params = new URL(request.url).searchParams;
+    const chapterId = params.get('chapter') || '';
     if (!uuid.test(chapterId)) return new NextResponse(null, { status: 400, headers: privateHeaders });
     const chapter = await discoveryDb.from('chapters').select('id, story_id').eq('id', chapterId).eq('published', true).maybeSingle();
     if (chapter.error) throw chapter.error;
     if (!chapter.data || !(await isPublicStoryVisible(discoveryDb, chapter.data.story_id))) return new NextResponse(null, { status: 404, headers: privateHeaders });
     const { data, error } = await discoveryDb.from('reading_progress').select('chapter_id, progress_percent, position').eq('user_id', reader.profile.id).eq('story_id', chapter.data.story_id).maybeSingle();
     if (error) throw error;
+    if (params.get('resume') === '1') {
+      if (!data) return NextResponse.json({ chapter_id: null }, { headers: privateHeaders });
+      const savedChapter = await discoveryDb.from('chapters').select('id').eq('id', data.chapter_id).eq('story_id', chapter.data.story_id).eq('published', true).maybeSingle();
+      if (savedChapter.error) throw savedChapter.error;
+      return NextResponse.json({ chapter_id: savedChapter.data?.id ?? null }, { headers: privateHeaders });
+    }
     return NextResponse.json({ account_id: reader.accountId, progress: data?.chapter_id === chapterId ? data : null }, { headers: privateHeaders });
   } catch { return NextResponse.json({ error: 'Não foi possível restaurar a leitura.' }, { status: 503, headers: privateHeaders }); }
 }
