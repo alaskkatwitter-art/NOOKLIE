@@ -25,7 +25,7 @@ export default function AuthStatus() {
   useEffect(() => {
     async function loadUser() {
       try {
-        const response = await fetch('/api/auth/me', {
+        const response = await fetch('/api/auth/me?summary=1', {
           cache: 'no-store',
         });
 
