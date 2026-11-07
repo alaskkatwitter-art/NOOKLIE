@@ -1,3 +1,5 @@
+import { isNewsArticle } from '@/lib/news/articles';
+import { sameOrigin } from '@/lib/chat/server';
 import { NextResponse } from 'next/server';
 import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
@@ -51,7 +53,7 @@ export async function GET() {
           user_id,
           body,
           image_url,
-          story_id,
+          story_id,news_slug,
           pinned,
           created_at,
           updated_at,
@@ -317,6 +319,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    if(!sameOrigin(request)) return new NextResponse(null,{status:403});
     const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
@@ -357,7 +360,9 @@ export async function POST(request: Request) {
      * sendo adicionadas posteriormente pela rota
      * /api/nook-posts/media.
      */
-    if (!text && !imageUrl) {
+    const newsSlug = body.news_slug ?? null;
+    if ((newsSlug !== null && !isNewsArticle(newsSlug)) || (newsSlug && storyId)) return NextResponse.json({error:'Selecione uma matéria ou uma história válida.'},{status:400});
+    if (!text && !imageUrl && !newsSlug) {
       return NextResponse.json(
         {
           error:
@@ -436,6 +441,7 @@ export async function POST(request: Request) {
         body: text,
         image_url: imageUrl,
         story_id: storyId,
+        news_slug: newsSlug,
         pinned: false,
       })
       .select(`
@@ -443,7 +449,7 @@ export async function POST(request: Request) {
         user_id,
         body,
         image_url,
-        story_id,
+        story_id,news_slug,
         pinned,
         created_at,
         updated_at

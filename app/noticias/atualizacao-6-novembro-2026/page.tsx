@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ShareNews from '@/components/ShareNews';
 import NewsComments from '@/components/NewsComments';
 
 export const metadata = {
@@ -26,6 +27,6 @@ export default function CommunityUpdatePage(){
       <div className="mt-9 space-y-9">{updates.map(update=><section key={update.title}><h2 className="text-xl font-bold text-pink-100 sm:text-2xl">{update.title}</h2><p className="mt-3 leading-8 text-white/80">{update.body}</p></section>)}</div>
       <footer className="mt-10 border-t border-pink-200/15 pt-6 leading-8 text-white/75"><p>Somos uma equipe reduzida e voluntária, e os relatos da comunidade ajudam a orientar os próximos passos. Se encontrar um erro, conte o que aconteceu na <Link href="/ouvidoria" className="font-semibold text-pink-200 underline">Ouvidoria</Link>. Para conversar sobre esta atualização, use os comentários logo abaixo.</p><p className="mt-4 font-bold text-pink-200">Equipe Nooklie</p></footer>
     </article>
-    <NewsComments article="atualizacao-6-novembro-2026" />
+    <ShareNews slug="atualizacao-6-novembro-2026"/><NewsComments article="atualizacao-6-novembro-2026" />
   </div></main>;
 }

@@ -8,7 +8,7 @@ export async function visiblePosts(ids: string[], viewer: string | null) {
   if (!ids.length) return [];
   const result = await chatDb
     .from("nook_posts")
-    .select("id,user_id,body,image_url,story_id,pinned,created_at,updated_at")
+    .select("id,user_id,body,image_url,story_id,news_slug,pinned,created_at,updated_at")
     .in("id", [...new Set(ids)])
     .is("moderation_hidden_at", null);
   if (result.error) throw result.error;

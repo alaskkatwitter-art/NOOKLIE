@@ -49,7 +49,7 @@ export async function GET() {
         user_id,
         body,
         image_url,
-        story_id,
+        story_id,news_slug,
         pinned,
         created_at,
         updated_at,

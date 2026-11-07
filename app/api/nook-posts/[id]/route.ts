@@ -1,3 +1,5 @@
+import { isNewsArticle } from '@/lib/news/articles';
+import { sameOrigin } from '@/lib/chat/server';
 import { NextResponse } from 'next/server';
 import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
@@ -25,6 +27,7 @@ export async function PATCH(
   }
 ) {
   try {
+    if(!sameOrigin(request)) return new NextResponse(null,{status:403});
     const userId = await currentViewerProfileId(supabase);
 
     if (!userId) {
@@ -64,7 +67,7 @@ export async function PATCH(
           user_id,
           body,
           image_url,
-          story_id,
+          story_id,news_slug,
           pinned
         `
         )
@@ -109,6 +112,7 @@ export async function PATCH(
       body?: string;
       image_url?: string | null;
       story_id?: string | null;
+      news_slug?: string | null;
       pinned?: boolean;
     } = {};
 
@@ -229,6 +233,12 @@ export async function PATCH(
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(body,'news_slug')) {
+      if (body.news_slug !== null && !isNewsArticle(body.news_slug)) return NextResponse.json({error:'Matéria inválida.'},{status:400});
+      updates.news_slug=body.news_slug;
+      if(updates.news_slug) updates.story_id=null;
+    }
+    if(updates.story_id) updates.news_slug=null;
     /*
      * Impede que o usuário salve um post completamente vazio.
      */
@@ -242,7 +252,7 @@ export async function PATCH(
         ? updates.image_url
         : existingPost.image_url;
 
-    if (!finalBody && !finalImage) {
+    if (!finalBody && !finalImage && !(updates.news_slug === undefined ? existingPost.news_slug : updates.news_slug)) {
       return NextResponse.json(
         {
           error:
@@ -280,7 +290,7 @@ export async function PATCH(
         user_id,
         body,
         image_url,
-        story_id,
+        story_id,news_slug,
         pinned,
         created_at,
         updated_at

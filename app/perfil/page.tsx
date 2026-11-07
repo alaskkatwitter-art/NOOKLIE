@@ -6,6 +6,7 @@ import Republicados from '@/components/Republicados';
 
 import { Cloud, MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from 'lucide-react';
 import {contentMediaUrl} from '@/lib/security/content-media';
+import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 import React, {
   ChangeEvent,
@@ -66,6 +67,7 @@ type NookPost = {
   body: string;
   image_url: string | null;
   story_id: string | null;
+  news_slug?: string | null;
   pinned: boolean;
   created_at: string;
   updated_at: string;
@@ -3246,7 +3248,7 @@ export default function PerfilPage() {
                                       </div>
                                     ) : (
                                       <>
-                                        {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}{post.body &&
+                                        {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>{post.body &&
                                           renderPostBody(
                                             post.body
                                           )}

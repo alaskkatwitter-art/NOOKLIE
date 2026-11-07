@@ -1,5 +1,7 @@
 'use client';
 
+import LinkedNewsCard from './LinkedNewsCard';
+import {isNewsArticle, newsArticles, newsArticleSlugs} from '@/lib/news/articles';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -11,6 +13,7 @@ type Story = {
 
 type Props = {
   open: boolean;
+  initialNewsSlug?: string;
   onClose: () => void;
   onPublished?: () => void;
 };
@@ -30,9 +33,11 @@ export default function NookPostComposer({
   open,
   onClose,
   onPublished,
+  initialNewsSlug,
 }: Props) {
   const [body, setBody] = useState('');
   const [storyId, setStoryId] = useState('');
+  const [newsSlug,setNewsSlug]=useState(isNewsArticle(initialNewsSlug)?initialNewsSlug:'');
   const [stories, setStories] = useState<Story[]>([]);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
@@ -41,8 +46,8 @@ export default function NookPostComposer({
   const [error, setError] = useState('');
 
   const canPublish = useMemo(() => {
-    return body.trim().length > 0 || mediaFiles.length > 0;
-  }, [body, mediaFiles]);
+    return body.trim().length > 0 || mediaFiles.length > 0 || !!newsSlug;
+  }, [body, mediaFiles, newsSlug]);
 
   /*
    * Carrega as histórias do usuário quando o compositor é aberto.
@@ -134,6 +139,7 @@ export default function NookPostComposer({
 
     setBody('');
     setStoryId('');
+    setNewsSlug('');
     setMediaFiles([]);
     setMediaPreviews([]);
     setError('');
@@ -260,6 +266,7 @@ export default function NookPostComposer({
           body: body.trim() || null,
           image_url: null,
           story_id: storyId || null,
+          news_slug: newsSlug || null,
         }),
       });
 
@@ -429,6 +436,7 @@ export default function NookPostComposer({
             </label>
           </div>
 
+          <div className="mt-4"><label className="block text-sm font-bold text-white/75">Vincular uma matéria do jornal<select value={newsSlug} disabled={publishing} onChange={event=>{setNewsSlug(event.target.value);if(event.target.value)setStoryId('');}} className="nook-input mt-2 w-full"><option value="">Nenhuma matéria</option>{newsArticleSlugs.map(slug=><option key={slug} value={slug}>{newsArticles[slug].title}</option>)}</select></label><LinkedNewsCard slug={newsSlug}/></div>
           {/* História */}
           <div className="mt-4 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
             <label className="block text-sm font-bold text-white/75">
@@ -442,7 +450,7 @@ export default function NookPostComposer({
             <select
               value={storyId}
               onChange={(event) =>
-                setStoryId(event.target.value)
+                {setStoryId(event.target.value);if(event.target.value)setNewsSlug('');}
               }
               disabled={publishing || loadingStories}
               className="mt-3 w-full rounded-xl border border-white/[0.08] bg-[#171118] px-3 py-3 text-sm text-white outline-none focus:border-[#ff78b9]/35"
