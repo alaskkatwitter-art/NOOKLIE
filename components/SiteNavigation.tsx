@@ -89,7 +89,7 @@ export default function SiteNavigation() {
               cache: "no-store",
               signal: controller.signal,
             }),
-            fetch("/api/notifications", {
+            fetch("/api/notifications?summary=1", {
               cache: "no-store",
               signal: controller.signal,
             }),
@@ -123,7 +123,7 @@ export default function SiteNavigation() {
     }
     async function refreshNotifications() {
       try {
-        const response = await fetch("/api/notifications", {
+        const response = await fetch("/api/notifications?summary=1", {
           cache: "no-store",
           signal: controller.signal,
         });

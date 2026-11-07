@@ -41,7 +41,7 @@ export default function FeedVideo({ id, standalone = false }: { id: string; stan
       <button type="button" className={actionClass} onClick={copyLink}>
         <Link2 aria-hidden="true" className="size-3.5" /> Copiar link
       </button>
-      {!standalone && <Link href={videoPath} className={actionClass}>
+      {!standalone && <Link href={videoPath} prefetch={false} className={actionClass}>
         Abrir vídeo <ArrowUpRight aria-hidden="true" className="size-3.5" />
       </Link>}
       <span role="status" className="text-xs text-pink-200">{notice}</span>

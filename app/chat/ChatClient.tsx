@@ -120,12 +120,14 @@ export default function ChatClient() {
     pinned = useRef(true);
   const refreshing = useRef<AbortSignal | null>(null);
   const refresh = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, includeList = true) => {
       if (signal?.aborted || (signal && refreshing.current === signal)) return;
       if (signal) refreshing.current = signal;
       try {
         const [list, res] = await Promise.all([
-          fetch("/api/chat", { cache: "no-store", signal }),
+          includeList
+            ? fetch("/api/chat", { cache: "no-store", signal })
+            : Promise.resolve(null),
           selected
             ? fetch("/api/chat?thread=" + selected, {
                 cache: "no-store",
@@ -133,24 +135,26 @@ export default function ChatClient() {
               })
             : Promise.resolve(null),
         ]);
-        if (list.status === 401) {
+        if (list?.status === 401 || res?.status === 401) {
           router.replace("/login");
           return;
         }
-        if (!list.ok) throw Error("Não foi possível carregar suas conversas.");
-        const l = await list.json();
+        if (list && !list.ok) throw Error("Não foi possível carregar suas conversas.");
+        const l: { threads?: Thread[]; me: string } | null = list ? await list.json() : null;
         if (signal?.aborted || activeThread.current !== selected) return;
-        setThreads(l.threads || []);
-        setMe(l.me);
-        setReady(true);
+        if (l) {
+          setThreads(l.threads || []);
+          setMe(l.me);
+          setReady(true);
+        }
         if (res) {
           if (!res.ok) throw Error("Esta conversa não está disponível.");
           const d = await res.json();
           if (signal?.aborted || activeThread.current !== selected) return;
-          setThread({
+          setThread(current => ({
             ...d.thread,
-            peer: l.threads.find((t: Thread) => t.id === selected)?.peer,
-          });
+            peer: l ? l.threads?.find(t => t.id === selected)?.peer : current?.peer,
+          }));
           setMembers(d.members || []);
           setMessages((old) => {
             const older = old.filter(
@@ -196,11 +200,17 @@ export default function ChatClient() {
     pinned.current = true;
     const c = new AbortController();
     void refresh(c.signal);
+    let lastListRefresh = Date.now();
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh(c.signal);
+      if (document.visibilityState !== "visible") return;
+      const includeList = !selected || Date.now() - lastListRefresh >= 30000;
+      if (includeList) lastListRefresh = Date.now();
+      void refresh(c.signal, includeList);
     }, selected ? 10000 : 30000);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void refresh(c.signal);
+      if (document.visibilityState !== "visible") return;
+      lastListRefresh = Date.now();
+      void refresh(c.signal);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {

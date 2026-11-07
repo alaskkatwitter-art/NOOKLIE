@@ -3074,7 +3074,7 @@ export default function FeedPage() {
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
-  const [activeTag, setActiveTag] = useState('');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [quoteBody, setQuoteBody] = useState('');
   useEffect(() => {
@@ -3126,6 +3126,9 @@ export default function FeedPage() {
 
   const [posts, setPosts] =
     useState<Post[]>([]);
+  const [feedCursor, setFeedCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const feedRequest = useRef<AbortController | null>(null);
 
   const [
     currentUser,
@@ -3521,55 +3524,50 @@ export default function FeedPage() {
      FEED
   ======================================================= */
 
-  const loadFeed =
-    useCallback(
-      async (
-        showRefresh = false
-      ) => {
-        if (showRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+  const loadFeed = useCallback(async (showRefresh = false, before?: string) => {
+    if (activeTag === null || (before && feedRequest.current)) return;
+    feedRequest.current?.abort();
+    const controller = new AbortController();
+    feedRequest.current = controller;
+    setLoadingOlder(Boolean(before));
+    setRefreshing(showRefresh);
+    setLoading(!before && !showRefresh);
+    if (!before && !showRefresh) setFeedCursor(null);
+    setError('');
 
-        setError('');
-
-        try {
-          const response =
-            await fetch(
-              '/api/feed' + (activeTag ? '?tag=' + encodeURIComponent(activeTag) : ''),
-              {
-                cache: 'no-store',
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (!response.ok) {
-            throw new Error(
-              data.error ||
-                'Não foi possível carregar o Feed.'
-            );
-          }
-
-          const incoming: Post[] = data.posts || [];
-          setPosts(incoming.filter(post => !deletedPostIds.current.has(post.id)));
-        } catch (err) {
-          console.error(err);
-
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Não foi possível carregar o Feed.'
-          );
-        } finally {
-          setLoading(false);
-          setRefreshing(false);
-        }
-      },
-      [activeTag]
-    );
+    try {
+      const params = new URLSearchParams();
+      if (activeTag) params.set('tag', activeTag);
+      if (before) params.set('before', before);
+      const query = params.toString();
+      const response = await fetch(query ? '/api/feed?' + query : '/api/feed', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Não foi possível carregar o Feed.');
+      if (controller.signal.aborted) return;
+      const incoming: Post[] = data.posts || [];
+      setPosts(current => {
+        const seen = new Set(before ? current.map(post => post.repost?.id || post.id) : []);
+        const fresh = incoming.filter(post =>
+          !deletedPostIds.current.has(post.id) && !seen.has(post.repost?.id || post.id));
+        return before ? [...current, ...fresh] : fresh;
+      });
+      setFeedCursor(data.next_cursor ?? null);
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : 'Não foi possível carregar o Feed.');
+      }
+    } finally {
+      if (feedRequest.current === controller) {
+        feedRequest.current = null;
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingOlder(false);
+      }
+    }
+  }, [activeTag]);
 
   /* =======================================================
      STORIES
@@ -3681,15 +3679,17 @@ export default function FeedPage() {
 
   useEffect(() => {
     loadCurrentUser();
-    loadFeed();
     loadStories();
     loadUpcomingUpdates();
-  }, [
-    loadCurrentUser,
-    loadFeed,
-    loadStories,
-    loadUpcomingUpdates,
-  ]);
+  }, [loadCurrentUser, loadStories, loadUpcomingUpdates]);
+
+  useEffect(() => {
+    void loadFeed();
+    return () => {
+      feedRequest.current?.abort();
+      feedRequest.current = null;
+    };
+  }, [loadFeed]);
 
   /* =======================================================
      ATUALIZAÇÃO AO VOLTAR PARA A ABA
@@ -3968,6 +3968,16 @@ export default function FeedPage() {
                     )
                   )}
                 </div>
+              )}
+              {!loading && feedCursor && (
+                <button
+                  type="button"
+                  disabled={loadingOlder || refreshing}
+                  onClick={() => void loadFeed(false, feedCursor)}
+                  className="mt-5 min-h-11 w-full rounded-full border border-pink-200/20 px-4 font-semibold text-pink-100 disabled:opacity-50"
+                >
+                  {loadingOlder ? 'Carregando publicações…' : 'Carregar mais publicações'}
+                </button>
               )}
             </div>
 

@@ -6,15 +6,38 @@ export default function ReadingProgressTracker({ chapterId, storyId }: { chapter
   useEffect(()=>{
     const controller=new AbortController();
     let account='';let enabled=false;let restoring=true;let alive=true;let last=Date.now();let visibleSeconds=0;let wasVisible=document.visibilityState==='visible';let latestPosition=0;
+    let lastScheduled = '';
     let queue=Promise.resolve();let timer:ReturnType<typeof setTimeout>|undefined;
     const element=document.querySelector<HTMLElement>('.chapter-content');
     function position(){if(!element?.isConnected)return latestPosition;const rect=element.getBoundingClientRect();const distance=Math.max(1,element.offsetHeight-window.innerHeight+100);latestPosition=Math.min(1,Math.max(0,(100-rect.top)/distance));return latestPosition;}
     function updateTime(){const now=Date.now();if(wasVisible)visibleSeconds+=Math.min(10,(now-last)/1000);last=now;wasVisible=document.visibilityState==='visible';}
     function save(){
       updateTime();if(!enabled||restoring||!account)return;
-      const percent=position()*100;
-      const body=JSON.stringify({chapter_id:chapterId,story_id:storyId,percent:Math.round(percent*100)/100,position:Math.round(percent*100),read_seconds:Math.floor(visibleSeconds)});
-      queue=queue.catch(()=>undefined).then(async()=>{try{const response=await fetch('/api/reading-progress',{method:'PUT',headers:{'Content-Type':'application/json','X-Discovery-Account':account},body,keepalive:true});if(!response.ok)throw new Error();if(alive)setStatus('Posição salva na sua conta.');}catch{if(alive)setStatus('Não foi possível sincronizar a posição. Tentaremos novamente.');}});
+      const savedPosition = Math.round(position() * 10000);
+      const seconds = Math.min(86400, Math.floor(visibleSeconds));
+      // The server persists position and whether the 30-second threshold was met.
+      const key = [new Date().toISOString().slice(0, 10), savedPosition, seconds >= 30].join(':');
+      if (key === lastScheduled) return;
+      lastScheduled = key;
+      const body = JSON.stringify({
+        chapter_id: chapterId, story_id: storyId,
+        percent: savedPosition / 100, position: savedPosition, read_seconds: seconds,
+      });
+      queue = queue.then(async () => {
+        try {
+          const response = await fetch('/api/reading-progress', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Discovery-Account': account },
+            body,
+            keepalive: true,
+          });
+          if (!response.ok) throw new Error();
+          if (alive) setStatus('Posição salva na sua conta.');
+        } catch {
+          if (lastScheduled === key) lastScheduled = '';
+          if (alive) setStatus('Não foi possível sincronizar a posição. Tentaremos novamente.');
+        }
+      });
     }
     async function restore(){try{
       const response=await fetch(`/api/reading-progress?chapter=${encodeURIComponent(chapterId)}`,{cache:'no-store',signal:controller.signal});

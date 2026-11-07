@@ -617,6 +617,9 @@ test('notifications route renders an inbox and reads only the signed-in account 
   const headers={Cookie:'toriland_session='+token,'Content-Type':'application/json'};
   state.notifications=[{id:'notification-own',user_id:userId,title:'Atualização da sua conta',body:'Mensagem real',href:'/inicio',created_at:new Date().toISOString(),read_at:null},{id:'notification-other',user_id:otherUserId,title:'Privada',body:'Outra conta',created_at:new Date().toISOString(),read_at:null}];
   const inbox=await fetch(baseUrl+'/api/notifications?user_id='+otherUserId,{headers});const data=await inbox.json();assert.deepEqual(data.notifications.map(item=>item.id),['notification-own']);assert.equal(data.unread_count,1);
+  const summary = await fetch(baseUrl + '/api/notifications?summary=1&user_id=' + otherUserId, { headers });
+  assert.match(summary.headers.get('cache-control'), /no-store/);
+  assert.deepEqual(await summary.json(), { unread_count: 1 });
   const foreign=await fetch(baseUrl+'/api/notifications',{method:'PATCH',headers,body:JSON.stringify({id:'notification-other'})});assert.equal(foreign.status,200);assert.equal(state.notifications[1].read_at,null);
   assert.equal((await fetch(baseUrl+'/api/notifications',{method:'PATCH',headers,body:JSON.stringify({all:true})})).status,200);
   const refreshed=await (await fetch(baseUrl+'/api/notifications',{headers})).json();assert.equal(refreshed.unread_count,0);assert.equal(state.notifications[1].read_at,null);
