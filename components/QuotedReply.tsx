@@ -29,7 +29,7 @@ export default function QuotedReply({ postId, replyId }: { postId: string; reply
       <span className="text-xs font-normal text-white/60">@{reply.author.username}</span>
     </span>}
     {reply?.content && <span className="line-clamp-4 whitespace-pre-wrap break-words text-sm">{reply.content}</span>}
-    {reply?.image_url && <img src={contentMediaUrl(reply.image_url)} alt="Imagem da resposta nooklada" loading="lazy" className="mt-2 max-h-56 w-full rounded-xl object-contain" />}
+    {reply?.image_url && <img src={contentMediaUrl(reply.image_url, 'feed')} alt="Imagem da resposta nooklada" loading="lazy" className="mt-2 max-h-56 w-full rounded-xl object-contain" />}
     <span className="mt-2 block text-xs text-pink-200">Ver resposta nooklada</span>
   </a>;
 }

@@ -1596,8 +1596,10 @@ function PostBody({
 
 function PostMedia({
   post,
+  expanded,
 }: {
   post: Post;
+  expanded: boolean;
 }) {
   const media =
     getPostMedia(post);
@@ -1614,7 +1616,7 @@ function PostMedia({
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
         <img
           loading="lazy"
-          src={contentMediaUrl(item.media_url)}
+          src={contentMediaUrl(item.media_url, expanded ? undefined : 'feed')}
           alt=""
           className="max-h-[360px] w-full object-contain"
         />
@@ -1633,7 +1635,7 @@ function PostMedia({
         >
           <img
             loading="lazy"
-            src={contentMediaUrl(item.media_url)}
+            src={contentMediaUrl(item.media_url, expanded ? undefined : 'feed')}
             alt=""
             className="h-full w-full object-cover"
           />
@@ -1688,7 +1690,7 @@ function CommentItem({ comment, children, onReply, onChange }: {
           <span className="text-xs text-white/55">{formatPostDateTime(comment.created_at)}</span>
         </div>
         <PostBody body={comment.content} />
-        {comment.image_url && <img loading="lazy" src={contentMediaUrl(comment.image_url)} alt="Imagem anexada à resposta" className="mt-3 max-h-80 w-full rounded-xl object-contain" />}
+        {comment.image_url && <img loading="lazy" src={contentMediaUrl(comment.image_url, 'feed')} alt="Imagem anexada à resposta" className="mt-3 max-h-80 w-full rounded-xl object-contain" />}
         <div className="mt-2 flex flex-wrap gap-x-4 text-sm text-white/70">
           <button type="button" className="min-h-10 hover:text-pink-200" onClick={() => onReply(comment)}>Responder</button>
           <button type="button" className="min-h-10 hover:text-pink-200 aria-pressed:text-pink-300" disabled={pending} aria-pressed={comment.liked} onClick={() => void toggle('like')}>{comment.liked ? 'Curtido' : 'Curtir'}{comment.likes > 0 && ' · ' + comment.likes}</button>
@@ -2191,7 +2193,7 @@ function FeedPost({
         {deleteError && <p role="alert" className="mt-2 text-sm text-rose-200">{deleteError}</p>}
         <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>
 
-        <PostMedia post={post} />
+        <PostMedia post={post} expanded={expanded} />
 
         <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3">
           <button

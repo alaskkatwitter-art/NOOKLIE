@@ -50,7 +50,7 @@ export default function OriginalsShelf() {
           {stories.map(story => (
             <Link key={story.id} href={`/historia/${story.id}`} className="group min-w-0 rounded-2xl focus-visible:outline-pink-300">
               <div className="grid aspect-[3/4] place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#5a2a46] to-[#1a101d] text-pink-200">
-                {story.cover_url ? <img src={contentMediaUrl(story.cover_url)} alt="" loading="lazy" className="h-full w-full object-cover group-hover:opacity-85" /> : <BookOpen size={32} />}
+                {story.cover_url ? <img src={contentMediaUrl(story.cover_url, 'cover')} alt="" loading="lazy" className="h-full w-full object-cover group-hover:opacity-85" /> : <BookOpen size={32} />}
               </div>
               <h3 className="mt-2 line-clamp-2 text-sm font-bold group-hover:text-pink-200">{story.title}</h3>
               <p className="mt-1 truncate text-xs text-white/60">{story.author?.display_name || story.author?.username}<AccountBadge account={story.author} /></p>
