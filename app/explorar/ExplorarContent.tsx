@@ -702,7 +702,8 @@ export default function ExplorarContent() {
                               >
                                 {story.cover_url ? (
                                   <img
-                                    src={contentMediaUrl(story.cover_url)}
+                                    src={contentMediaUrl(story.cover_url, 'cover')}
+                                    loading="lazy"
                                     alt=""
                                     className="h-full w-full object-contain transition duration-500 sm:group-hover:scale-105"
                                   />
