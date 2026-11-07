@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { chatDb } from '@/lib/chat/server';
-import { imageMatchesType } from '@/lib/security/uploads';
+import { imageMatchesType, videoMatchesType } from '@/lib/security/uploads';
 import { feedImageTypes, feedVideoTypes, maxFeedUploadBytes } from './attachments';
 
 const extensions: Record<string, string> = {
@@ -21,8 +21,7 @@ export async function uploadFeedAttachments(files: File[], profileId: string, im
     }
     const buffer = Buffer.from(await file.arrayBuffer());
     const valid = isVideo
-      ? file.type === 'video/mp4' ? buffer.length >= 16 && buffer.toString('ascii', 4, 8) === 'ftyp'
-        : buffer.length >= 16 && buffer.readUInt32BE(0) === 0x1a45dfa3
+      ? videoMatchesType(buffer, file.type)
       : imageMatchesType(buffer, file.type);
     if (!valid) throw new AttachmentError('O arquivo não corresponde ao formato informado.');
     return { buffer, file, mediaType: isVideo ? 'video' : file.type === 'image/gif' ? 'gif' : 'image' };

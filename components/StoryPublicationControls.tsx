@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { StoryPublication } from '@/lib/stories/publication';
 
@@ -18,6 +19,7 @@ export default function StoryPublicationControls({ storyId, publication, release
   hasPublishedChapter: boolean;
   onChange: (publication: StoryPublication, releaseAt: string | null) => void;
 }) {
+  const router = useRouter();
   const [date, setDate] = useState('');
   const [confirmation, setConfirmation] = useState<'publish' | 'unpublish' | null>(null);
   const [message, setMessage] = useState('');
@@ -40,7 +42,8 @@ export default function StoryPublicationControls({ storyId, publication, release
       if (!response.ok) throw new Error(result.error);
       onChange(result.publication, scheduledFor);
       setConfirmation(null);
-      setMessage(action === 'publish' ? 'A obra está no ar.' : action === 'schedule' ? 'Publicação agendada.' : 'A obra foi retirada do ar.');
+      if (action === 'publish') router.push('/historia/' + storyId);
+      else setMessage(action === 'schedule' ? 'Publicação agendada.' : 'A obra foi retirada do ar.');
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível atualizar a publicação.');
     } finally {

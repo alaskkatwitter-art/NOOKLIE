@@ -6,7 +6,15 @@ import {
   sameOrigin,
   privateHeaders,
 } from "@/lib/chat/server";
-import crypto from "crypto";
+import { randomUUID } from "node:crypto";
+import { detectedMedia } from "@/lib/chat/safety";
+import { videoMatchesType } from "@/lib/security/uploads";
+import { chapterBannerTypes, maxChapterBannerBytes, youtubeBannerId } from "@/lib/stories/chapter-banner";
+
+const extensions: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+  'video/mp4': 'mp4', 'video/webm': 'webm',
+};
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -32,59 +40,48 @@ export async function PUT(
     if (story.error) throw story.error;
     if (story.data.author_id !== actor.profileId)
       return new NextResponse(null, { status: 403 });
-    if (Number(request.headers.get("content-length")) > 6 * 1024 * 1024)
-      return new NextResponse(null, { status: 413 });
+    if (Number(request.headers.get("content-length")) > maxChapterBannerBytes + 16_384)
+      return NextResponse.json({ error: "Envie um arquivo de até 4 MB." }, { status: 413 });
     const form = await request.formData();
     const file = form.get("file");
+    const link = form.get("youtube");
     let url: string | null = null;
     let path: string | undefined;
-    if (form.get("remove") !== "true") {
-      if (!(file instanceof File) || !file.size || file.size > 5 * 1024 * 1024)
-        return NextResponse.json(
-          { error: "Escolha uma imagem de até 5 MB." },
-          { status: 400 },
-        );
+    const storage = chatDb.storage.from("chapter-media");
+    if (typeof link === "string") {
+      const video = youtubeBannerId(link);
+      if (!video) return NextResponse.json({ error: "Informe um link válido do YouTube." }, { status: 400 });
+      url = 'https://www.youtube.com/watch?v=' + video;
+    } else if (form.get("remove") !== "true") {
+      if (!(file instanceof File) || !file.size || file.size > maxChapterBannerBytes)
+        return NextResponse.json({ error: "Escolha uma imagem ou vídeo de até 4 MB." }, { status: 400 });
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
-        ? "jpg"
-        : buffer
-              .subarray(0, 8)
-              .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-          ? "png"
-          : /^GIF8[79]a/.test(buffer.toString("ascii", 0, 6))
-            ? "gif"
-            : buffer.toString("ascii", 0, 4) === "RIFF" &&
-                buffer.toString("ascii", 8, 12) === "WEBP"
-              ? "webp"
-              : null;
-      if (!ext)
-        return NextResponse.json(
-          { error: "Use uma imagem JPG, PNG, WEBP ou GIF." },
-          { status: 415 },
-        );
-      path = `${actor.profileId}/${chapter.data.story_id}/${id}/banner-${crypto.randomUUID()}.${ext}`;
-      const result = await chatDb.storage
-        .from("chapter-media")
-        .upload(path, buffer, {
-          contentType: ext === "jpg" ? "image/jpeg" : "image/" + ext,
-          upsert: false,
-        });
+      const type = file.type.startsWith('video/') && videoMatchesType(buffer, file.type)
+        ? file.type : detectedMedia(buffer);
+      if (!type || !chapterBannerTypes.includes(type))
+        return NextResponse.json({ error: "Use JPG, PNG, WebP, GIF, MP4 ou WebM." }, { status: 415 });
+      path = `${actor.profileId}/${chapter.data.story_id}/${id}/banner-${randomUUID()}.${extensions[type]}`;
+      const result = await storage.upload(path, buffer, { contentType: type, upsert: false });
       if (result.error) throw result.error;
-      url = chatDb.storage.from("chapter-media").getPublicUrl(path)
-        .data.publicUrl;
+      url = storage.getPublicUrl(path).data.publicUrl;
     }
-    const updated = await chatDb
-      .from("chapters")
+
+    let update = chatDb.from("chapters")
       .update({ banner_url: url, updated_at: new Date().toISOString() })
       .eq("id", id);
-    if (updated.error) {
-      if (path) await chatDb.storage.from("chapter-media").remove([path]);
-      throw updated.error;
+    update = chapter.data.banner_url === null
+      ? update.is("banner_url", null)
+      : update.eq("banner_url", chapter.data.banner_url);
+    const updated = await update.select("id").maybeSingle();
+    if (updated.error || !updated.data) {
+      if (path) await storage.remove([path]);
+      if (updated.error) throw updated.error;
+      return NextResponse.json({ error: "O banner mudou em outra aba. Atualize a página e tente novamente." }, { status: 409 });
     }
     const old = chapter.data.banner_url;
     const prefix = chatDb.storage.from("chapter-media").getPublicUrl("")
       .data.publicUrl;
-    if (old && old.startsWith(prefix)) {
+    if (old && old !== url && old.startsWith(prefix)) {
       const oldPath = old.slice(prefix.length);
       if (oldPath.startsWith(`${actor.profileId}/`))
         await chatDb.storage.from("chapter-media").remove([oldPath]);

@@ -2,6 +2,7 @@
 import QuotedReply from '@/components/QuotedReply';
 import FeedVideo from '@/components/FeedVideo';
 import { feedImageTypes, maxFeedUploadBytes } from '@/lib/social/attachments';
+import { notificationReturnParam, notificationsPath } from '@/lib/notifications/presentation';
 import { feedTokenPattern, linkedVideoId, normalizeHashtag } from '@/lib/social/feed-links';
 import AccountBadge from '@/components/AccountBadge';
 import RepostActions from '@/components/RepostActions';
@@ -19,6 +20,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { Ellipsis, Trash2 } from 'lucide-react';
+import { PostMention } from '@/components/PostMention';
 import NookPostComposer from '@/components/NookPostComposer';
 import StoryComposer from '@/components/StoryComposer';
 
@@ -1567,6 +1569,7 @@ function PostBody({
     <div className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
       {body.split(feedTokenPattern).map((piece, index) => {
         if (index % 2 === 0) return piece;
+        if (piece.startsWith('@')) return <PostMention key={index} token={piece} />;
         if (piece.startsWith('#')) return <a key={index} href={'/feed?tag=' + encodeURIComponent(normalizeHashtag(piece))} className="font-semibold text-pink-200 hover:underline">{piece}</a>;
         const url = URL.parse(piece);
         if (!url || !['http:', 'https:'].includes(url.protocol)) return piece;
@@ -4110,6 +4113,10 @@ export default function FeedPage() {
 
       <dialog ref={detailDialog} data-post-id={detailPost?.id} className="nook-dialog feed-detail" aria-labelledby="feed-detail-title" onClose={() => {
         const url = new URL(window.location.href);
+        if (url.searchParams.get(notificationReturnParam) === 'notificacoes') {
+          window.location.assign(notificationsPath);
+          return;
+        }
         url.searchParams.delete('post'); url.searchParams.delete('reply'); url.hash = '';
         window.history.replaceState(null, '', url);
       }}>

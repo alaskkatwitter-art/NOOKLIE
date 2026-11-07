@@ -4,7 +4,7 @@ import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Bell, BellRing, CheckCheck, RefreshCw } from 'lucide-react';
-import { notificationHref } from '@/lib/notifications/presentation';
+import { notificationDestination } from '@/lib/notifications/presentation';
 
 type NotificationItem = {
   actor?: {username:string;display_name:string|null;avatar_url:string|null}|null;
@@ -52,6 +52,22 @@ export default function NotificationsPage() {
     return () => controller.abort();
   }, [loadNotifications]);
 
+  function openNotification(item: NotificationItem) {
+    if (item.read_at) return;
+    void fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id }),
+      keepalive: true,
+    }).then(response => {
+      if (!response.ok) return;
+      setNotifications(items => items.map(notification =>
+        notification.id === item.id ? { ...notification, read_at: new Date().toISOString() } : notification
+      ));
+      window.dispatchEvent(new Event('nooklie:notifications-changed'));
+    }).catch(() => {});
+  }
+
   async function markRead(id?: string) {
     setBusy(true); setError(''); setMessage('');
     try {
@@ -82,9 +98,9 @@ export default function NotificationsPage() {
     {!loading && needsLogin && <section className="mt-8 rounded-3xl border border-[#ffb7da]/20 bg-[#241520] p-7 text-center"><BellRing className="mx-auto text-[#ffb7da]" size={36}/><h2 className="mt-5 text-xl font-bold">Entre para ver suas notificações</h2><p className="mt-3 text-sm leading-7 text-white/60">As atualizações desta área são pessoais e ficam vinculadas à sua conta.</p><Link href="/login" className="discovery-secondary mt-6">Entrar na minha conta</Link></section>}
     {!loading && !needsLogin && !error && visible.length===0 && <section className="mt-8 rounded-3xl border border-dashed border-[#ffb7da]/25 p-8 text-center"><Bell className="mx-auto text-[#dbabca]" size={38}/><h2 className="mt-5 text-xl font-bold">{filter==='unread' && notifications.length ? 'Tudo em dia!' : 'Nenhuma notificação por enquanto'}</h2><p className="mx-auto mt-3 max-w-md text-sm leading-7 text-white/60">{filter==='unread' && notifications.length ? 'Você já leu todas as notificações desta lista.' : 'Quando houver uma atualização para sua conta, ela aparecerá aqui.'}</p><Link href="/inicio" className="discovery-secondary mt-6">Minhas leituras</Link></section>}
     {!loading && !needsLogin && visible.length > 0 && <div className="mt-6 space-y-3">{visible.map(item => {
-      const href=notificationHref(item.href);
+      const href=notificationDestination(item.href);
       return <article key={item.id} aria-label={`${item.read_at ? 'Lida' : 'Não lida'}: ${item.title}`} className={`rounded-2xl border p-5 sm:p-6 ${item.read_at ? 'border-white/10 bg-white/[0.025]' : 'border-[#ffb7da]/30 bg-[#ffb7da]/[0.07]'}`}>
-        <div className="flex items-start gap-3">{item.actor&&<Link href={'/perfil/'+encodeURIComponent(item.actor.username)} aria-label={'Perfil de '+(item.actor.display_name||item.actor.username)} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff9bca]/15">{item.actor.avatar_url?<img src={contentMediaUrl(item.actor.avatar_url)} alt="" className="h-full w-full object-cover"/>:item.actor.username[0].toUpperCase()}</Link>}<span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${item.read_at ? 'bg-white/20' : 'bg-[#ff9bcb]'}`} aria-hidden="true"/><div className="min-w-0 flex-1"><h2 className="break-words text-sm font-semibold leading-6">{item.title}</h2>{item.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-white/70">{item.body}</p>}<time dateTime={item.created_at} className="mt-3 block text-xs text-white/45">{new Date(item.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</time><div className="mt-4 flex flex-wrap gap-3">{href && <Link href={href} className="discovery-secondary">Ver</Link>}{!item.read_at && <button type="button" disabled={busy || loading} onClick={() => void markRead(item.id)} className="min-h-11 rounded-full border border-white/15 px-4 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40">Marcar como lida</button>}</div></div></div>
+        <div className="flex items-start gap-3">{item.actor&&<Link href={notificationDestination('/perfil/'+encodeURIComponent(item.actor.username))!} onClick={() => openNotification(item)} aria-label={'Perfil de '+(item.actor.display_name||item.actor.username)} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#ff9bca]/15">{item.actor.avatar_url?<img src={contentMediaUrl(item.actor.avatar_url)} alt="" className="h-full w-full object-cover"/>:item.actor.username[0].toUpperCase()}</Link>}<span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${item.read_at ? 'bg-white/20' : 'bg-[#ff9bcb]'}`} aria-hidden="true"/><div className="min-w-0 flex-1"><h2 className="break-words text-sm font-semibold leading-6">{item.title}</h2>{item.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-white/70">{item.body}</p>}<time dateTime={item.created_at} className="mt-3 block text-xs text-white/45">{new Date(item.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</time><div className="mt-4 flex flex-wrap gap-3">{href && <Link href={href} onClick={() => openNotification(item)} className="discovery-secondary">Ver</Link>}{!item.read_at && <button type="button" disabled={busy || loading} onClick={() => void markRead(item.id)} className="min-h-11 rounded-full border border-white/15 px-4 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40">Marcar como lida</button>}</div></div></div>
       </article>;
     })}<p className="pt-3 text-xs text-white/40">Suas 50 notificações mais recentes.</p></div>}
   </div></main>;

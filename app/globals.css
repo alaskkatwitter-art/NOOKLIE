@@ -1676,3 +1676,12 @@ body:has(.site-drawer[open]) {
     border-radius: 0;
   }
 }
+
+:root {
+  --site-shell-height: 64px;
+}
+@media (max-width: 640px) {
+  :root {
+    --site-shell-height: 60px;
+  }
+}
