@@ -221,20 +221,6 @@ export default function HistoriaPage() {
 
   return (
     <main className="min-h-screen bg-[#0b0710] text-white">
-      <header className="border-b border-white/5 bg-[#0b0710]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="text-xl font-bold tracking-tight text-white transition hover:text-pink-300"
-          >
-            NOOKLIE
-          </button>
-
-
-        </div>
-      </header>
-
       <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 gap-y-4 rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_top_left,#42203a_0%,#211222_42%,#130d18_78%)] p-4 min-[380px]:grid-cols-[6rem_minmax(0,1fr)] sm:p-7 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-9 lg:p-9">
           <div className="contents lg:flex lg:flex-col lg:gap-4">
