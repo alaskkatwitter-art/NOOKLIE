@@ -1,5 +1,5 @@
 import { isNewsArticle } from '@/lib/news/articles';
-import { sameOrigin } from '@/lib/chat/server';
+import { sameOrigin, uuid } from '@/lib/chat/server';
 import { NextResponse } from 'next/server';
 import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
@@ -343,13 +343,15 @@ export async function PATCH(
  * O usuário só pode excluir os próprios posts.
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: {
     params: Promise<{
       id: string;
     }>;
   }
 ) {
+  if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
+
   try {
     const userId = await currentViewerProfileId(supabase);
 
@@ -366,10 +368,10 @@ export async function DELETE(
 
     const { id } = await context.params;
 
-    if (!id) {
+    if (!uuid.test(id)) {
       return NextResponse.json(
         {
-          error: 'ID do post não informado.',
+          error: 'ID do post inválido.',
         },
         {
           status: 400,
