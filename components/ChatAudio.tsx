@@ -26,7 +26,7 @@ export default function ChatAudio({ src }: { src: string }) {
       <audio
         ref={audio}
         src={src}
-        preload="metadata"
+        preload="none"
         controlsList="nodownload noplaybackrate"
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}

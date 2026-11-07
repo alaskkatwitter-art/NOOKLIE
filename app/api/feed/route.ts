@@ -1,356 +1,67 @@
 import { normalizeHashtag } from '@/lib/social/feed-links';
-import { visibleReposts } from '@/lib/social/posts';
-import {hiddenFeedProfiles} from '@/lib/moderation/feed-controls';
+import { visiblePosts, visibleReposts } from '@/lib/social/posts';
+import { hiddenFeedProfiles } from '@/lib/moderation/feed-controls';
+import { currentViewerProfileId, getPublicProfileIds } from '@/lib/moderation/content-visibility';
+import { chatDb } from '@/lib/chat/server';
 import { NextResponse } from 'next/server';
-import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
-import { createClient } from '@supabase/supabase-js';
-import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
-
-const ALLOWED_REACTIONS = [
-  '❤️',
-  '😂',
-  '😭',
-  '😱',
-  '👀',
-  '🔥',
-];
-
+const PAGE_SIZE = 20;
+const headers = { 'Cache-Control': 'private, no-store' };
 
 export async function GET(request: Request) {
   try {
-    const userId = await currentViewerProfileId(supabase);
+    const viewer = await currentViewerProfileId(chatDb);
+    if (!viewer) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401, headers });
 
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error: 'Não autenticado.',
-        },
-        { status: 401 }
-      );
-    }
-
-    /*
-     * Busca TODOS os posts.
-     *
-     * O Feed é global, então não filtramos
-     * pelo usuário atual.
-     */
-    const rawTag = new URL(request.url).searchParams.get('tag');
+    const params = new URL(request.url).searchParams;
+    const rawTag = params.get('tag');
     const tag = rawTag ? normalizeHashtag(rawTag) : '';
-    if (rawTag && !tag) return NextResponse.json({ error: 'Hashtag inválida.' }, { status: 400 });
-    let query = supabase
-      .from('nook_posts')
-      .select(`
-        id,
-        user_id,
-        body,
-        image_url,
-        story_id,news_slug,
-        pinned,
-        created_at,
-        updated_at,
-        moderation_hidden_at
-      `)
+    if (rawTag && !tag) return NextResponse.json({ error: 'Hashtag inválida.' }, { status: 400, headers });
+
+    const rawCursor = params.get('before');
+    const cursor = rawCursor?.match(/^(\d{1,15}):(post|repost):([0-9a-f-]{36})$/);
+    if (rawCursor && !cursor) return NextResponse.json({ error: 'Página do feed inválida.' }, { status: 400, headers });
+    const beforeTime = cursor ? Number(cursor[1]) : Infinity;
+    const beforeKey = cursor ? cursor[2] + ':' + cursor[3] : '';
+
+    let query = chatDb.from('nook_posts')
+      .select('id,user_id,created_at')
       .is('moderation_hidden_at', null)
-      .order('created_at', {
-        ascending: false,
-      });
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
     if (tag) query = query.contains('hashtags', [tag]);
-    const { data: rawPosts, error: postsError } = await query;
 
-    if (postsError) {
-      console.error(
-        'ERRO AO BUSCAR FEED:',
-        postsError
-      );
+    const [result, hidden] = await Promise.all([query, hiddenFeedProfiles()]);
+    if (result.error) throw result.error;
+    const candidates = result.data || [];
+    const authors = await getPublicProfileIds(chatDb, candidates.map(post => post.user_id), viewer);
+    const originals = candidates.filter(post => authors.has(post.user_id) && !hidden.has(post.user_id));
+    const originalIds = new Set(originals.map(post => post.id));
+    const reposts = originals.length ? await visibleReposts(undefined, undefined, viewer) : [];
+    const timeline = [
+      ...originals.map(post => ({
+        postId: post.id, key: 'post:' + post.id, time: Date.parse(post.created_at), repost: null,
+      })),
+      ...reposts.filter(repost => originalIds.has(repost.post_id) && !hidden.has(repost.user_id)).map(repost => ({
+        postId: repost.post_id, key: 'repost:' + repost.id, time: Date.parse(repost.created_at), repost,
+      })),
+    ].filter(entry => entry.time < beforeTime || (entry.time === beforeTime && entry.key < beforeKey))
+      .sort((a, b) => b.time - a.time || (a.key === b.key ? 0 : a.key > b.key ? -1 : 1));
 
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar o Feed.',
-        },
-        { status: 500 }
-      );
-    }
-
-    const visibleProfileIds = await getPublicProfileIds(
-      supabase,
-      (rawPosts || []).map((post) => post.user_id)
-    );
-    const hiddenProfiles=await hiddenFeedProfiles();
-    const posts = (rawPosts || []).filter(
-      (post) =>
-        !post.moderation_hidden_at && !hiddenProfiles.has(post.user_id) &&
-        visibleProfileIds.has(post.user_id)
-    );
-
-    if (!posts || posts.length === 0) {
-      return NextResponse.json({
-        posts: [],
-      });
-    }
-
-    const postIds = posts.map(
-      (post) => post.id
-    );
-
-    const authorIds = [
-      ...new Set(
-        posts.map(
-          (post) => post.user_id
-        )
-      ),
-    ];
-
-    /*
-     * Busca autores.
-     */
-    const {
-      data: profiles,
-      error: profilesError,
-    } = await supabase
-      .from('profiles')
-      .select(
-        'id, username, display_name, avatar_url, verified, is_official'
-      )
-      .in('id', authorIds);
-
-    if (profilesError) {
-      console.error(
-        'ERRO AO BUSCAR AUTORES DO FEED:',
-        profilesError
-      );
-
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar os autores.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * Busca mídias.
-     */
-    const {
-      data: media,
-      error: mediaError,
-    } = await supabase
-      .from('nook_post_media')
-      .select(`
-        id,
-        post_id,
-        media_url,
-        media_type,
-        created_at
-      `)
-      .in('post_id', postIds)
-      .order('created_at', {
-        ascending: true,
-      });
-
-    if (mediaError) {
-      console.error(
-        'ERRO AO BUSCAR MÍDIAS DO FEED:',
-        mediaError
-      );
-
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar as mídias.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * Busca reações.
-     */
-    const {
-      data: reactions,
-      error: reactionsError,
-    } = await supabase
-      .from('nook_post_reactions')
-      .select(`
-        id,
-        post_id,
-        user_id,
-        emoji
-      `)
-      .in('post_id', postIds);
-
-    if (reactionsError) {
-      console.error(
-        'ERRO AO BUSCAR REAÇÕES DO FEED:',
-        reactionsError
-      );
-
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar as reações.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * Busca comentários apenas para
-     * saber a quantidade.
-     */
-    const {
-      data: comments,
-      error: commentsError,
-    } = await supabase
-      .from('nook_comments')
-      .select('id, post_id')
-      .in('post_id', postIds);
-
-    if (commentsError) {
-      console.error(
-        'ERRO AO BUSCAR COMENTÁRIOS DO FEED:',
-        commentsError
-      );
-
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar os comentários.',
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * Busca posts salvos pelo usuário atual.
-     */
-    const {
-      data: savedPosts,
-      error: savedError,
-    } = await supabase
-      .from('nook_saved_posts')
-      .select('post_id')
-      .eq('user_id', userId)
-      .in('post_id', postIds);
-
-    if (savedError) {
-      console.error(
-        'ERRO AO BUSCAR POSTS SALVOS:',
-        savedError
-      );
-
-      return NextResponse.json(
-        {
-          error: 'Não foi possível carregar os posts salvos.',
-        },
-        { status: 500 }
-      );
-    }
-
-    const savedPostIds = new Set(
-      (savedPosts || []).map(
-        (item) => item.post_id
-      )
-    );
-
-    /*
-     * Monta posts enriquecidos.
-     */
-    const enrichedPosts = posts.map(
-      (post) => {
-        const postReactions =
-          (reactions || []).filter(
-            (reaction) =>
-              reaction.post_id === post.id
-          );
-
-        const postComments =
-          (comments || []).filter(
-            (comment) =>
-              comment.post_id === post.id
-          );
-
-        const postMedia =
-          (media || []).filter(
-            (item) =>
-              item.post_id === post.id
-          );
-
-        const reactionCounts: Record<
-          string,
-          number
-        > = {};
-
-        for (const emoji of ALLOWED_REACTIONS) {
-          reactionCounts[emoji] =
-            postReactions.filter(
-              (reaction) =>
-                reaction.emoji === emoji
-            ).length;
-        }
-
-        const userReactions =
-          postReactions
-            .filter(
-              (reaction) =>
-                reaction.user_id === userId
-            )
-            .map(
-              (reaction) =>
-                reaction.emoji
-            );
-
-        return {
-          ...post,
-
-          author:
-            (profiles || []).find(
-              (profile) =>
-                profile.id === post.user_id
-            ) || null,
-
-          media: postMedia,
-
-          reaction_counts:
-            reactionCounts,
-
-          user_reactions:
-            userReactions,
-
-          comments_count:
-            postComments.length,
-
-          saved:
-            savedPostIds.has(post.id),
-        };
-      }
-    );
-
-    const republications=await visibleReposts(undefined,undefined,userId);
-    const reposts=await Promise.all(republications.map(async repost=>{
-      if(hiddenProfiles.has(repost.user_id))return null;
-      const original=enrichedPosts.find(p=>p.id===repost.post_id);
-      if(!original||hiddenProfiles.has(original.user_id))return null;
-      return {...original,repost};
-    }));
-    const timeline=[
-      ...enrichedPosts.map(post=>({post,time:post.created_at})),
-      ...reposts.filter((p):p is NonNullable<typeof p>=>p!==null).map(post=>({post,time:post.repost.created_at})),
-    ].sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).map(entry=>entry.post);
-    return NextResponse.json({posts:timeline}, {headers:{'Cache-Control':'no-store, private'}});
+    const page = timeline.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
+    const next_cursor = timeline.length > PAGE_SIZE && last ? last.time + ':' + last.key : null;
+    const posts = await visiblePosts(page.map(entry => entry.postId), viewer);
+    const byId = new Map(posts.map(post => [post.id, post]));
+    return NextResponse.json({
+      posts: page.flatMap(entry => {
+        const post = byId.get(entry.postId);
+        return post ? [entry.repost ? { ...post, repost: entry.repost } : post] : [];
+      }),
+      next_cursor,
+    }, { headers });
   } catch (error) {
-    console.error(
-      'ERRO GERAL NO FEED:',
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error: 'Erro interno do servidor.',
-      },
-      { status: 500 }
-    );
+    console.error('ERRO GERAL NO FEED:', error);
+    return NextResponse.json({ error: 'Não foi possível carregar o Feed.' }, { status: 500, headers });
   }
-          }
+}

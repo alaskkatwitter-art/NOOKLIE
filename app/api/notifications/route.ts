@@ -8,10 +8,21 @@ const supabase = createClient(
 );
 const noStore = { 'Cache-Control': 'no-store' };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthenticatedUserContext();
     if (!user) return NextResponse.json({ error: 'Entre na sua conta.' }, { status: 401, headers: noStore });
+    if (request.nextUrl.searchParams.get('summary') === '1') {
+      const { data, error } = await supabase.from('user_notifications')
+        .select('read_at')
+        .eq('user_id', user.userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return NextResponse.json({
+        unread_count: (data || []).filter(item => !item.read_at).length,
+      }, { headers: noStore });
+    }
     const { data, error } = await supabase.from('user_notifications')
       .select('id, notification_type, title, body, href, created_at, read_at, actor_id')
       .eq('user_id', user.userId)
