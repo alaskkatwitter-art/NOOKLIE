@@ -26,3 +26,7 @@ pnpm-debug.log*
 
 # Supabase CLI local cache
 /supabase/.temp/
+/dist/
+.vinext/
+.cloudflare/
+.dev.vars*

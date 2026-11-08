@@ -1,0 +1,46 @@
+{
+  "name": "nooklie-preview",
+  "main": "./.cloudflare/output/v0/workers/default/bundle/index.js",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "no_bundle": true,
+  "find_additional_modules": true,
+  "base_dir": "./.cloudflare/output/v0/workers/default/bundle",
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": [
+        "**/*.js",
+        "**/*.mjs"
+      ],
+      "fallthrough": true
+    },
+    {
+      "type": "CompiledWasm",
+      "globs": [
+        "**/*.wasm"
+      ]
+    }
+  ],
+  "assets": {
+    "directory": "./.cloudflare/output/v0/workers/default/assets",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": [
+      "/*",
+      "!/_next/static/*",
+      "!/*/_next/static/*"
+    ]
+  },
+  "vars": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://nooklie-preview.invalid",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "preview-placeholder",
+    "SUPABASE_SECRET_KEY": "preview-placeholder",
+    "CHAT_ENCRYPTION_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  }
+}
