@@ -1,6 +1,6 @@
 {
   "name": "nooklie-preview",
-  "main": "./.cloudflare/output/v0/workers/default/bundle/index.js",
+  "main": "./bundle/index.js",
   "compatibility_date": "2026-11-08",
   "compatibility_flags": [
     "nodejs_compat"
@@ -9,7 +9,7 @@
   "preview_urls": false,
   "no_bundle": true,
   "find_additional_modules": true,
-  "base_dir": "./.cloudflare/output/v0/workers/default/bundle",
+  "base_dir": "./bundle",
   "rules": [
     {
       "type": "ESModule",
@@ -27,7 +27,7 @@
     }
   ],
   "assets": {
-    "directory": "./.cloudflare/output/v0/workers/default/assets",
+    "directory": "./assets",
     "binding": "ASSETS",
     "html_handling": "none",
     "not_found_handling": "none",
@@ -37,10 +37,17 @@
       "!/*/_next/static/*"
     ]
   },
-  "vars": {
-    "NEXT_PUBLIC_SUPABASE_URL": "https://nooklie-preview.invalid",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "preview-placeholder",
-    "SUPABASE_SECRET_KEY": "preview-placeholder",
-    "CHAT_ENCRYPTION_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  "limits": {
+    "cpu_ms": 3000
+  },
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false,
+      "head_sampling_rate": 1,
+      "persist": true
+    }
   }
 }
