@@ -33,3 +33,32 @@ test('image uploads reject empty files, spoofed MIME types and executable format
  assert.equal(exports.imageMatchesType(png,'image/jpeg'),false);
  for(const data of [Buffer.alloc(0),Buffer.from('<svg onload="alert(1)"></svg>'),Buffer.from('<html>not a PNG</html>')])assert.equal(exports.imageMatchesType(data,'image/png'),false);
 });
+
+test('the new chat key separates archived bodies and attachment paths', () => {
+  const oldKey = process.env.CHAT_ENCRYPTION_KEY;
+  const newKey = process.env.CHAT_ENCRYPTION_KEY_V2;
+  const plaintext = Buffer.from('mensagem de teste');
+  const aad = 'thread:message:body';
+  try {
+    delete process.env.CHAT_ENCRYPTION_KEY_V2;
+    process.env.CHAT_ENCRYPTION_KEY = 'ab'.repeat(32);
+    const archived = crypto.encodeChatBody(crypto.encryptChat(plaintext, aad));
+    assert.equal(crypto.chatMediaPath('thread', 'message'), 'thread/message.enc');
+
+    process.env.CHAT_ENCRYPTION_KEY_V2 = 'cd'.repeat(32);
+    const current = crypto.encodeChatBody(crypto.encryptChat(plaintext, aad));
+    assert.equal(crypto.chatCipherVersion(), 2);
+    assert.match(current, /^v2:/);
+    assert.equal(crypto.chatMediaPath('thread', 'message'), 'v2/thread/message.enc');
+    assert.deepEqual(crypto.decryptChat(crypto.decodeChatBody(current), aad), plaintext);
+    assert.throws(() => crypto.decodeChatBody(archived));
+    assert.throws(() => crypto.decryptChat(Buffer.from(archived, 'base64'), aad));
+    process.env.CHAT_ENCRYPTION_KEY_V2 = '';
+    assert.throws(() => crypto.encryptChat(plaintext, aad));
+  } finally {
+    if (oldKey === undefined) delete process.env.CHAT_ENCRYPTION_KEY;
+    else process.env.CHAT_ENCRYPTION_KEY = oldKey;
+    if (newKey === undefined) delete process.env.CHAT_ENCRYPTION_KEY_V2;
+    else process.env.CHAT_ENCRYPTION_KEY_V2 = newKey;
+  }
+});

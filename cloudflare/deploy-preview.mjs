@@ -29,13 +29,15 @@ const names = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SECRET_KEY',
-  'CHAT_ENCRYPTION_KEY',
+  production || process.env.CHAT_ENCRYPTION_KEY_V2 !== undefined
+    ? 'CHAT_ENCRYPTION_KEY_V2' : 'CHAT_ENCRYPTION_KEY',
 ];
+const chatKeyName = names.at(-1);
 const secrets = Object.fromEntries(names.map(name => [name, process.env[name]]));
 if (!dryRun && (secrets.NEXT_PUBLIC_SUPABASE_URL !== supabaseUrl ||
     !secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.startsWith('sb_publishable_') ||
     !secrets.SUPABASE_SECRET_KEY?.startsWith('sb_secret_') ||
-    !/^[a-f0-9]{64}$/i.test(secrets.CHAT_ENCRYPTION_KEY ?? ''))) {
+    !/^[a-f0-9]{64}$/i.test(secrets[chatKeyName] ?? ''))) {
   throw new Error('The Nooklie Worker configuration is incomplete or targets the wrong database.');
 }
 

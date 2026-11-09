@@ -9,7 +9,7 @@ import {
   sameOrigin,
 } from "@/lib/chat/server";
 import { moderationStaff } from "@/lib/moderation/staff";
-import { decryptChat } from "@/lib/chat/crypto";
+import { chatCipherVersion, decodeChatBody, decryptChat } from "@/lib/chat/crypto";
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
         .select("id")
         .eq("id", b.message_id)
         .eq("thread_id", b.thread_id)
+        .eq("cipher_version", chatCipherVersion())
         .maybeSingle();
       if (m.error) throw m.error;
       if (!m.data) return new NextResponse(null, { status: 404 });
@@ -88,6 +89,7 @@ export async function GET() {
           .select("id,thread_id,body_cipher,sender_id,media_type,created_at")
           .eq("id", report.message_id)
           .eq("thread_id", report.thread_id)
+          .eq("cipher_version", chatCipherVersion())
           .maybeSingle();
         if (m.error) throw m.error;
         if (m.data) {
@@ -96,7 +98,7 @@ export async function GET() {
             id: v.id,
             sender_id: v.sender_id,
             body: decryptChat(
-              Buffer.from(v.body_cipher, "base64"),
+              decodeChatBody(v.body_cipher),
               `${v.thread_id}:${v.id}:body`,
             ).toString("utf8"),
             has_attachment: Boolean(v.media_type),

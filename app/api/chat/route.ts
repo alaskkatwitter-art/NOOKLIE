@@ -8,7 +8,10 @@ import {
   uuid,
   sameOrigin,
 } from "@/lib/chat/server";
-import { encryptChat, decryptChat } from "@/lib/chat/crypto";
+import {
+  chatCipherVersion, chatMediaBucket, chatMediaPath, decodeChatBody, encodeChatBody,
+  encryptChat, decryptChat,
+} from "@/lib/chat/crypto";
 import { detectedMedia } from "@/lib/chat/safety";
 
 export async function GET(request: Request) {
@@ -111,6 +114,7 @@ export async function GET(request: Request) {
         "id,thread_id,sender_id,body_cipher,media_type,is_sticker,reply_to,created_at,read_at",
       )
       .eq("thread_id", id)
+      .eq("cipher_version", chatCipherVersion())
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(60);
@@ -128,7 +132,7 @@ export async function GET(request: Request) {
         id: m.id,
         sender_id: m.sender_id,
         body: decryptChat(
-          Buffer.from(m.body_cipher, "base64"),
+          decodeChatBody(m.body_cipher),
           `${id}:${m.id}:body`,
         ).toString("utf8"),
         media_type: m.media_type,
@@ -143,6 +147,7 @@ export async function GET(request: Request) {
         .from("chat_messages")
         .update({ read_at: new Date().toISOString() })
         .eq("thread_id", id)
+        .eq("cipher_version", chatCipherVersion())
         .neq("sender_id", actor.profileId)
         .is("read_at", null);
       if (read.error) throw read.error;
@@ -239,6 +244,15 @@ export async function POST(request: Request) {
         { error: "A conversa precisa ser aceita e estar desbloqueada." },
         { status: 403, headers: privateHeaders },
       );
+    if (reply) {
+      const original = await chatDb.from("chat_messages").select("id")
+        .eq("id", String(reply))
+        .eq("thread_id", threadId)
+        .eq("cipher_version", chatCipherVersion())
+        .maybeSingle();
+      if (original.error) throw original.error;
+      if (!original.data) return new NextResponse(null, { status: 404, headers: privateHeaders });
+    }
     const id = randomUUID();
     let mediaType: string | null = null;
     if (sticker && (!(file instanceof File) || !file.type.startsWith("image/")))
@@ -263,19 +277,16 @@ export async function POST(request: Request) {
           },
           { status: 400, headers: privateHeaders },
         );
-      uploaded = `${threadId}/${id}.enc`;
+      uploaded = chatMediaPath(threadId, id);
       const upload = await chatDb.storage
-        .from("private-chat")
+        .from(chatMediaBucket)
         .upload(uploaded, encryptChat(bytes, `${threadId}:${id}:media`), {
           contentType: "application/octet-stream",
           upsert: false,
         });
       if (upload.error) throw upload.error;
     }
-    const cipher = encryptChat(
-      Buffer.from(text),
-      `${threadId}:${id}:body`,
-    ).toString("base64");
+    const cipher = encodeChatBody(encryptChat(Buffer.from(text), `${threadId}:${id}:body`));
     const result = await chatDb.rpc(
       thread.kind === "group" ? "chat_group_send" : "chat_direct_send",
       {
@@ -291,7 +302,7 @@ export async function POST(request: Request) {
     );
     if (result.error || !result.data) {
       if (uploaded)
-        await chatDb.storage.from("private-chat").remove([uploaded]);
+        await chatDb.storage.from(chatMediaBucket).remove([uploaded]);
       return NextResponse.json(
         {
           error:
@@ -305,7 +316,7 @@ export async function POST(request: Request) {
       { status: 201, headers: privateHeaders },
     );
   } catch {
-    if (uploaded) await chatDb.storage.from("private-chat").remove([uploaded]);
+    if (uploaded) await chatDb.storage.from(chatMediaBucket).remove([uploaded]);
     return NextResponse.json(
       { error: "Não foi possível enviar. Tente novamente." },
       { status: 503, headers: privateHeaders },

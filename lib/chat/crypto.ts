@@ -1,7 +1,29 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+export function chatCipherVersion() {
+  return process.env.CHAT_ENCRYPTION_KEY_V2 === undefined ? 1 : 2;
+}
+export const chatMediaBucket = 'private-chat';
+
+export function chatMediaPath(threadId: string, messageId: string) {
+  const path = `${threadId}/${messageId}.enc`;
+  return chatCipherVersion() === 2 ? `v2/${path}` : path;
+}
+
+export function encodeChatBody(cipher: Buffer) {
+  const encoded = cipher.toString('base64');
+  return chatCipherVersion() === 2 ? `v2:${encoded}` : encoded;
+}
+
+export function decodeChatBody(value: string) {
+  if (value.startsWith('v2:') !== (chatCipherVersion() === 2)) {
+    throw new Error('Mensagem de outra versão do chat.');
+  }
+  return Buffer.from(chatCipherVersion() === 2 ? value.slice(3) : value, 'base64');
+}
+
 function key() {
-  const value=process.env.CHAT_ENCRYPTION_KEY;
+  const value=chatCipherVersion() === 2 ? process.env.CHAT_ENCRYPTION_KEY_V2 : process.env.CHAT_ENCRYPTION_KEY;
   if(!value || !/^[a-f0-9]{64}$/i.test(value))throw new Error('O chat está indisponível: chave de proteção não configurada.');
   return Buffer.from(value,'hex');
 }

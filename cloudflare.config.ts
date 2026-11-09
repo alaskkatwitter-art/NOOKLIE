@@ -17,6 +17,7 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: bindings.secret(),
       SUPABASE_SECRET_KEY: bindings.secret(),
       CHAT_ENCRYPTION_KEY: bindings.secret(),
+      CHAT_ENCRYPTION_KEY_V2: bindings.secret(),
     },
   }),
 });
