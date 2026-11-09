@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "preview/cloudflare": false,
+      "release/cloudflare": false,
       "feature/reader-fonts-and-site-typography": false,
       "feature/mobile-design-community": false,
       "feature/nooklar-reading-scheduling": false

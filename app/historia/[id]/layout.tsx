@@ -17,7 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     if (!story.data || !chapter.data?.length || !(await isPublicProfileVisible(discoveryDb,story.data.author_id,null))) return unavailable;
     const title=`${story.data.title} | Nooklie`;
     const description=(story.data.description || 'Leia esta história no Nooklie.').replace(/<[^>]+>|[*#]/g,'').slice(0,180);
-    const url=`https://nooklie.vercel.app/historia/${id}`;
+    const origin=process.env.NEXT_PUBLIC_SITE_URL || 'https://nooklie.vercel.app';
+    const url=new URL('/historia/'+id,origin).href;
     return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName:'Nooklie', type:'article', ...(story.data.cover_url ? {images:[new URL(contentMediaUrl(story.data.cover_url)!,url).href]} : {}) } };
   } catch { return unavailable; }
 }

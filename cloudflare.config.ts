@@ -2,7 +2,7 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
   worker: defineWorker({
-    name: "nooklie-preview",
+    name: process.env.NOOKLIE_CLOUDFLARE_PRODUCTION === "1" ? "nooklie" : "nooklie-preview",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-11-08",
     compatibilityFlags: ["nodejs_compat"],
