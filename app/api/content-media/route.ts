@@ -42,6 +42,7 @@ function rememberThumbnail(key: string, sourceTag: string, bytes: Buffer) {
 }
 
 export async function GET(request: Request) {
+  let step = 'parameters';
   try {
     const params = new URL(request.url).searchParams;
     const bucket = params.get('bucket') || '';
@@ -54,10 +55,12 @@ export async function GET(request: Request) {
     const storageUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) + '/storage/v1/object/';
     const object = bucket + '/' + path.split('/').map(encodeURIComponent).join('/');
     const original = storageUrl + 'public/' + object;
+    step = 'session';
     const sessionHash = await getSessionTokenHash();
     if (bucket === 'social-stories' && !sessionHash) {
       return new Response(null, { status: 404, headers: privateHeaders });
     }
+    step = 'authorization';
     const { data: allowed, error } = await db.rpc('content_media_allowed', {
       p_session: sessionHash,
       p_bucket: bucket,
@@ -89,6 +92,7 @@ export async function GET(request: Request) {
       redirect: 'error',
       signal: request.signal,
     });
+    step = 'storage-fetch';
     let upstream = await fetchObject();
     if (upstream.status === 304 && !upstream.headers.has('etag') && upstreamTags.length !== 1) {
       upstreamHeaders.delete('If-None-Match');
@@ -110,6 +114,7 @@ export async function GET(request: Request) {
       return new Response(null, { status: 416, headers });
     }
     if (!upstream.ok && !unchanged) {
+      if (upstream.status >= 500) console.error('nooklie-media-upstream', { status: upstream.status });
       await upstream.body?.cancel();
       return new Response(null, { status: upstream.status >= 500 ? 503 : 404, headers });
     }
@@ -147,6 +152,7 @@ export async function GET(request: Request) {
       return new Response(upstream.body, { status: upstream.status, headers });
     }
 
+    step = 'storage-body';
     let bytes = Buffer.from(await upstream.arrayBuffer());
     if (width && thumbnailTypes.has(type)) {
       try {
@@ -183,7 +189,9 @@ export async function GET(request: Request) {
     }
     headers.set('Content-Length', String(bytes.length));
     return new Response(new Uint8Array(bytes), { headers });
-  } catch {
+  } catch (error) {
+    const failure = error as { name?: string; code?: string } | null;
+    console.error('nooklie-media-error', { step, name: failure?.name, code: failure?.code });
     return new Response(null, { status: 503, headers: privateHeaders });
   }
 }
