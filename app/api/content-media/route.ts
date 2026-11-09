@@ -88,9 +88,8 @@ export async function GET(request: Request) {
     if (!width && range && rangeMatch) upstreamHeaders.set('Range', range);
     const fetchObject = () => fetch(storageUrl + object, {
       headers: upstreamHeaders,
-      next: { revalidate: 0 },
-      redirect: 'error',
-      signal: request.signal,
+      cache: 'no-store',
+      redirect: 'manual',
     });
     step = 'storage-fetch';
     let upstream = await fetchObject();
@@ -190,8 +189,9 @@ export async function GET(request: Request) {
     headers.set('Content-Length', String(bytes.length));
     return new Response(new Uint8Array(bytes), { headers });
   } catch (error) {
-    const failure = error as { name?: string; code?: string } | null;
-    console.error('nooklie-media-error', { step, name: failure?.name, code: failure?.code });
+    const failure = error as { name?: string; code?: string; message?: string } | null;
+    const reason = failure?.message?.match(/abort|cache|redirect|network|signal|fetch|invalid URL|receiver|RequestInit/i)?.[0];
+    console.error('nooklie-media-error', { step, name: failure?.name, code: failure?.code, reason });
     return new Response(null, { status: 503, headers: privateHeaders });
   }
 }
