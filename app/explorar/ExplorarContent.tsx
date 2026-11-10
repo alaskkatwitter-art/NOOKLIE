@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { storyFormats, storyKinds } from '@/lib/stories/metadata';
 import TagFilters from './TagFilters';
+import FeaturedStories from './FeaturedStories';
 
 type ExploreUser = {
   id: string;
@@ -19,7 +20,7 @@ type ExploreUser = {
   is_self?: boolean;
 };
 
-type ExploreStory = {
+export type ExploreStory = {
   story_kind?: keyof typeof storyKinds;
   story_format?: keyof typeof storyFormats;
   fandom?: string;
@@ -32,7 +33,7 @@ type ExploreStory = {
   author: ExploreUser | null;
   is_saved?: boolean;
   is_own_story?: boolean;
-  tags?: Array<{ name: string; slug: string; category: string | null }>;
+  tags?: Array<{ name: string; slug: string; category: string | null; category_slug?: string | null }>;
 };
 
 type ExploreResults = {
@@ -539,6 +540,10 @@ export default function ExplorarContent() {
             )}
           </div>
         </section>
+
+        {!filterQuery && !loadingResults && results.stories.length > 0 && (
+          <FeaturedStories stories={results.stories.slice(0, 7)} />
+        )}
 
         <TagFilters currentUser={currentUser} />
 
