@@ -4,6 +4,8 @@ import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import ProfileBanner from '@/components/ProfileBanner';
+import NookPostComposer from '@/components/NookPostComposer';
+import Link from 'next/link';
 import { useCoverPalette } from '@/lib/profile/use-cover-palette';
 import { parseProfileTheme, profileThemeVariables, type ProfileTheme } from '@/lib/profile/themes';
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
@@ -136,10 +138,9 @@ type Tab =
   | 'stories'
   | 'nook'
   | 'lists'
-  | 'clubs'
   | 'about';
 
-const TAB_ORDER: Tab[] = ['nook', 'stories', 'clubs', 'lists', 'about'];
+const TAB_ORDER: Tab[] = ['stories', 'nook', 'lists', 'about'];
 
 function formatDate(
   value: string
@@ -243,10 +244,10 @@ function StoryCard({
     <button
       type="button"
       onClick={onOpen}
-      className="profile-themed-surface group w-full overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/30 hover:bg-[#181218]"
+      className="profile-story-card profile-themed-surface group w-full overflow-hidden rounded-lg border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/30 hover:bg-[#181218]"
     >
       <div className="flex gap-4 p-4 sm:p-5">
-        <div className="relative h-36 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#211a21] sm:h-44 sm:w-28">
+        <div className="profile-story-cover relative h-28 w-20 shrink-0 overflow-hidden rounded bg-[#211a21] sm:h-32 sm:w-24">
           {story.cover_url ? (
             <img
               src={
@@ -385,6 +386,8 @@ export default function PublicProfilePage() {
   const [stories, setStories] =
     useState<Story[]>([]);
 
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [repostsOpen, setRepostsOpen] = useState(false);
   const [posts, setPosts] =
     useState<NookPost[]>([]);
 
@@ -874,7 +877,7 @@ export default function PublicProfilePage() {
                   type="button"
                   onClick={() =>
                     router.push(
-                      '/perfil'
+                      '/configuracoes/perfil'
                     )
                   }
                   className="mb-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
@@ -933,10 +936,9 @@ export default function PublicProfilePage() {
                 > = {
                   stories:
                     'Obras',
-                  nook: 'Publicações',
+                  nook: 'Mural',
                   lists:
                     'Listas',
-                  clubs: 'Mural',
                   about: 'Sobre',
                 };
 
@@ -957,7 +959,7 @@ export default function PublicProfilePage() {
                         : 'profile-themed-text text-white/45 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    {tab === 'nook' ? <FileText size={21}/> : tab === 'stories' ? <BookOpen size={21}/> : tab === 'clubs' ? <ImageIcon size={21}/> : tab === 'lists' ? <Layers size={21}/> : <Info size={21}/>}
+                    {tab === 'nook' ? <FileText size={21}/> : tab === 'stories' ? <BookOpen size={21}/> : tab === 'lists' ? <Layers size={21}/> : <Info size={21}/>}
                     <span>{labels[tab]}</span>
                   </button>
                 );
@@ -1029,7 +1031,8 @@ export default function PublicProfilePage() {
 
             {/* MURAL */}
 
-            <section hidden={activeTab !== 'nook'} className="profile-tab-panel w-full shrink-0 px-0.5">
+            <section hidden={activeTab !== 'nook'} className="profile-wall profile-tab-panel w-full shrink-0 px-0.5" aria-label="Mural">
+              {isSelf && <button type="button" className="profile-wall-compose" onClick={() => setComposerOpen(true)}>Escrever no mural</button>}
               {posts.length ===
               0 ? (
                 <EmptyState
@@ -1291,15 +1294,14 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            <section hidden={activeTab !== 'clubs'} className="profile-tab-panel w-full shrink-0 px-0.5">
-              <div className="profile-media-grid">{posts.filter(post => post.image_url).map(post => <a key={post.id} href={'/feed?post=' + encodeURIComponent(post.id)}><img src={contentMediaUrl(post.image_url!)} alt="Imagem publicada no mural" loading="lazy"/></a>)}</div>
-              <h2 className="mb-4 text-lg font-bold">Republicados</h2><Republicados profileId={user.id} own={isSelf} active={activeTab==='clubs'}/>
-            </section>
-            <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div></section>
+            <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div><details className="profile-secondary-section" onToggle={event => setRepostsOpen(event.currentTarget.open)}><summary>Republicados</summary>{repostsOpen && <Republicados profileId={user.id} own={isSelf} active={activeTab === 'about'}/>}</details>{isSelf && <Link className="profile-management-link" href="/configuracoes/conteudo">Gerenciar publicações e listas</Link>}</section>
           </div>
         </div>
         </>}
       </div>
+      <NookPostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={() => {
+        void fetch('/api/public-profile/' + encodeURIComponent(user.username), { cache: 'no-store' }).then(async response => { if (response.ok) { const data = await response.json(); setPosts(data.posts || []); } }).catch(() => {});
+      }}/>
     </main>
   );
 }
