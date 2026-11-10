@@ -21,23 +21,29 @@ if (config.name !== 'nooklie-preview') {
 if (production) {
   config.name = 'nooklie';
   // Enable a public route only after reviewing the protected production candidate.
-  config.workers_dev = false;
+  config.workers_dev = process.env.NOOKLIE_WORKERS_DEV === '1';
+  config.vars = {
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  };
   config.observability.traces = { enabled: true, head_sampling_rate: 0.01 };
   config.placement = { region: 'aws:us-east-2' };
 }
-const names = [
+const previewKeys = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SECRET_KEY',
-  production || process.env.CHAT_ENCRYPTION_KEY_V2 !== undefined
-    ? 'CHAT_ENCRYPTION_KEY_V2' : 'CHAT_ENCRYPTION_KEY',
+  process.env.CHAT_ENCRYPTION_KEY_V2 === undefined ? 'CHAT_ENCRYPTION_KEY' : 'CHAT_ENCRYPTION_KEY_V2',
 ];
-const chatKeyName = names.at(-1);
-const secrets = Object.fromEntries(names.map(name => [name, process.env[name]]));
-if (!dryRun && (secrets.NEXT_PUBLIC_SUPABASE_URL !== supabaseUrl ||
-    !secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.startsWith('sb_publishable_') ||
-    !secrets.SUPABASE_SECRET_KEY?.startsWith('sb_secret_') ||
-    !/^[a-f0-9]{64}$/i.test(secrets[chatKeyName] ?? ''))) {
+const previewSecrets = Object.fromEntries(previewKeys.map(name => [name, process.env[name]]));
+const validPublicConfig = process.env.NEXT_PUBLIC_SUPABASE_URL === supabaseUrl &&
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.startsWith('sb_publishable_');
+const validTargetConfig = production
+  ? process.env.NEXT_PUBLIC_SITE_URL === 'https://nooklie.nooklie-the-app.workers.dev'
+  : previewSecrets.SUPABASE_SECRET_KEY?.startsWith('sb_secret_') &&
+    /^[a-f0-9]{64}$/i.test(previewSecrets[previewKeys.at(-1)] ?? '');
+if (!dryRun && (!validPublicConfig || !validTargetConfig)) {
   throw new Error('The Nooklie Worker configuration is incomplete or targets the wrong database.');
 }
 
@@ -48,11 +54,12 @@ try {
     cpSync(join(output, part), join(directory, part), { recursive: true });
   }
   writeFileSync(join(directory, 'wrangler.json'), JSON.stringify(config));
-  if (!dryRun) {
-    writeFileSync(join(directory, 'worker-secrets.json'), JSON.stringify(secrets), { mode: 0o600 });
+  // The production credentials already live in Worker settings and stay there.
+  if (!dryRun && !production) {
+    writeFileSync(join(directory, 'worker-secrets.json'), JSON.stringify(previewSecrets), { mode: 0o600 });
   }
   const wranglerArgs = ['--yes', '--package=wrangler@4.158.0', 'wrangler', 'deploy',
-    '--config', 'wrangler.json', ...(dryRun ? [] : ['--secrets-file', 'worker-secrets.json']),
+    '--config', 'wrangler.json', ...(dryRun || production ? [] : ['--secrets-file', 'worker-secrets.json']),
     '--no-autoconfig', '--keep-vars', ...args];
   const child = spawnSync('npx', wranglerArgs, { cwd: directory, stdio: 'inherit' });
   if (child.error) throw child.error;
