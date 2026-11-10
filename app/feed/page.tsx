@@ -11,6 +11,7 @@ import {contentMediaUrl} from '@/lib/security/content-media';
 import RepostAttribution from '@/components/RepostAttribution';
 import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
+import UpcomingUpdatesCalendar, { type CalendarStatus, type UpcomingUpdate } from '@/components/UpcomingUpdatesCalendar';
 import {
   useCallback,
   useRef,
@@ -958,491 +959,6 @@ function StoryViewer({
         )}
       </div>
     </div>
-  );
-}
-
-/* =========================================================
-   PRÓXIMAS ATUALIZAÇÕES
-========================================================= */
-
-type ApiUpcomingUpdate = {
-  id: string;
-  chapter_id: string;
-  story_id: string;
-  chapter_number: number;
-  chapter_title: string;
-  story_title: string;
-  story_cover_url: string | null;
-  scheduled_for: string;
-  author: {
-    id: string;
-    username: string;
-    display_name: string | null; verified?: boolean; is_official?: boolean;
-    avatar_url: string | null;
-  };
-};
-
-type UpcomingUpdate = ApiUpcomingUpdate & {
-  color: string;
-};
-
-const UPDATE_COLORS = [
-  '#ff78b9',
-  '#b88cff',
-  '#7ddcff',
-  '#ffd36e',
-  '#8ee39a',
-  '#ff9c7d',
-  '#c7a6ff',
-  '#72e0c1',
-];
-
-function getAuthorColor(
-  authorId: string,
-  authorIds: string[]
-) {
-  const index =
-    authorIds.indexOf(authorId);
-
-  if (index === -1) {
-    return UPDATE_COLORS[0];
-  }
-
-  return UPDATE_COLORS[
-    index % UPDATE_COLORS.length
-  ];
-}
-
-function getCalendarDays(
-  year: number,
-  month: number
-) {
-  const firstDay = new Date(
-    year,
-    month,
-    1
-  ).getDay();
-
-  const daysInMonth = new Date(
-    year,
-    month + 1,
-    0
-  ).getDate();
-
-  const days: (number | null)[] =
-    [];
-
-  for (
-    let i = 0;
-    i < firstDay;
-    i++
-  ) {
-    days.push(null);
-  }
-
-  for (
-    let day = 1;
-    day <= daysInMonth;
-    day++
-  ) {
-    days.push(day);
-  }
-
-  return days;
-}
-
-function formatScheduledTime(
-  date: string
-) {
-  return new Date(
-    date
-  ).toLocaleTimeString(
-    'pt-BR',
-    {
-      hour: '2-digit',
-      minute: '2-digit',
-    }
-  );
-}
-
-function UpcomingUpdatesContent({
-  updates,
-  onClose,
-  mobile = false,
-}: {
-  updates: UpcomingUpdate[];
-  onClose?: () => void;
-  mobile?: boolean;
-}) {
-  const now = new Date();
-
-  const [
-    calendarDate,
-    setCalendarDate,
-  ] = useState(
-    new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    )
-  );
-
-  const year =
-    calendarDate.getFullYear();
-
-  const month =
-    calendarDate.getMonth();
-
-  const monthName =
-    calendarDate.toLocaleDateString(
-      'pt-BR',
-      {
-        month: 'long',
-      }
-    );
-
-  const calendarDays = useMemo(
-    () =>
-      getCalendarDays(
-        year,
-        month
-      ),
-    [year, month]
-  );
-
-  const updatesForMonth =
-    useMemo(() => {
-      return updates
-        .filter((update) => {
-          const date = new Date(
-            update.scheduled_for
-          );
-
-          return (
-            date.getFullYear() ===
-              year &&
-            date.getMonth() === month
-          );
-        })
-        .sort(
-          (a, b) =>
-            new Date(
-              a.scheduled_for
-            ).getTime() -
-            new Date(
-              b.scheduled_for
-            ).getTime()
-        );
-    }, [
-      updates,
-      year,
-      month,
-    ]);
-
-  function getUpdatesForDay(
-    day: number
-  ) {
-    return updatesForMonth.filter(
-      (update) =>
-        new Date(
-          update.scheduled_for
-        ).getDate() === day
-    );
-  }
-
-  return (
-    <div
-      className={
-        mobile
-          ? 'flex h-full min-h-0 flex-col'
-          : ''
-      }
-    >
-      <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <CloudIcon className="h-5 w-5 text-[#ff78b9]" />
-
-              <h2 className="text-sm font-black uppercase tracking-[0.12em] text-white">
-                Próximas ATTs
-              </h2>
-            </div>
-
-            <p className="mt-1.5 text-[11px] leading-4 text-white/35">
-              Acompanhe as próximas atualizações.
-            </p>
-          </div>
-
-          {mobile &&
-            onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.05] hover:text-white"
-                aria-label="Fechar calendário"
-              >
-                <CloseIcon />
-              </button>
-            )}
-        </div>
-      </div>
-
-      <div className="px-4 py-4">
-        <div className="mb-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() =>
-              setCalendarDate(
-                new Date(
-                  year,
-                  month - 1,
-                  1
-                )
-              )
-            }
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-          >
-            <ChevronLeftIcon />
-          </button>
-
-          <p className="text-xs font-black capitalize text-white">
-            {monthName}{' '}
-            <span className="text-white/35">
-              {year}
-            </span>
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              setCalendarDate(
-                new Date(
-                  year,
-                  month + 1,
-                  1
-                )
-              )
-            }
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/[0.05] hover:text-[#ff78b9]"
-          >
-            <ChevronRightIcon />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {[
-            'D',
-            'S',
-            'T',
-            'Q',
-            'Q',
-            'S',
-            'S',
-          ].map(
-            (
-              day,
-              index
-            ) => (
-              <div
-                key={`${day}-${index}`}
-                className="flex h-7 items-center justify-center text-[9px] font-bold text-white/20"
-              >
-                {day}
-              </div>
-            )
-          )}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map(
-            (
-              day,
-              index
-            ) => {
-              if (
-                day === null
-              ) {
-                return (
-                  <div
-                    key={`empty-${index}`}
-                    className="h-10"
-                  />
-                );
-              }
-
-              const dayUpdates =
-                getUpdatesForDay(
-                  day
-                );
-
-              const today =
-                new Date();
-
-              const isToday =
-                today.getFullYear() ===
-                  year &&
-                today.getMonth() ===
-                  month &&
-                today.getDate() ===
-                  day;
-
-              return (
-                <div
-                  key={`${year}-${month}-${day}`}
-                  className={`relative flex h-10 items-center justify-center rounded-xl text-[10px] ${
-                    isToday
-                      ? 'bg-[#ff78b9]/[0.09] font-black text-[#ff78b9]'
-                      : 'text-white/45'
-                  }`}
-                >
-                  {day}
-
-                  {dayUpdates.length >
-                    0 && (
-                    <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-[2px]">
-                      {dayUpdates
-                        .slice(
-                          0,
-                          3
-                        )
-                        .map(
-                          (update) => (
-                            <span
-                              key={
-                                update.id
-                              }
-                              style={{
-                                color:
-                                  update.color,
-                              }}
-                            >
-                              <CloudIcon className="h-[7px] w-[9px]" />
-                            </span>
-                          )
-                        )}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-          )}
-        </div>
-      </div>
-
-      <div
-        className={`border-t border-white/[0.06] px-4 py-4 ${
-          mobile
-            ? 'min-h-0 flex-1 overflow-y-auto'
-            : ''
-        }`}
-      >
-        <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/20">
-          Próximas atualizações
-        </p>
-
-        <div className="space-y-3">
-          {updatesForMonth.length >
-          0 ? (
-            updatesForMonth
-              .slice(0, 8)
-              .map((update) => {
-                const date =
-                  new Date(
-                    update.scheduled_for
-                  );
-
-                return (
-                  <Link
-                    key={update.id}
-                    href={`/historia/${update.story_id}`}
-                    onClick={onClose}
-                    className="group flex items-start gap-2.5 rounded-xl p-1.5 transition hover:bg-white/[0.035]"
-                  >
-                    <div
-                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.035]"
-                      style={{
-                        color:
-                          update.color,
-                      }}
-                    >
-                      <CloudIcon className="h-4 w-4" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-[11px] font-bold text-white group-hover:text-[#ff78b9]">
-                          @{update.author.username}<AccountBadge account={update.author} />
-                        </p>
-
-                        <span
-                          className="shrink-0 text-[9px] font-bold"
-                          style={{
-                            color:
-                              update.color,
-                          }}
-                        >
-                          {date.getDate()}{' '}
-                          {date.toLocaleDateString(
-                            'pt-BR',
-                            {
-                              month:
-                                'short',
-                            }
-                          )}
-                        </span>
-                      </div>
-
-                      <p className="mt-0.5 truncate text-[10px] text-white/45">
-                        {update.story_title}
-                        {' · '}
-                        Cap.{' '}
-                        {
-                          update.chapter_number
-                        }
-                      </p>
-
-                      <p className="mt-0.5 text-[9px] text-white/25">
-                        {
-                          update.chapter_title
-                        }{' '}
-                        ·{' '}
-                        {formatScheduledTime(
-                          update.scheduled_for
-                        )}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })
-          ) : (
-            <div className="py-5 text-center">
-              <CloudIcon className="mx-auto h-9 w-9 text-white/15" />
-
-              <p className="mt-3 text-[10px] text-white/25">
-                Nenhuma atualização programada para este mês.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UpcomingUpdatesCard({
-  updates,
-}: {
-  updates: UpcomingUpdate[];
-}) {
-  return (
-    <aside className="hidden w-[270px] shrink-0 xl:block">
-      <div className="sticky top-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <UpcomingUpdatesContent
-          updates={updates}
-        />
-      </div>
-    </aside>
   );
 }
 
@@ -2771,10 +2287,14 @@ function MobileDrawer({
 function MobileCalendarModal({
   open,
   updates,
+  status,
+  onRetry,
   onClose,
 }: {
   open: boolean;
   updates: UpcomingUpdate[];
+  status: CalendarStatus;
+  onRetry: () => void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -2788,14 +2308,12 @@ function MobileCalendarModal({
       ref={dialog}
       id="feed-updates-calendar"
       aria-label="Calendário de atualizações"
-      className="m-auto w-[calc(100%_-_1.5rem)] max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[#100c11] p-0 text-white backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+      className="m-auto max-h-[90dvh] w-[calc(100%_-_1.5rem)] max-w-[520px] overflow-y-auto overscroll-contain rounded-[26px] border border-pink-200/20 bg-[#17101b] p-0 text-white backdrop:bg-black/70"
       onCancel={onClose}
       onClose={onClose}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
-      <div className="flex h-[90dvh] max-h-[850px] flex-col overflow-hidden">
-        <UpcomingUpdatesContent updates={updates} onClose={onClose} mobile />
-      </div>
+      {open && <UpcomingUpdatesCalendar updates={updates} status={status} onRetry={onRetry} onClose={onClose} />}
     </dialog>
   );
 }
@@ -3198,6 +2716,8 @@ export default function FeedPage() {
   ] = useState<
     UpcomingUpdate[]
   >([]);
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
+  const calendarRequest = useRef<AbortController | null>(null);
 
   const [
     drawerOpen,
@@ -3632,64 +3152,30 @@ export default function FeedPage() {
      PRÓXIMAS ATUALIZAÇÕES
   ======================================================= */
 
-  const loadUpcomingUpdates =
-    useCallback(async () => {
-      try {
-        const response =
-          await fetch(
-            '/api/upcoming-updates',
-            {
-              cache: 'no-store',
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              'Não foi possível carregar as próximas atualizações.'
-          );
-        }
-
-        const rawUpdates: ApiUpcomingUpdate[] =
-          data.updates || [];
-
-        const authorIds =
-          Array.from(
-            new Set(
-              rawUpdates.map(
-                (update) =>
-                  update.author.id
-              )
-            )
-          );
-
-        const coloredUpdates =
-          rawUpdates.map(
-            (update) => ({
-              ...update,
-              color:
-                getAuthorColor(
-                  update.author.id,
-                  authorIds
-                ),
-            })
-          );
-
-        setUpcomingUpdates(
-          coloredUpdates
-        );
-      } catch (error) {
-        console.error(
-          'Erro ao carregar próximas atualizações:',
-          error
-        );
-
+  const loadUpcomingUpdates = useCallback(async () => {
+    calendarRequest.current?.abort();
+    const request = new AbortController();
+    calendarRequest.current = request;
+    setCalendarStatus('loading');
+    try {
+      const response = await fetch('/api/upcoming-updates', { cache: 'no-store', signal: request.signal });
+      if (request.signal.aborted) return;
+      if (response.status === 401) {
         setUpcomingUpdates([]);
+        setCalendarStatus('signed-out');
+        return;
       }
-    }, []);
+      if (!response.ok) throw Error('Falha ao carregar o calendário.');
+      const data = await response.json();
+      if (request.signal.aborted) return;
+      setUpcomingUpdates(Array.isArray(data.updates) ? data.updates : []);
+      setCalendarStatus('ready');
+    } catch {
+      if (request.signal.aborted) return;
+      setUpcomingUpdates([]);
+      setCalendarStatus('error');
+    }
+  }, []);
 
   /* =======================================================
      CARREGAMENTO INICIAL
@@ -3699,6 +3185,7 @@ export default function FeedPage() {
     loadCurrentUser();
     loadStories();
     loadUpcomingUpdates();
+    return () => calendarRequest.current?.abort();
   }, [loadCurrentUser, loadStories, loadUpcomingUpdates]);
 
   useEffect(() => {
@@ -3782,6 +3269,8 @@ export default function FeedPage() {
       <MobileCalendarModal
         open={calendarOpen}
         updates={upcomingUpdates}
+        status={calendarStatus}
+        onRetry={loadUpcomingUpdates}
         onClose={() =>
           setCalendarOpen(false)
         }
@@ -4080,11 +3569,9 @@ export default function FeedPage() {
 
                 {/* CALENDÁRIO */}
 
-                <UpcomingUpdatesCard
-                  updates={
-                    upcomingUpdates
-                  }
-                />
+                <aside className="max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[26px] border border-pink-200/15 bg-[#17101b]">
+                  <UpcomingUpdatesCalendar updates={upcomingUpdates} status={calendarStatus} onRetry={loadUpcomingUpdates} />
+                </aside>
               </div>
             </div>
           </div>
