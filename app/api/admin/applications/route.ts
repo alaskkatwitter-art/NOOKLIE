@@ -20,7 +20,7 @@ function dbError(error: { code?: string; message?: string }, label: string) {
   return NextResponse.json({ error: 'Não foi possível concluir a análise.' }, { status: 500, headers: noStore });
 }
 
-export async function GET(request?: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const staff = await getStaffContext();
     if (!staff) return staffPermissionErrorResponse(401);
@@ -39,7 +39,7 @@ export async function GET(request?: NextRequest) {
       if (!departmentIds.length) return NextResponse.json({ applications: [] }, { headers: noStore });
       opportunityQuery = opportunityQuery.in('department_id', departmentIds);
     }
-    const opportunityId = request?.nextUrl?.searchParams.get('opportunity_id');
+    const opportunityId = request.nextUrl.searchParams.get('opportunity_id');
     if (opportunityId) {
       if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(opportunityId)) {
         return NextResponse.json({ error: 'Vaga inválida.' }, { status: 400, headers: noStore });

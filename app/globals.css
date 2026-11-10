@@ -569,13 +569,64 @@ select {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.feed-post {
-  border-bottom: 1px solid var(--line);
-  background: #161019;
-  overflow: hidden;
+.feed-page {
+  background: radial-gradient(ellipse at top, #261424 0, #110c15 36rem);
 }
-.feed-post > div:first-child {
-  padding: 20px;
+.feed-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: clamp(16px, 4vw, 32px);
+  border: 1px solid #ffc7e32b;
+  border-radius: 26px;
+  background: linear-gradient(115deg, #49273e, #251829 75%);
+}
+.feed-post-list {
+  display: grid;
+  gap: 18px;
+}
+.feed-post {
+  min-width: 0;
+  border: 1px solid #ffc7e324;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #211625, #18111c 65%);
+}
+.feed-post-content {
+  min-width: 0;
+  padding: clamp(14px, 3vw, 24px);
+  overflow-wrap: anywhere;
+}
+.feed-post-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 20px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.feed-post-actions > button {
+  min-width: 0;
+  padding-inline: 6px;
+  color: #cbb6c8;
+  transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+.feed-post-actions > button:hover,
+.feed-post-actions > button[aria-pressed="true"] {
+  color: var(--rose-soft);
+  background: #f99ac613;
+}
+.feed-post-actions > button:active:not(:disabled) {
+  transform: scale(.96);
+}
+.feed-page :is(a, button, summary, input):focus-visible {
+  outline: 2px solid var(--rose-soft);
+  outline-offset: 2px;
+}
+.feed-reply + .feed-reply,
+.feed-reply .feed-reply {
+  margin-top: 10px;
 }
 .feed-compose {
   display: flex;
@@ -602,9 +653,6 @@ select {
   height: 36px;
   font-size: 22px;
   flex-shrink: 0;
-}
-[data-social-page="feed"] > div.relative {
-  padding-top: 20px !important;
 }
 [data-social-page="feed"] .feed-post img {
   max-height: 360px;
@@ -792,32 +840,17 @@ select {
   body {
     padding-bottom: 94px;
   }
-  .feed-post > div:first-child {
-    padding: 16px 12px;
-  }
   .feed-post {
-    border-radius: 0;
+    border-radius: 18px;
   }
   .feed-post p {
     line-height: 1.65;
-  }
-  [data-social-page="feed"] > div.relative {
-    padding-inline: 12px !important;
   }
   [data-social-page="feed"] .feed-post img {
     max-height: 280px;
   }
   [data-social-page="feed"] #stories {
     margin-bottom: 18px;
-  }
-  [data-social-page="feed"] .space-y-5:has(> .feed-post) {
-    margin-inline: -12px;
-    width: calc(100% + 24px);
-    --tw-space-y-reverse: 0;
-    gap: 0;
-  }
-  [data-social-page="feed"] .space-y-5 > .feed-post {
-    margin-block: 0;
   }
   [data-social-page="profile"] > div {
     padding-inline: 12px;
@@ -835,6 +868,22 @@ select {
   .nook-card {
     padding: 18px;
     border-radius: 18px;
+  }
+}
+@media (min-width: 1440px) {
+  body:has(.feed-page) .site-navigation {
+    top: 104px;
+    bottom: auto;
+    left: 24px;
+    width: 156px;
+    flex-direction: column;
+    transform: none;
+    border-radius: 22px;
+  }
+  body:has(.feed-page) .site-navigation a {
+    justify-content: flex-start;
+    padding-inline: 12px;
+    border-radius: 14px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
