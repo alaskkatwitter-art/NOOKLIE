@@ -13,9 +13,10 @@ type Props = {
   onChange: (value: ProfileThemeCollection) => void;
   cover: string | null;
   username: string;
+  expanded?: boolean;
 };
 
-export default function ProfileThemeEditor({ collection, onChange, cover, username }: Props) {
+export default function ProfileThemeEditor({ collection, onChange, cover, username, expanded = false }: Props) {
   const [draft, setDraft] = useState(collection.active ?? profileThemePresets[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -65,7 +66,7 @@ export default function ProfileThemeEditor({ collection, onChange, cover, userna
   }
 
   return (
-    <details className="rounded-2xl border border-white/10 bg-[#100b12] p-4">
+    <details open={expanded || undefined} className="profile-theme-editor rounded-2xl border border-white/10 bg-[#100b12] p-4">
       <summary className="min-h-8 cursor-pointer font-bold">Aparência do perfil · Meus temas</summary>
       <p className="mt-2 text-sm text-white/75">{collection.active ? `Tema publicado: ${collection.active.name}` : 'Seu perfil está usando o tema padrão.'}</p>
       <fieldset disabled={saving} className="mt-4 space-y-4">
@@ -92,6 +93,7 @@ export default function ProfileThemeEditor({ collection, onChange, cover, userna
             </select>
           </label>
         )}
+        <details className="profile-theme-advanced"><summary>Personalizar cores e fonte</summary>
         <label className="block text-sm font-semibold">Nome do tema
           <input value={draft.name} maxLength={48} onChange={event => setDraft({ ...draft, name: event.target.value })} className="nook-input mt-2 w-full" />
         </label>
@@ -110,6 +112,11 @@ export default function ProfileThemeEditor({ collection, onChange, cover, userna
             {Object.entries(themeFonts).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
+          <button type="button" disabled={!draft.name.trim() || !readable} onClick={() => void persist('save')} className="nook-choice">Salvar rascunho</button>
+          {collection.drafts.some(theme => themeNameKey(theme.name) === themeNameKey(draft.name)) && (
+            <button type="button" onClick={() => void persist('delete')} className="nook-choice">Excluir rascunho</button>
+          )}
+        </details>
         <div aria-label="Prévia do tema" data-profile-theme="" className="profile-theme-preview overflow-hidden rounded-2xl border"
           style={profileThemeVariables(draft) as CSSProperties}>
           <ProfileBanner cover={cover} />
@@ -123,12 +130,8 @@ export default function ProfileThemeEditor({ collection, onChange, cover, userna
         {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}
         {notice && <p role="status" className="text-sm text-emerald-200">{notice}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!draft.name.trim() || !readable} onClick={() => void persist('save')} className="nook-choice">Salvar rascunho</button>
           <button type="button" disabled={!draft.name.trim() || !readable} onClick={() => void persist('publish')} className="nook-primary">Publicar no perfil</button>
           {collection.active && <button type="button" onClick={() => void persist('reset')} className="nook-choice">Usar tema padrão</button>}
-          {collection.drafts.some(theme => themeNameKey(theme.name) === themeNameKey(draft.name)) && (
-            <button type="button" onClick={() => void persist('delete')} className="nook-choice">Excluir rascunho</button>
-          )}
         </div>
       </fieldset>
     </details>

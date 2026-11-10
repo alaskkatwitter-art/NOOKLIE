@@ -1,5 +1,6 @@
 "use client";
 
+import UiThemeControl from '@/components/UiThemeControl';
 import AccountBadge from '@/components/AccountBadge';
 import { contentMediaUrl } from "@/lib/security/content-media";
 import Link from "next/link";
@@ -185,7 +186,7 @@ export default function SiteNavigation() {
   }
   return (
     <>
-      <header className="site-shell" data-visual-shell={pathname === '/feed' || pathname.startsWith('/chat') || pathname.startsWith('/perfil/') ? 'neon' : undefined}>
+      <header className="site-shell" data-visual-shell={pathname === '/feed' || pathname.startsWith('/chat') || (pathname.startsWith('/perfil/') || pathname.startsWith('/configuracoes/perfil')) ? 'neon' : undefined}>
         <div className="site-shell-inner">
           <div className="flex items-center gap-1 sm:gap-3">
             <button
@@ -357,6 +358,7 @@ export default function SiteNavigation() {
             </Link>
           )}
         </nav>
+        <UiThemeControl/>
         <nav
           aria-label="Sua conta e ajuda"
           className="drawer-links drawer-bottom"
