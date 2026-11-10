@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import {
+  isProfileAvatarPosition, isProfileHeaderLayout,
+  type ProfileAvatarPosition, type ProfileHeaderLayout,
+} from '@/lib/profile/appearance';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,6 +76,8 @@ export async function PATCH(request: Request) {
       display_name?: string | null;
       bio?: string | null;
       theme_color?: string;
+      header_layout?: ProfileHeaderLayout;
+      avatar_position?: ProfileAvatarPosition;
     } = {};
 
     if (Object.prototype.hasOwnProperty.call(body, 'display_name')) {
@@ -140,6 +146,20 @@ export async function PATCH(request: Request) {
       updates.theme_color = body.theme_color.toLowerCase();
     }
 
+    if (Object.hasOwn(body, 'header_layout')) {
+      if (!isProfileHeaderLayout(body.header_layout)) {
+        return NextResponse.json({ error: 'Estilo de cabeçalho inválido.' }, { status: 400 });
+      }
+      updates.header_layout = body.header_layout;
+    }
+
+    if (Object.hasOwn(body, 'avatar_position')) {
+      if (!isProfileAvatarPosition(body.avatar_position)) {
+        return NextResponse.json({ error: 'Posição do avatar inválida.' }, { status: 400 });
+      }
+      updates.avatar_position = body.avatar_position;
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         { error: 'Nenhuma alteração válida foi informada.' },
@@ -153,7 +173,7 @@ export async function PATCH(request: Request) {
         .update(updates)
         .eq('user_id', session.user_id)
         .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official'
+          'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official, header_layout, avatar_position'
         )
         .single();
 
