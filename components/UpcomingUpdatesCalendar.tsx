@@ -2,7 +2,7 @@
 
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import AccountBadge from '@/components/AccountBadge';
 import { contentMediaUrl } from '@/lib/security/content-media';
 
@@ -50,20 +50,17 @@ export default function UpcomingUpdatesCalendar({ updates, status, onRetry, onCl
   const days = new Date(year, monthIndex + 1, 0).getDate();
   const todayInMonth = today.getFullYear() === year && today.getMonth() === monthIndex;
   const focusDay = selectedDay ?? (todayInMonth ? today.getDate() : 1);
-  const { monthly, byDay } = useMemo(() => {
-    const monthly = updates
-      .map(update => ({ update, date: new Date(update.scheduled_for) }))
-      .filter(({ date }) => date.getFullYear() === year && date.getMonth() === monthIndex)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-    const byDay = new Map<number, typeof monthly>();
-    for (const entry of monthly) {
-      const day = entry.date.getDate();
-      const group = byDay.get(day) ?? [];
-      group.push(entry);
-      byDay.set(day, group);
-    }
-    return { monthly, byDay };
-  }, [updates, year, monthIndex]);
+  const monthly = updates
+    .map(update => ({ update, date: new Date(update.scheduled_for) }))
+    .filter(({ date }) => date.getFullYear() === year && date.getMonth() === monthIndex)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const byDay = new Map<number, typeof monthly>();
+  for (const entry of monthly) {
+    const day = entry.date.getDate();
+    const group = byDay.get(day) ?? [];
+    group.push(entry);
+    byDay.set(day, group);
+  }
   const visible = selectedDay === null ? monthly : byDay.get(selectedDay) ?? [];
 
   function moveMonth(offset: number) {
