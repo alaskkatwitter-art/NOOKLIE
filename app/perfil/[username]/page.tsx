@@ -4,6 +4,7 @@ import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import ProfileBanner from '@/components/ProfileBanner';
+import { useCoverPalette } from '@/lib/profile/use-cover-palette';
 import { parseProfileTheme, profileThemeVariables, type ProfileTheme } from '@/lib/profile/themes';
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
@@ -375,6 +376,7 @@ export default function PublicProfilePage() {
     useState<User | null>(
       null
     );
+  const coverColors = useCoverPalette(user?.cover_url);
   const [theme, setTheme] = useState<ProfileTheme | null>(null);
 
   const [storyFilter, setStoryFilter] = useState<'' | 'original' | 'fanfic'>('');
@@ -807,7 +809,7 @@ export default function PublicProfilePage() {
 
   return (
     <main data-social-page="profile" data-profile-theme={theme ? '' : undefined}
-      style={{ ...(theme ? profileThemeVariables(theme) : {}), ...(user.cover_url ? { '--profile-cover': `url(${JSON.stringify(contentMediaUrl(user.cover_url))})` } : {}) } as CSSProperties}
+      style={{ ...(theme ? profileThemeVariables(theme) : {}), ...coverColors } as CSSProperties}
       className="profile-reference min-h-screen text-white">
       <div className="profile-reference-inner mx-auto w-full max-w-5xl">
 
