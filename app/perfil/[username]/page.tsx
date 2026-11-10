@@ -4,6 +4,7 @@ import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
 import ProfileBanner from '@/components/ProfileBanner';
+import { parseProfileTheme, profileThemeVariables, type ProfileTheme } from '@/lib/profile/themes';
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -15,6 +16,7 @@ import LinkedStoryCard from '@/components/LinkedStoryCard';
 
 
 import {
+  type CSSProperties,
   useEffect,
   useRef,
   useState,
@@ -111,6 +113,7 @@ type FicClub = {
 type ProfileResponse = {
  restricted?:boolean;
   user?: User;
+  theme?: ProfileTheme | null;
   stories?: Story[];
   posts?: NookPost[];
   reading_lists?: ReadingList[];
@@ -243,7 +246,7 @@ function StoryCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group w-full overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/30 hover:bg-[#181218]"
+      className="profile-themed-surface group w-full overflow-hidden rounded-3xl border border-white/10 bg-[#151015] text-left transition hover:border-[#ff78b9]/30 hover:bg-[#181218]"
     >
       <div className="flex gap-4 p-4 sm:p-5">
         <div className="relative h-36 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#211a21] sm:h-44 sm:w-28">
@@ -263,22 +266,22 @@ function StoryCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-black text-white sm:text-lg">
+          <h3 className="profile-themed-text text-base font-black text-white sm:text-lg">
             {story.title}
           </h3>
 
           {story.description && (
-            <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/45">
+            <p className="profile-themed-text mt-2 line-clamp-3 text-sm leading-6 text-white/45">
               {
                 story.description
               }
             </p>
           )}
 
-          <div className="mt-4 space-y-2 text-xs text-white/40">
+          <div className="profile-themed-text mt-4 space-y-2 text-xs text-white/40">
             {fandom && (
               <p>
-                <span className="font-bold text-white/60">
+                <span className="profile-themed-text font-bold text-white/60">
                   Fandom:
                 </span>{' '}
                 {fandom}
@@ -287,7 +290,7 @@ function StoryCard({
 
             {story.rating && (
               <p>
-                <span className="font-bold text-white/60">
+                <span className="profile-themed-text font-bold text-white/60">
                   Classificação:
                 </span>{' '}
                 {story.rating}
@@ -295,7 +298,7 @@ function StoryCard({
             )}
 
             <p>
-              <span className="font-bold text-white/60">
+              <span className="profile-themed-text font-bold text-white/60">
                 Atualizada:
               </span>{' '}
               {formatDate(
@@ -334,7 +337,7 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
+    <div className="profile-themed-surface rounded-3xl border border-white/10 bg-[#151015] px-6 py-14 text-center">
       <div className="text-4xl">
         {icon}
       </div>
@@ -376,6 +379,7 @@ export default function PublicProfilePage() {
     useState<User | null>(
       null
     );
+  const [theme, setTheme] = useState<ProfileTheme | null>(null);
 
   const [storyFilter, setStoryFilter] = useState<'' | 'original' | 'fanfic'>('');
   const [pinBusy, setPinBusy] = useState(false);
@@ -495,6 +499,7 @@ export default function PublicProfilePage() {
         }
 
         setUser(data.user);setRestricted(Boolean(data.restricted));
+        setTheme(data.restricted ? null : parseProfileTheme(data.theme));
 
         setStories(
           Array.isArray(
@@ -805,13 +810,15 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <main data-social-page="profile" className="min-h-screen bg-[#0d0a0d] text-white">
+    <main data-social-page="profile" data-profile-theme={theme ? '' : undefined}
+      style={theme ? profileThemeVariables(theme) as CSSProperties : undefined}
+      className="min-h-screen bg-[#0d0a0d] text-white">
       <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-8">
 
         {/* PERFIL */}
 
         <section
-          className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl"
+          className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl"
           data-profile-layout={user.header_layout ?? 'classic'}
           data-avatar-position={user.avatar_position ?? 'left'}
         >
@@ -853,7 +860,7 @@ export default function PublicProfilePage() {
                   className={`rounded-full px-5 py-2.5 text-sm font-black transition disabled:opacity-50 ${
                     isFollowing
                       ? 'border border-white/15 bg-white/5 text-white hover:bg-white/10'
-                      : 'bg-gradient-to-r from-[#ffd0e6] to-[#e999c2] text-[#321a2a] hover:brightness-110'
+                      : 'profile-themed-action bg-gradient-to-r from-[#ffd0e6] to-[#e999c2] text-[#321a2a] hover:brightness-110'
                   }`}
                 >
                   {followLoading
@@ -897,7 +904,7 @@ export default function PublicProfilePage() {
                 )}
               </div>
 
-              <p className="mt-1 text-sm font-semibold text-white/40">
+              <p className="profile-themed-text mt-1 text-sm font-semibold text-white/40">
                 @{user.username}
               </p>
               {user.staff_badges?.map((badge, index) => (
@@ -911,11 +918,11 @@ export default function PublicProfilePage() {
               {!restricted && <ProfileStats profileId={user.id} stories={stories.length} counts={{followers_count:followersCount,following_count:followingCount}}/>}
 
               {user.bio ? (
-                <p className="mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
+                <p className="profile-themed-text mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
                   {user.bio}
                 </p>
               ) : (
-                <p className="mt-5 text-sm italic text-white/30">
+                <p className="profile-themed-text mt-5 text-sm italic text-white/30">
                   Este usuário ainda não adicionou uma bio.
                 </p>
               )}
@@ -927,7 +934,7 @@ export default function PublicProfilePage() {
         {!restricted && <>
         {/* ABAS */}
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
+        <div className="profile-themed-surface mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
           <div className="grid grid-cols-4 gap-1">
             {TAB_ORDER.map(
               (tab) => {
@@ -956,8 +963,8 @@ export default function PublicProfilePage() {
                     className={`rounded-xl px-2 py-3 text-[10px] font-black uppercase tracking-wide transition sm:px-4 sm:text-xs ${
                       activeTab ===
                       tab
-                        ? 'bg-white text-black'
-                        : 'text-white/45 hover:bg-white/5 hover:text-white'
+                        ? 'profile-themed-action bg-white text-black'
+                        : 'profile-themed-text text-white/45 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     {labels[tab]}
@@ -1050,7 +1057,7 @@ export default function PublicProfilePage() {
                         key={
                           post.id
                         }
-                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                        className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
                       >
                         <div className="p-5 sm:p-6">
                           <div className="flex items-center gap-3">
@@ -1075,13 +1082,13 @@ export default function PublicProfilePage() {
                             )}
 
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-black text-white">
+                              <p className="profile-themed-text truncate text-sm font-black text-white">
                                 {getDisplayName(
                                   user
                                 )}<AccountBadge account={user} />
                               </p>
 
-                              <p className="text-xs text-white/35">
+                              <p className="profile-themed-text text-xs text-white/35">
                                 @
                                 {
                                   user.username
@@ -1104,7 +1111,7 @@ export default function PublicProfilePage() {
                           </div>
 
                           {post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>{post.body && (
-                            <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
+                            <p className="profile-themed-text mt-5 whitespace-pre-wrap text-sm leading-7 text-white/75">
                               <PostMentions text={post.body} />
                             </p>
                           )}
@@ -1187,7 +1194,7 @@ export default function PublicProfilePage() {
                         key={
                           list.id
                         }
-                        className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                        className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
                       >
                         <div className="border-b border-white/10 p-5">
                           <div className="flex items-start justify-between gap-4">
@@ -1199,7 +1206,7 @@ export default function PublicProfilePage() {
                               </h2>
 
                               {list.description && (
-                                <p className="mt-2 text-sm leading-6 text-white/45">
+                                <p className="profile-themed-text mt-2 text-sm leading-6 text-white/45">
                                   {
                                     list.description
                                   }
@@ -1216,7 +1223,7 @@ export default function PublicProfilePage() {
                         <div className="divide-y divide-white/[0.06]">
                           {list.items.length ===
                           0 ? (
-                            <p className="p-5 text-sm text-white/30">
+                            <p className="profile-themed-text p-5 text-sm text-white/30">
                               Esta lista ainda está vazia.
                             </p>
                           ) : (
@@ -1263,7 +1270,7 @@ export default function PublicProfilePage() {
                                     </div>
 
                                     <div className="min-w-0">
-                                      <h3 className="truncate text-sm font-black text-white">
+                                      <h3 className="profile-themed-text truncate text-sm font-black text-white">
                                         {
                                           story.title
                                         }
