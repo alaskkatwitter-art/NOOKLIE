@@ -185,7 +185,7 @@ export default function SiteNavigation() {
   }
   return (
     <>
-      <header className="site-shell">
+      <header className="site-shell" data-visual-shell={pathname === '/feed' || pathname.startsWith('/chat') || pathname.startsWith('/perfil/') ? 'neon' : undefined}>
         <div className="site-shell-inner">
           <div className="flex items-center gap-1 sm:gap-3">
             <button

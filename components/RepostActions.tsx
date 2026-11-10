@@ -2,7 +2,7 @@
 import AccountBadge from '@/components/AccountBadge';
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
-import { CloudUpload, X } from "lucide-react";
+import { Repeat2 as CloudUpload, X } from "lucide-react";
 import { contentMediaUrl } from "@/lib/security/content-media";
 type Person = {
   id: string;

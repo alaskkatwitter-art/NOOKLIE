@@ -74,7 +74,7 @@ export default function ProfileStats({
       <div className="profile-stat-strip" aria-label="Histórias e conexões">
         <div>
           <strong>{stories}</strong>
-          <span>Histórias</span>
+          <span>Obras</span>
         </div>
         <button onClick={() => open("followers")}>
           <strong>{visibleCounts.followers_count}</strong>

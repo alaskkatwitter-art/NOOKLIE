@@ -22,6 +22,11 @@ import {
   ShieldBan,
   Trash2,
   Info,
+  ArrowLeft,
+  ChevronRight,
+  Search,
+  Link as LinkIcon,
+  Pencil,
 } from "lucide-react";
 import { contentMediaUrl } from "@/lib/security/content-media";
 import { chatSafetyNotice, needsSupport } from "@/lib/chat/safety";
@@ -78,6 +83,8 @@ function Avatar({
   );
 }
 export default function ChatClient() {
+  const groupInfo = useRef<HTMLDialogElement>(null);
+  const [groupSearch, setGroupSearch] = useState('');
   const [groupPeople,setGroupPeople]=useState<Person[]>([]);
   const router = useRouter();
   const params = useSearchParams();
@@ -581,7 +588,7 @@ export default function ChatClient() {
                 <Avatar peer={thread.peer} group={groupChat} groupPhoto={thread.avatar_path?`/api/chat/groups/${thread.id}/avatar?v=${encodeURIComponent(thread.avatar_path)}`:undefined} />
                 <div className="min-w-0 flex-1">
                   {groupChat ? (
-                    <h2 className="truncate font-bold text-sm">{peerName}{!groupChat && <AccountBadge account={thread?.peer} />}</h2>
+                    <button type="button" className="chat-info-trigger" aria-label="Informações do grupo" onClick={() => groupInfo.current?.showModal()}><h2>{peerName}</h2><span>Grupo · {members.filter(m => m.status === "accepted").length} participantes · informações</span></button>
                   ) : (
                     <Link
                       className="truncate block font-bold text-sm"
@@ -590,9 +597,7 @@ export default function ChatClient() {
                       {peerName}{!groupChat && <AccountBadge account={thread?.peer} />}
                     </Link>
                   )}
-                  <p className="text-[11px] text-white/45">
-                    {groupChat ? "Grupo · até 15 pessoas" : "Conversa privada"}
-                  </p>
+                  {!groupChat && <p className="text-[11px] text-white/60">Conversa privada</p>}
                 </div>
                 <details className="chat-options">
                   <summary
@@ -640,24 +645,6 @@ export default function ChatClient() {
                   </div>
                 </details>
               </header>
-              {groupChat && thread.initiator_id === me && thread.status === 'accepted' && !thread.blocked && <div key={thread.id}><GroupPhoto threadId={thread.id} hasPhoto={!!thread.avatar_path} onSaved={()=>void refresh()}/><GroupInvites threadId={thread.id} remaining={15-members.length} onInvited={() => void refresh()} /></div>}
-              {groupChat && members.length > 0 && (
-                <details className="chat-members">
-                  <summary>
-                    <Users size={13} />
-                    {members.filter((m) => m.status === "accepted").length}{" "}
-                    participantes · ver pessoas
-                  </summary>
-                  <div>
-                    {members.map((m) => (
-                      <span key={m.profile_id}>
-                        @{m.profile?.username}
-                        {m.status === "pending" ? " · convidado" : ""}
-                      </span>
-                    ))}
-                  </div>
-                </details>
-              )}
               {thread.blocked ? (
                 <p className="p-6 nook-muted">
                   Esta conversa está bloqueada. Mensagens e anexos ficam
@@ -1105,6 +1092,28 @@ export default function ChatClient() {
           )}
         </section>
       </div>
+      <dialog ref={groupInfo} className="nook-dialog chat-group-info" aria-labelledby="group-info-title" onClose={() => setGroupSearch('')}>
+        {groupChat && thread && <>
+          <header className="chat-group-top"><button type="button" className="shell-icon" aria-label="Voltar à conversa" onClick={() => groupInfo.current?.close()}><ArrowLeft size={22}/></button><span>Informações do grupo</span></header>
+          <div className="chat-group-hero">
+            <Avatar group groupPhoto={thread.avatar_path ? `/api/chat/groups/${thread.id}/avatar?v=${encodeURIComponent(thread.avatar_path)}` : undefined}/>
+            <h2 id="group-info-title">{peerName}</h2>
+            <p>Grupo · {members.filter(m => m.status === 'accepted').length} participantes</p>
+          </div>
+          <label className="chat-group-search"><Search size={20}/><input aria-label="Buscar nas mensagens carregadas" placeholder="Buscar nesta conversa" value={groupSearch} onChange={e => setGroupSearch(e.target.value)}/></label>
+          {groupSearch.trim() && <div className="chat-group-results"><p className="nook-muted">Resultados nas mensagens carregadas</p>{messages.filter(m => m.body.toLocaleLowerCase('pt-BR').includes(groupSearch.trim().toLocaleLowerCase('pt-BR'))).map(m => <p key={m.id}>{m.body}</p>)}{!messages.some(m => m.body.toLocaleLowerCase('pt-BR').includes(groupSearch.trim().toLocaleLowerCase('pt-BR'))) && <p>Nenhuma mensagem encontrada.</p>}</div>}
+          <div className="chat-group-sections">
+            <details><summary><ImageIcon size={22}/>Mídias e arquivos<ChevronRight size={20}/></summary><div className="chat-group-media">{messages.filter(m => m.media_url).map(m => <a key={m.id} href={m.media_url!} target="_blank" rel="noreferrer">{m.media_type?.startsWith('image/') ? <img src={m.media_url!} alt="Imagem compartilhada" loading="lazy"/> : 'Áudio compartilhado'}</a>)}{!messages.some(m => m.media_url) && <p>Nenhuma mídia nas mensagens carregadas.</p>}</div><p className="nook-muted">Mídias das mensagens carregadas nesta conversa.</p></details>
+            <details><summary><LinkIcon size={22}/>Links<ChevronRight size={20}/></summary><div className="chat-group-links">{Array.from(new Set(messages.flatMap(m => m.body.match(/https?:\/\/[^\s<>]+/g) || []))).map(url => <a key={url} href={url} target="_blank" rel="noreferrer">{url}</a>)}{!messages.some(m => /https?:\/\//.test(m.body)) && <p>Nenhum link nas mensagens carregadas.</p>}</div></details>
+          </div>
+          <details className="chat-group-people"><summary><Users size={22}/>Participantes ({members.filter(m => m.status === 'accepted').length})<ChevronRight size={20}/></summary><div>{members.map(m => <Link key={m.profile_id} href={'/perfil/' + encodeURIComponent(m.profile?.username || '')} onClick={() => groupInfo.current?.close()}><Avatar peer={m.profile}/><span>{m.profile?.display_name || m.profile?.username}<AccountBadge account={m.profile}/><small>@{m.profile?.username}{m.status === 'pending' ? ' · convidado' : ''}</small></span></Link>)}</div></details>
+          {thread.initiator_id === me && thread.status === 'accepted' && !thread.blocked && <div className="chat-group-manage" key={thread.id}>
+            <GroupInvites threadId={thread.id} remaining={15-members.length} onInvited={() => void refresh()}/>
+            <details><summary><Pencil size={20}/>Foto do grupo<ChevronRight size={20}/></summary><GroupPhoto threadId={thread.id} hasPhoto={!!thread.avatar_path} onSaved={() => void refresh()}/></details>
+          </div>}
+          <button type="button" className="chat-group-leave" disabled={busy} onClick={() => {groupInfo.current?.close(); void action('leave');}}>Sair do grupo</button>
+        </>}
+      </dialog>
       <dialog ref={group} className="nook-dialog">
         <form
           className="space-y-4"
