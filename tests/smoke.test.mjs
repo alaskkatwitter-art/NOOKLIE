@@ -32,6 +32,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
 }));
 const state = { notifications: [], discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 const profileAppearance = { header_layout: 'classic', avatar_position: 'left' };
+let libraryFixture = null;
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -106,6 +107,24 @@ before(async () => {
   supabaseMock = createHttpServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
+
+    if (libraryFixture && request.method === 'GET') {
+      const owner = url.searchParams.get('user_id') === `eq.${userId}`;
+      if (path === 'reading_lists') return respondRows(request, response, owner ? [{ id: 'library', name: 'Biblioteca' }] : []);
+      if (path === 'reading_list_items') return respondRows(request, response, libraryFixture.stories.map(story => ({ list_id: 'library', story_id: story.id })));
+      if (path === 'released_stories') return respondRows(request, response, libraryFixture.stories);
+      if (path === 'profiles') return respondRows(request, response, [{ id: userId, user_id: userId, username: 'owner' }]);
+      if (path === 'auth_accounts') return respondRows(request, response, [{ id: userId, account_status: 'active' }]);
+      if (path === 'chat_blocks') return respondRows(request, response, []);
+      if (path === 'reading_progress') return respondRows(request, response, owner ? libraryFixture.progress : []);
+      if (path === 'stories' && url.searchParams.get('select')?.includes('chapter_favorites')) {
+        return respondRows(request, response, url.searchParams.get('chapters.chapter_favorites.user_id') === `eq.${userId}` ? [{ id: 'earlier' }] : []);
+      }
+      if (path === 'stories') return respondRows(request, response, [
+        { id: 'finished', chapters: [{ id: 'last-chapter' }] },
+        { id: 'earlier', chapters: [{ id: 'a-later-chapter' }] },
+      ]);
+    }
 
     if (path === 'user_notifications') {
       const owner=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
@@ -367,6 +386,35 @@ test('the home page responds successfully and identifies NOOKLIE', async () => {
   const response = await fetch(baseUrl);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /NOOKLIE/);
+});
+
+test('library distinguishes reading the last published chapter from finishing an earlier chapter', async () => {
+  const token = 'library-shelf-session';
+  const ids = ['unread', 'earlier', 'finished'];
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  libraryFixture = {
+    stories: ids.map(id => ({ id, title: id, author_id: userId, status: 'Concluída' })),
+    progress: [
+      { story_id: 'earlier', chapter_id: 'first-chapter', progress_percent: 100, chapters: { title: 'Primeiro', story_id: 'earlier' } },
+      { story_id: 'finished', chapter_id: 'last-chapter', progress_percent: 100, chapters: { title: 'Último', story_id: 'finished' } },
+    ],
+  };
+  try {
+    assert.equal((await fetch(baseUrl + '/api/library')).status, 401);
+    const response = await fetch(baseUrl + '/api/library', { headers: { Cookie: `toriland_session=${token}` } });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control'), /private/);
+    const { items, reading_details_available } = await response.json();
+    assert.equal(reading_details_available, true);
+    assert.deepEqual(items.map(item => [item.story_id, item.chapter_id, item.reading_completed, item.has_favorite_chapter]), [
+      ['unread', null, false, false],
+      ['earlier', 'first-chapter', false, true],
+      ['finished', 'last-chapter', true, false],
+    ]);
+  } finally {
+    libraryFixture = null;
+    state.sessions = state.sessions.filter(session => session.token_hash !== hash(token));
+  }
 });
 
 test('profile appearance only saves supported choices on the authenticated profile', async () => {

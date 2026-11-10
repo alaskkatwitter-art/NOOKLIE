@@ -9,6 +9,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LayoutGrid, LibraryBig } from 'lucide-react';
 
 type CurrentUser = {
   id: string;
@@ -35,11 +36,35 @@ type LibraryItem = {
 
   progress_percent?: number | null;
   position?: number | null;
+  reading_completed?: boolean;
+  has_favorite_chapter?: boolean;
 
   updated_at?: string | null;
 
   lists?: string[];
 };
+
+const libraryFilters = {
+  all: 'Todas',
+  unread: 'Quero ler',
+  reading: 'Lendo',
+  completed: 'Concluídas',
+  favorites: 'Favoritas',
+} as const;
+
+type LibraryFilter = keyof typeof libraryFilters;
+type LibraryView = 'grid' | 'shelf';
+
+function matchesFilter(item: LibraryItem, filter: LibraryFilter) {
+  const started = Boolean(item.chapter_id) || (item.progress_percent ?? 0) > 0;
+  switch (filter) {
+    case 'unread': return !started;
+    case 'reading': return started && !item.reading_completed;
+    case 'completed': return item.reading_completed === true;
+    case 'favorites': return item.has_favorite_chapter === true;
+    default: return true;
+  }
+}
 
 /* =========================================================
    ÍCONES
@@ -188,6 +213,20 @@ export default function BibliotecaPage() {
 
   const [error, setError] =
     useState('');
+  const [view, setView] = useState<LibraryView>('grid');
+  const [filter, setFilter] = useState<LibraryFilter>('all');
+  const [readingDetailsAvailable, setReadingDetailsAvailable] = useState(true);
+  const visibleItems = readingDetailsAvailable ? items.filter(item => matchesFilter(item, filter)) : items;
+
+  function changeView(next: LibraryView) {
+    setView(next);
+    if (!currentUser) return;
+    try {
+      localStorage.setItem(`nooklie:library-view:${currentUser.id}`, next);
+    } catch {
+      // The current view can still be used if browser storage is unavailable.
+    }
+  }
 
   /* =======================================================
      USUÁRIO
@@ -212,6 +251,11 @@ export default function BibliotecaPage() {
           data.user
         ) {
           setCurrentUser(data.user);
+          try {
+            setView(localStorage.getItem(`nooklie:library-view:${data.user.id}`) === 'shelf' ? 'shelf' : 'grid');
+          } catch {
+            setView('grid');
+          }
 
           return data.user as CurrentUser;
         }
@@ -272,6 +316,7 @@ export default function BibliotecaPage() {
             Array.isArray(data?.items)
               ? data.items
               : [];
+          setReadingDetailsAvailable(data.reading_details_available !== false);
 
           setItems(
             incoming.map(
@@ -339,6 +384,8 @@ export default function BibliotecaPage() {
                         item.position
                       )
                     : 0,
+                reading_completed: item.reading_completed === true,
+                has_favorite_chapter: item.has_favorite_chapter === true,
 
                 updated_at:
                   item.updated_at ||
@@ -519,15 +566,28 @@ export default function BibliotecaPage() {
 
         {/* TÍTULO */}
 
-        <div className="mb-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
-            Salvos
-          </p>
-
-          <h2 className="mt-1 text-xl font-black text-white">
-            Sua biblioteca
-          </h2>
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">Salvos</p>
+            <h2 className="mt-1 text-xl font-black text-white">Sua biblioteca</h2>
+          </div>
+          <div className="library-view-options" role="group" aria-label="Visualização da biblioteca">
+            <button type="button" aria-pressed={view === 'grid'} onClick={() => changeView('grid')}><LayoutGrid size={16} aria-hidden="true" /> Grade</button>
+            <button type="button" aria-pressed={view === 'shelf'} onClick={() => changeView('shelf')}><LibraryBig size={16} aria-hidden="true" /> Estante</button>
+          </div>
         </div>
+        {!loading && items.length > 0 && readingDetailsAvailable && (
+          <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrar histórias salvas">
+            {(Object.keys(libraryFilters) as LibraryFilter[]).map(key => (
+              <button type="button" key={key} aria-pressed={filter === key} onClick={() => setFilter(key)} className="library-filter">
+                {libraryFilters[key]}
+              </button>
+            ))}
+          </div>
+        )}
+        {!loading && items.length > 0 && !readingDetailsAvailable && (
+          <p role="status" className="mb-4 text-sm text-white/70">Os filtros de leitura estão temporariamente indisponíveis.</p>
+        )}
 
         {/* LOADING */}
 
@@ -598,13 +658,35 @@ export default function BibliotecaPage() {
 
           </div>
 
+        ) : visibleItems.length === 0 ? (
+          <p role="status" className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/75">
+            {filter === 'favorites' ? 'Nenhuma obra salva tem um capítulo favoritado.' : 'Nenhuma história salva nesta categoria.'}
+          </p>
+        ) : view === 'shelf' ? (
+          <ul className="library-shelves" aria-label="Histórias na estante">
+            {visibleItems.map(item => (
+              <li key={item.story_id} className="min-w-0">
+                <Link href={`/historia/${item.story_id}`} className="library-shelf-book">
+                  <div className="library-shelf-cover">
+                    {item.story_cover_url
+                      ? <img src={contentMediaUrl(item.story_cover_url, 'cover')} alt="" loading="lazy" decoding="async" />
+                      : <span className="grid h-full place-items-center text-pink-200" aria-hidden="true"><BookIcon /></span>}
+                  </div>
+                  <span className="library-shelf-title">{item.story_title}</span>
+                  <span className="library-shelf-detail">
+                    {item.reading_completed ? 'Leitura concluída' : item.chapter_id ? `${Math.round(item.progress_percent ?? 0)}% do capítulo` : item.author_display_name || item.author_username || 'Obra salva'}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         ) : (
 
           /* CARDS */
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
-            {items.map(
+            {visibleItems.map(
               (item) => {
 
                 const progress = Math.max(
@@ -653,6 +735,8 @@ export default function BibliotecaPage() {
                             contentMediaUrl(item.story_cover_url)
                           }
                           alt=""
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
                         />
 
@@ -788,10 +872,12 @@ export default function BibliotecaPage() {
                       {/* BOTÃO */}
 
                       <Link
-                        href={href}
+                        href={item.chapter_id && !item.reading_completed ? `/capitulo/${item.chapter_id}` : href}
                         className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-xs font-bold text-white/55 transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
                       >
-                        {hasProgress
+                        {item.reading_completed
+                          ? 'Ver obra'
+                          : hasProgress
                           ? 'Continuar lendo'
                           : 'Começar a ler'}
 

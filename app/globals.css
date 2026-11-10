@@ -572,6 +572,102 @@ select {
 .feed-page {
   background: radial-gradient(ellipse at top, #261424 0, #110c15 36rem);
 }
+.library-view-options {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #f9bfd72e;
+  border-radius: 15px;
+  background: #1c1420;
+}
+.library-view-options button,
+.library-filter {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  color: #ead4e2;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.library-filter {
+  border: 1px solid #f9bfd72e;
+  background: #201522;
+}
+.library-view-options button[aria-pressed="true"],
+.library-filter[aria-pressed="true"] {
+  border-color: transparent;
+  background: #ffc8e2;
+  color: #361b30;
+}
+.library-view-options button:focus-visible,
+.library-filter:focus-visible,
+.library-shelf-book:focus-visible {
+  outline: 2px solid #ffd3e8;
+  outline-offset: 3px;
+}
+.library-shelves {
+  --cover-height: clamp(7.75rem, 30vw, 10.5rem);
+  --shelf-row-height: calc(var(--cover-height) + 5.5rem);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.25rem), 1fr));
+  grid-auto-rows: var(--shelf-row-height);
+  padding: .75rem .5rem 0;
+  overflow: hidden;
+  border: 1px solid #bc825c55;
+  border-radius: 20px;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--cover-height) + .75rem),
+      #b97b58 calc(var(--cover-height) + .75rem) calc(var(--cover-height) + .95rem),
+      #78452f calc(var(--cover-height) + .95rem) calc(var(--cover-height) + 1.35rem),
+      #11070bb3 calc(var(--cover-height) + 1.35rem) calc(var(--cover-height) + 1.6rem),
+      transparent calc(var(--cover-height) + 1.6rem) var(--shelf-row-height)
+    ),
+    radial-gradient(ellipse at 45% 0, #613c34, #23151c 70%);
+}
+.library-shelf-book {
+  display: grid;
+  justify-items: center;
+  padding: 0 .35rem;
+  text-align: center;
+}
+.library-shelf-cover {
+  width: min(100%, calc(var(--cover-height) * .66));
+  height: var(--cover-height);
+  overflow: hidden;
+  border-radius: 5px 9px 9px 4px;
+  background: linear-gradient(135deg, #623649, #292035);
+  box-shadow: inset 4px 0 #190b1766, 3px 2px 8px #0c0611b3;
+}
+.library-shelf-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.library-shelf-title {
+  display: -webkit-box;
+  margin-top: .85rem;
+  overflow: hidden;
+  color: #fff0f6;
+  font-size: .8125rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.library-shelf-detail {
+  max-width: 100%;
+  overflow: hidden;
+  color: #e2c3d1;
+  font-size: .6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .feed-calendar {
   background: linear-gradient(150deg, #2d1a2b, #18111d 19rem);
 }
