@@ -31,6 +31,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
   name: slug === 'genre' ? 'Gênero' : slug === 'freeform' ? 'Tags livres' : slug,
 }));
 const state = { notifications: [], discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
+const profileAppearance = { header_layout: 'classic', avatar_position: 'left' };
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -231,7 +232,18 @@ before(async () => {
       const profile = { id: userId, username: 'owner', display_name: 'Owner', avatar_url: null };
       if (select.includes('verified')) profile.verified = true;
       if (select.includes('is_official')) profile.is_official = true;
+      if (select.includes('header_layout')) profile.header_layout = profileAppearance.header_layout;
+      if (select.includes('avatar_position')) profile.avatar_position = profileAppearance.avatar_position;
       return sendJson(response, [profile]);
+    }
+    if (path === 'profiles' && request.method === 'PATCH') {
+      if (url.searchParams.get('user_id') !== `eq.${userId}`) return respondRows(request, response, []);
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      const patch = JSON.parse(body);
+      if (patch.header_layout) profileAppearance.header_layout = patch.header_layout;
+      if (patch.avatar_position) profileAppearance.avatar_position = patch.avatar_position;
+      return respondRows(request, response, [{ id: userId, ...profileAppearance }]);
     }
 
     if (path === 'auth_accounts' && request.method === 'GET') {
@@ -355,6 +367,32 @@ test('the home page responds successfully and identifies NOOKLIE', async () => {
   const response = await fetch(baseUrl);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /NOOKLIE/);
+});
+
+test('profile appearance only saves supported choices on the authenticated profile', async () => {
+  const token = 'profile-appearance-session';
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  try {
+    const save = (body, authenticated = true) => fetch(baseUrl + '/api/profile/update', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...(authenticated ? { Cookie: `toriland_session=${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await save({ header_layout: 'immersive' }, false)).status, 401);
+    assert.equal((await save({ header_layout: 'unsupported', avatar_position: 'right' })).status, 400);
+    assert.equal((await save({ avatar_position: null })).status, 400);
+    assert.deepEqual(profileAppearance, { header_layout: 'classic', avatar_position: 'left' });
+
+    const response = await save({ header_layout: 'immersive', avatar_position: 'right', user_id: otherUserId });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).user, { id: userId, header_layout: 'immersive', avatar_position: 'right' });
+    const nameChange = await save({ display_name: 'Owner' });
+    assert.equal(nameChange.status, 200);
+    assert.deepEqual((await nameChange.json()).user, { id: userId, header_layout: 'immersive', avatar_position: 'right' });
+  } finally {
+    state.sessions = state.sessions.filter(session => session.token_hash !== hash(token));
+    Object.assign(profileAppearance, { header_layout: 'classic', avatar_position: 'left' });
+  }
 });
 
 test('login rejects invalid credentials and creates a hashed session on success', async () => {

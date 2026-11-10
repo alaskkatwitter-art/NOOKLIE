@@ -3,6 +3,8 @@ import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
+import ProfileBanner from '@/components/ProfileBanner';
+import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import MuralActions from '@/components/MuralActions';
@@ -33,6 +35,8 @@ type User = {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  header_layout?: ProfileHeaderLayout;
+  avatar_position?: ProfileAvatarPosition;
   verified?: boolean;
   is_official?: boolean;
   staff_badges?: { title: string; description: string }[];
@@ -806,26 +810,16 @@ export default function PublicProfilePage() {
 
         {/* PERFIL */}
 
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl">
-          <div className="relative h-44 overflow-hidden bg-[#241924] sm:h-60">
-            {user.cover_url ? (
-              <img
-                src={
-                  contentMediaUrl(user.cover_url)
-                }
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.10),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.06),transparent_35%)]" />
-            )}
-
-            <div className="absolute inset-0 bg-gradient-to-t from-[#151015] via-transparent to-black/10" />
-          </div>
+        <section
+          className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl"
+          data-profile-layout={user.header_layout ?? 'classic'}
+          data-avatar-position={user.avatar_position ?? 'left'}
+        >
+          <ProfileBanner cover={user.cover_url} />
 
           <div className="relative px-5 pb-7 sm:px-8">
-            <div className="-mt-14 flex items-end justify-between gap-4">
-              <div>
+            <div className="profile-header-row--visitor -mt-14 flex items-end justify-between gap-2 sm:gap-4">
+              <div className="profile-header-avatar shrink-0">
                 {user.avatar_url ? (
                   <img
                     src={
@@ -834,10 +828,10 @@ export default function PublicProfilePage() {
                     alt={getDisplayName(
                       user
                     )}
-                    className="h-28 w-28 rounded-full border-4 border-[#151015] bg-[#211a21] object-cover shadow-xl sm:h-32 sm:w-32"
+                    className="size-24 rounded-full border-4 border-[#151015] bg-[#211a21] object-cover shadow-xl sm:size-32"
                   />
                 ) : (
-                  <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-[#151015] bg-[#211a21] text-4xl font-black text-white/40 shadow-xl sm:h-32 sm:w-32">
+                  <div className="flex size-24 items-center justify-center rounded-full border-4 border-[#151015] bg-[#211a21] text-4xl font-black text-white/40 shadow-xl sm:size-32">
                     {getDisplayName(
                       user
                     )
@@ -848,7 +842,7 @@ export default function PublicProfilePage() {
               </div>
 
               {!isSelf && (
-                <div className="mb-2 flex items-center gap-2"><MessageProfileButton profileId={user.id}/><button
+                <div className="mb-2 flex flex-wrap items-center gap-2"><MessageProfileButton profileId={user.id}/><button
                   type="button"
                   onClick={
                     handleFollow

@@ -4,6 +4,9 @@ import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileStats from '@/components/ProfileStats';
+import ProfileBanner from '@/components/ProfileBanner';
+import ProfileAppearanceEditor from '@/components/ProfileAppearanceEditor';
+import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
 
 import { Cloud, MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from 'lucide-react';
@@ -28,6 +31,8 @@ type User = {
   avatar_url: string | null;
   cover_url: string | null;
   theme_color: string | null;
+  header_layout?: ProfileHeaderLayout;
+  avatar_position?: ProfileAvatarPosition;
   staff_badges?: { title: string; description: string }[];
 };
 
@@ -375,6 +380,8 @@ export default function PerfilPage() {
 
   const [editDisplayName, setEditDisplayName] =
     useState('');
+  const [editHeaderLayout, setEditHeaderLayout] = useState<ProfileHeaderLayout>('classic');
+  const [editAvatarPosition, setEditAvatarPosition] = useState<ProfileAvatarPosition>('left');
 
   const [bio, setBio] =
     useState('');
@@ -820,6 +827,8 @@ export default function PerfilPage() {
     );
 
     setBio(user.bio || '');
+    setEditHeaderLayout(user.header_layout ?? 'classic');
+    setEditAvatarPosition(user.avatar_position ?? 'left');
     setError('');
     setSuccess('');
     setCustomColor(profileTheme);
@@ -835,7 +844,7 @@ export default function PerfilPage() {
   }
 
   async function handleSave() {
-    if (saving) return;
+    if (saving || !user) return;
 
     setSaving(true);
     setError('');
@@ -854,6 +863,8 @@ export default function PerfilPage() {
             display_name:
               editDisplayName,
             bio,
+            header_layout: editHeaderLayout !== (user.header_layout ?? 'classic') ? editHeaderLayout : undefined,
+            avatar_position: editAvatarPosition !== (user.avatar_position ?? 'left') ? editAvatarPosition : undefined,
           }),
         }
       );
@@ -869,7 +880,7 @@ export default function PerfilPage() {
         return;
       }
 
-      setUser(data.user);
+      setUser(current => current ? { ...current, ...data.user } : current);
 
       setSuccess(
         'Perfil atualizado com sucesso.'
@@ -929,7 +940,7 @@ export default function PerfilPage() {
         return;
       }
 
-      setUser(data.user);
+      setUser(current => current ? { ...current, ...data.user } : current);
       localStorage.setItem(
         `${PRIVATE_THEME_STORAGE_PREFIX}${user.id}`,
         color
@@ -2363,28 +2374,14 @@ export default function PerfilPage() {
     >
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         <section
-          className="overflow-hidden rounded-3xl border border-white/10 bg-[#191219]"
+          className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+          data-profile-layout={user.header_layout ?? 'classic'}
+          data-avatar-position={user.avatar_position ?? 'left'}
           style={{
             boxShadow: `0 0 80px ${profileTheme}10`,
           }}
         >
-          <div
-            className="group relative block h-36 w-full overflow-hidden sm:h-44 md:h-48"
-            style={{
-              background: `linear-gradient(135deg, ${profileTheme}70, #191219, ${profileTheme}25)`,
-            }}
-          >
-            {user.cover_url && (
-              <img
-                src={contentMediaUrl(user.cover_url)}
-                alt="Capa do perfil"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            )}
-
-            <div className="absolute inset-0 bg-black/10 transition group-hover:bg-black/40" />
-
-          </div>
+          <ProfileBanner cover={user.cover_url} accent={profileTheme} />
 
           <input
             ref={coverInputRef}
@@ -2395,8 +2392,8 @@ export default function PerfilPage() {
           />
 
           <div className="relative px-5 pb-7 sm:px-7 md:px-10 md:pb-8">
-            <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 md:flex-row md:items-end">
-              <div className="relative shrink-0">
+            <div className="profile-header-row--owner -mt-12 flex flex-col gap-4 sm:-mt-14 md:flex-row md:items-end">
+              <div className="profile-header-avatar relative shrink-0">
                 <div
                   className={`rounded-full p-[3px] transition ${
                     hasActiveSocialStories
@@ -3616,6 +3613,17 @@ export default function PerfilPage() {
                 {user?.cover_url && <button type="button" className="nook-choice" onClick={() => setCrop({source: user.cover_url!, kind: 'cover'})}>Ajustar capa atual</button>}
               </div>
               <div className="grid grid-cols-2 gap-3"><button type="button" onClick={openAvatarPicker} disabled={uploadingAvatar} className="nook-choice">{uploadingAvatar?'Enviando…':'Alterar foto de perfil'}</button><button type="button" onClick={openCoverPicker} disabled={uploadingCover} className="nook-choice">{uploadingCover?'Enviando…':'Alterar capa'}</button></div>
+              <ProfileAppearanceEditor
+                layout={editHeaderLayout}
+                position={editAvatarPosition}
+                onLayoutChange={setEditHeaderLayout}
+                onPositionChange={setEditAvatarPosition}
+                cover={user.cover_url}
+                avatar={user.avatar_url}
+                name={editDisplayName.trim() || user.username}
+                username={user.username}
+                disabled={saving}
+              />
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-white/80">
