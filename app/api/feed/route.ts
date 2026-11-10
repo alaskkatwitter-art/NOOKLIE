@@ -14,6 +14,11 @@ export async function GET(request: Request) {
     if (!viewer) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401, headers });
 
     const params = new URL(request.url).searchParams;
+    const scope = params.get('scope');
+    if (scope && scope !== 'following') return NextResponse.json({ error: 'Filtro inválido.' }, { status: 400, headers });
+    const follows = scope === 'following' ? await chatDb.from('follows').select('following_id').eq('follower_id', viewer) : null;
+    if (follows?.error) throw follows.error;
+    const followed = new Set((follows?.data || []).map(row => row.following_id));
     const rawTag = params.get('tag');
     const tag = rawTag ? normalizeHashtag(rawTag) : '';
     if (rawTag && !tag) return NextResponse.json({ error: 'Hashtag inválida.' }, { status: 400, headers });
@@ -39,10 +44,10 @@ export async function GET(request: Request) {
     const originalIds = new Set(originals.map(post => post.id));
     const reposts = originals.length ? await visibleReposts(undefined, undefined, viewer) : [];
     const timeline = [
-      ...originals.map(post => ({
+      ...originals.filter(post => scope !== 'following' || followed.has(post.user_id)).map(post => ({
         postId: post.id, key: 'post:' + post.id, time: Date.parse(post.created_at), repost: null,
       })),
-      ...reposts.filter(repost => originalIds.has(repost.post_id) && !hidden.has(repost.user_id)).map(repost => ({
+      ...reposts.filter(repost => originalIds.has(repost.post_id) && !hidden.has(repost.user_id) && (scope !== 'following' || followed.has(repost.user_id))).map(repost => ({
         postId: repost.post_id, key: 'repost:' + repost.id, time: Date.parse(repost.created_at), repost,
       })),
     ].filter(entry => entry.time < beforeTime || (entry.time === beforeTime && entry.key < beforeKey))

@@ -33,6 +33,7 @@ const categories = Object.entries(categoryIds).map(([slug, id]) => ({
 const state = { notifications: [], discoveryPreferences: new Map(), readerPreferences: new Map(), readerUnavailable: false, account: null, sessions: [], chapters: [], rateLimits: new Map(), categories, tags: [], discoveryStories: [], storyTags: [] };
 const profileAppearance = { header_layout: 'classic', avatar_position: 'left' };
 let libraryFixture = null;
+let feedFixture = null;
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -107,6 +108,25 @@ before(async () => {
   supabaseMock = createHttpServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const path = url.pathname.replace('/rest/v1/', '');
+
+    if (feedFixture) {
+      if (path === 'rpc/social_actor') return sendJson(response, userId);
+      if (request.method === 'GET') {
+        if (path === 'follows') return respondRows(request, response, [{ follower_id: userId, following_id: 'followed-author' }]);
+        if (path === 'profiles') {
+          const profiles = [userId, 'followed-author', 'other-author'].map(id => ({ id, user_id: id, username: id, is_private: false }));
+          const eq = url.searchParams.get('user_id') || url.searchParams.get('id');
+          return respondRows(request, response, eq?.startsWith('eq.') ? profiles.filter(p => p.id === eq.slice(3)) : profiles);
+        }
+        if (path === 'auth_accounts') return respondRows(request, response, [{ id: userId, account_status: 'active' }]);
+        if (['chat_blocks','profile_mutes','nook_post_media','nook_post_reactions','nook_comments','nook_saved_posts'].includes(path)) return respondRows(request, response, []);
+        if (path === 'nook_reposts') return respondRows(request, response, [feedFixture.repost]);
+        if (path === 'nook_posts') {
+          const ids = url.searchParams.get('id');
+          return respondRows(request, response, ids ? feedFixture.posts.filter(p => ids.includes(p.id)) : feedFixture.posts);
+        }
+      }
+    }
 
     if (libraryFixture && request.method === 'GET') {
       const owner = url.searchParams.get('user_id') === `eq.${userId}`;
@@ -386,6 +406,30 @@ test('the home page responds successfully and identifies NOOKLIE', async () => {
   const response = await fetch(baseUrl);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /NOOKLIE/);
+});
+
+test('following timeline filters authors and reposters before pagination', async () => {
+  const token = 'following-timeline-session';
+  const id = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
+  state.sessions.push({ user_id: userId, token_hash: hash(token), expires_at: new Date(Date.now() + 60_000).toISOString() });
+  feedFixture = {
+    posts: Array.from({ length: 25 }, (_, n) => ({ id: id(n + 1), user_id: 'other-author', body: 'Other', created_at: new Date(Date.UTC(2026, 9, 20, 0, n)).toISOString() })).concat([{ id: id(30), user_id: 'followed-author', body: 'Followed', created_at: '2026-10-01T00:00:00.000Z' }]),
+    repost: { id: id(31), post_id: id(1), user_id: 'followed-author', created_at: '2026-10-21T00:00:00.000Z' },
+  };
+  try {
+    assert.equal((await fetch(baseUrl + '/api/feed?scope=following')).status, 401);
+    const headers = { Cookie: `toriland_session=${token}` };
+    const response = await fetch(baseUrl + '/api/feed?scope=following', { headers });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control'), /private/);
+    const data = await response.json();
+    assert.deepEqual(data.posts.map(p => [p.id, p.repost?.user_id || null]), [[id(1), 'followed-author'], [id(30), null]]);
+    assert.equal(data.next_cursor, null);
+    assert.equal((await fetch(baseUrl + '/api/feed?scope=invalid', { headers })).status, 400);
+  } finally {
+    feedFixture = null;
+    state.sessions = state.sessions.filter(s => s.token_hash !== hash(token));
+  }
 });
 
 test('library distinguishes reading the last published chapter from finishing an earlier chapter', async () => {

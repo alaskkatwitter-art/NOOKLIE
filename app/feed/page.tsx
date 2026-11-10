@@ -20,7 +20,7 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
-import { Ellipsis, Trash2 } from 'lucide-react';
+import { Ellipsis, Trash2, Heart, Share2 } from 'lucide-react';
 import { PostMention } from '@/components/PostMention';
 import NookPostComposer from '@/components/NookPostComposer';
 import StoryComposer from '@/components/StoryComposer';
@@ -606,6 +606,14 @@ function formatPostDateTime(date: string) {
   })}`;
 }
 
+function compactPostTime(date: string) {
+  const elapsed = Math.max(0, Date.now() - new Date(date).getTime());
+  if (elapsed < 60_000) return 'agora';
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)} min`;
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)} h`;
+  return new Date(date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+}
+
 function getInitial(
   profile: Profile | CurrentUser | StoryUser | FeedSearchUser | null
 ) {
@@ -1082,7 +1090,7 @@ function PostBody({
   }
 
   return (
-    <div className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
+    <div className="feed-post-body mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-white/85">
       {body.split(feedTokenPattern).map((piece, index) => {
         if (index % 2 === 0) return piece;
         if (piece.startsWith('@')) return <PostMention key={index} token={piece} />;
@@ -1270,6 +1278,7 @@ function FeedPost({
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [shareNotice, setShareNotice] = useState('');
 
   async function deletePost() {
     if (deleting || !window.confirm('Apagar esta publicação? As respostas e as nookladas dela também serão removidas.')) return;
@@ -1634,7 +1643,7 @@ function FeedPost({
     <article className="feed-post" onClick={e=>{if(!expanded && e.target instanceof Element && !e.target.closest('a,button,input,textarea,dialog,video,audio,details,label'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
       {post.repost&&<div className="border-b border-white/10 px-5 py-4"><RepostAttribution author={post.repost.author} comment={post.repost.comment}/></div>}
       <div className="feed-post-content">
-        <div className="flex items-start gap-3">
+        <div className="feed-post-identity flex items-start gap-3">
           <Link
             href={
               post.author
@@ -1650,7 +1659,7 @@ function FeedPost({
           </Link>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="feed-author-line flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link
                   href={
@@ -1703,7 +1712,7 @@ function FeedPost({
                     }}
                     className="text-[10px] text-white/65 hover:text-pink-200 sm:text-xs"
                   >
-                    <time dateTime={post.created_at}>{formatPostDateTime(post.created_at)}</time>
+                    <time dateTime={post.created_at} title={formatPostDateTime(post.created_at)}>{compactPostTime(post.created_at)}</time>
                   </a>
                 )}
                 {viewerId === post.user_id && !post.repost && <details className="relative">
@@ -1722,6 +1731,7 @@ function FeedPost({
           </div>
         </div>
 
+        {shareNotice && <p role="status" className="text-sm text-pink-200">{shareNotice}</p>}
         {deleteError && <p role="alert" className="mt-2 text-sm text-rose-200">{deleteError}</p>}
         <PostBody body={post.body} />{post.story_id && <LinkedStoryCard storyId={post.story_id}/>}<LinkedNewsCard slug={post.news_slug}/>
 
@@ -1740,7 +1750,7 @@ function FeedPost({
                 : 'text-white/45 hover:bg-white/[0.04] hover:text-[#ff78b9]'
             }`}
           >
-            <CloudIcon filled={liked} />
+            <Heart size={21} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
 
             {likeCount > 0 && (
               <span className="text-[11px] font-semibold">
@@ -1784,6 +1794,7 @@ function FeedPost({
               filled={post.saved}
             />
           </button>
+          <button type="button" aria-label="Compartilhar publicação" onClick={async () => {const url = `${window.location.origin}/feed?post=${encodeURIComponent(post.id)}`; try {if(navigator.share) await navigator.share({url}); else {await navigator.clipboard.writeText(url); setShareNotice('Link da publicação copiado.');}} catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) setShareNotice('Não foi possível compartilhar. Abra a publicação para copiar o endereço.'); }}}><Share2 size={20} aria-hidden="true"/></button>
         </div>
       </div>
 
@@ -3062,6 +3073,7 @@ export default function FeedPage() {
      FEED
   ======================================================= */
 
+  const [feedScope, setFeedScope] = useState<'all' | 'following'>('all');
   const loadFeed = useCallback(async (showRefresh = false, before?: string) => {
     if (activeTag === null || (before && feedRequest.current)) return;
     feedRequest.current?.abort();
@@ -3076,6 +3088,7 @@ export default function FeedPage() {
     try {
       const params = new URLSearchParams();
       if (activeTag) params.set('tag', activeTag);
+      if (feedScope === 'following') params.set('scope', 'following');
       if (before) params.set('before', before);
       const query = params.toString();
       const response = await fetch(query ? '/api/feed?' + query : '/api/feed', {
@@ -3105,7 +3118,7 @@ export default function FeedPage() {
         setLoadingOlder(false);
       }
     }
-  }, [activeTag]);
+  }, [feedScope, activeTag]);
 
   /* =======================================================
      STORIES
@@ -3326,6 +3339,8 @@ export default function FeedPage() {
               TOP BAR
           ================================================= */}
 
+          <nav className="feed-timeline-tabs" aria-label="Explorar publicações"><button type="button" aria-pressed={feedScope === 'all'} onClick={() => setFeedScope('all')}>Feed</button><button type="button" aria-pressed={feedScope === 'following'} onClick={() => setFeedScope('following')}>Seguindo</button><Link href="/explorar">Descobrir</Link></nav>
+          <details className="feed-tools"><summary>Buscar, calendário e mais</summary>
           <header className="feed-heading">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-pink-200">Comunidade Nooklie</p>
@@ -3375,6 +3390,7 @@ export default function FeedPage() {
               setStoryComposerOpen(true)
             }
           /></div>
+          </details>
 
           {/* =================================================
               LAYOUT
@@ -3388,7 +3404,7 @@ export default function FeedPage() {
             <div className="w-full max-w-[680px]">
               {/* CREATE POST */}
 
-              <button type="button" onClick={()=>setComposerOpen(true)} className="feed-compose"><Avatar profile={currentUser}/><span>O que você quer compartilhar?</span><span className="feed-compose-plus" aria-hidden="true">+</span></button>
+              <button type="button" onClick={()=>setComposerOpen(true)} aria-label="Criar publicação" className="feed-compose"><Avatar profile={currentUser}/><span>O que você quer compartilhar?</span><span className="feed-compose-plus" aria-hidden="true">+</span></button>
               {/* ERROR */}
 
               {error && (

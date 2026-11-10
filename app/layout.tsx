@@ -1,4 +1,5 @@
 import './globals.css';
+import './social-visual.css';
 import SiteNavigation from '@/components/SiteNavigation';
 import { ReactNode } from 'react';
 import Link from 'next/link';

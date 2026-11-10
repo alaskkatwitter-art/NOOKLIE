@@ -9,7 +9,7 @@ import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/a
 import Republicados from '@/components/Republicados';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import MuralActions from '@/components/MuralActions';
-import {Pin,BookOpen,MessageCircle} from 'lucide-react';
+import {Pin,BookOpen,MessageCircle,Image as ImageIcon,Layers,Info,FileText} from 'lucide-react';
 import MessageProfileButton from '@/components/MessageProfileButton';
 import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
@@ -135,14 +135,10 @@ type Tab =
   | 'stories'
   | 'nook'
   | 'lists'
-  | 'clubs';
+  | 'clubs'
+  | 'about';
 
-const TAB_ORDER: Tab[] = [
-  'stories',
-  'nook',
-  'lists',
-  'clubs',
-];
+const TAB_ORDER: Tab[] = ['nook', 'stories', 'clubs', 'lists', 'about'];
 
 function formatDate(
   value: string
@@ -408,7 +404,7 @@ export default function PublicProfilePage() {
     activeTab,
     setActiveTab,
   ] = useState<Tab>(
-    'stories'
+    'nook'
   );
 
   const [loading, setLoading] =
@@ -811,20 +807,20 @@ export default function PublicProfilePage() {
 
   return (
     <main data-social-page="profile" data-profile-theme={theme ? '' : undefined}
-      style={theme ? profileThemeVariables(theme) as CSSProperties : undefined}
-      className="min-h-screen bg-[#0d0a0d] text-white">
-      <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-5 sm:py-8">
+      style={{ ...(theme ? profileThemeVariables(theme) : {}), ...(user.cover_url ? { '--profile-cover': `url(${JSON.stringify(contentMediaUrl(user.cover_url))})` } : {}) } as CSSProperties}
+      className="profile-reference min-h-screen text-white">
+      <div className="profile-reference-inner mx-auto w-full max-w-5xl">
 
         {/* PERFIL */}
 
         <section
-          className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015] shadow-2xl"
+          className="profile-reference-header"
           data-profile-layout={user.header_layout ?? 'classic'}
           data-avatar-position={user.avatar_position ?? 'left'}
         >
           <ProfileBanner cover={user.cover_url} />
 
-          <div className="relative px-5 pb-7 sm:px-8">
+          <div className="profile-header-details relative px-5 pb-5 sm:px-8">
             <div className="profile-header-row--visitor -mt-14 flex items-end justify-between gap-2 sm:gap-4">
               <div className="profile-header-avatar shrink-0">
                 {user.avatar_url ? (
@@ -886,7 +882,7 @@ export default function PublicProfilePage() {
               )}
             </div>
 
-            <div className="mt-5">
+            <div className="profile-identity mt-5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
                   {getDisplayName(
@@ -904,7 +900,7 @@ export default function PublicProfilePage() {
                 )}
               </div>
 
-              <p className="profile-themed-text mt-1 text-sm font-semibold text-white/40">
+              <p className="profile-username profile-themed-text mt-1 text-sm font-semibold text-white/70">
                 @{user.username}
               </p>
               {user.staff_badges?.map((badge, index) => (
@@ -915,18 +911,9 @@ export default function PublicProfilePage() {
               ))}
 
 
-              {!restricted && <ProfileStats profileId={user.id} stories={stories.length} counts={{followers_count:followersCount,following_count:followingCount}}/>}
 
-              {user.bio ? (
-                <p className="profile-themed-text mt-5 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-white/70">
-                  {user.bio}
-                </p>
-              ) : (
-                <p className="profile-themed-text mt-5 text-sm italic text-white/30">
-                  Este usuário ainda não adicionou uma bio.
-                </p>
-              )}
             </div>
+            {!restricted && <ProfileStats profileId={user.id} stories={stories.length} counts={{followers_count:followersCount,following_count:followingCount}}/>}
             {!isSelf&&<div className="mt-4 flex items-center justify-end gap-2"><ProfileActions profileId={user.id} username={user.username}/></div>}
           </div>
         </section>
@@ -934,8 +921,8 @@ export default function PublicProfilePage() {
         {!restricted && <>
         {/* ABAS */}
 
-        <div className="profile-themed-surface mt-5 rounded-2xl border border-white/10 bg-[#151015] p-1.5">
-          <div className="grid grid-cols-4 gap-1">
+        <div className="profile-reference-tabs">
+          <div role="group" aria-label="Seções do perfil">
             {TAB_ORDER.map(
               (tab) => {
                 const labels: Record<
@@ -943,12 +930,12 @@ export default function PublicProfilePage() {
                   string
                 > = {
                   stories:
-                    'Histórias',
-                  nook: 'Mural',
+                    'Obras',
+                  nook: 'Publicações',
                   lists:
                     'Listas',
-                  clubs:
-                    'Republicados',
+                  clubs: 'Mural',
+                  about: 'Sobre',
                 };
 
                 return (
@@ -960,6 +947,7 @@ export default function PublicProfilePage() {
                         tab
                       )
                     }
+                    aria-pressed={activeTab === tab}
                     className={`rounded-xl px-2 py-3 text-[10px] font-black uppercase tracking-wide transition sm:px-4 sm:text-xs ${
                       activeTab ===
                       tab
@@ -967,7 +955,8 @@ export default function PublicProfilePage() {
                         : 'profile-themed-text text-white/45 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    {labels[tab]}
+                    {tab === 'nook' ? <FileText size={21}/> : tab === 'stories' ? <BookOpen size={21}/> : tab === 'clubs' ? <ImageIcon size={21}/> : tab === 'lists' ? <Layers size={21}/> : <Info size={21}/>}
+                    <span>{labels[tab]}</span>
                   </button>
                 );
               }
@@ -989,17 +978,14 @@ export default function PublicProfilePage() {
           <div
             className="flex transition-transform duration-300 ease-out"
             style={{
-              width: '400%',
-              transform: `translateX(-${
-                activeIndex *
-                25
-              }%)`,
+              width: '100%',
+              transform: 'none',
             }}
           >
 
             {/* HISTÓRIAS */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section hidden={activeTab !== 'stories'} className="profile-tab-panel w-full shrink-0 px-0.5">
               <div className="mx-auto mb-5 flex w-full max-w-2xl flex-wrap gap-2" role="group" aria-label="Filtrar obras no perfil">
                 {([['', 'Todas'], ['original', 'Originais'], ['fanfic', 'Fanfics']] as const).map(([kind, label]) => (
                   <button type="button" key={kind} aria-pressed={storyFilter === kind} onClick={() => setStoryFilter(kind)} className="min-h-11 rounded-full border border-pink-300/20 px-4 text-sm font-semibold text-pink-100 aria-pressed:bg-pink-300 aria-pressed:text-[#200f1b]">{label}</button>
@@ -1041,7 +1027,7 @@ export default function PublicProfilePage() {
 
             {/* MURAL */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section hidden={activeTab !== 'nook'} className="profile-tab-panel w-full shrink-0 px-0.5">
               {posts.length ===
               0 ? (
                 <EmptyState
@@ -1178,7 +1164,7 @@ export default function PublicProfilePage() {
 
             {/* LISTAS */}
 
-            <section className="w-1/4 shrink-0 px-0.5">
+            <section hidden={activeTab !== 'lists'} className="profile-tab-panel w-full shrink-0 px-0.5">
               {readingLists.length ===
               0 ? (
                 <EmptyState
@@ -1303,7 +1289,11 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            <section className="w-1/4 shrink-0 px-0.5"><Republicados profileId={user.id} own={isSelf} active={activeTab==='clubs'}/></section>
+            <section hidden={activeTab !== 'clubs'} className="profile-tab-panel w-full shrink-0 px-0.5">
+              <div className="profile-media-grid">{posts.filter(post => post.image_url).map(post => <a key={post.id} href={'/feed?post=' + encodeURIComponent(post.id)}><img src={contentMediaUrl(post.image_url!)} alt="Imagem publicada no mural" loading="lazy"/></a>)}</div>
+              <h2 className="mb-4 text-lg font-bold">Republicados</h2><Republicados profileId={user.id} own={isSelf} active={activeTab==='clubs'}/>
+            </section>
+            <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div></section>
           </div>
         </div>
         </>}
