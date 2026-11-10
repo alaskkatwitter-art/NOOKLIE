@@ -6,6 +6,8 @@ import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileStats from '@/components/ProfileStats';
 import ProfileBanner from '@/components/ProfileBanner';
 import ProfileAppearanceEditor from '@/components/ProfileAppearanceEditor';
+import ProfileThemeEditor from '@/components/ProfileThemeEditor';
+import { parseProfileThemeCollection, profileThemeVariables, type ProfileThemeCollection } from '@/lib/profile/themes';
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
 
@@ -15,6 +17,7 @@ import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
 import React, {
   ChangeEvent,
+  CSSProperties,
   TouchEvent,
   ReactNode,
   useEffect,
@@ -341,6 +344,17 @@ export default function PerfilPage() {
 
   const [user, setUser] =
     useState<User | null>(null);
+  const [themes, setThemes] = useState<ProfileThemeCollection | null>();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const controller = new AbortController();
+    fetch('/api/profile/themes', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => response.ok ? parseProfileThemeCollection(await response.json()) : null)
+      .then(value => { if (!controller.signal.aborted) setThemes(value); })
+      .catch(() => { if (!controller.signal.aborted) setThemes(null); });
+    return () => controller.abort();
+  }, [user?.id]);
 
   const [stories, setStories] =
     useState<Story[]>([]);
@@ -2361,6 +2375,8 @@ export default function PerfilPage() {
   return (
     <main
       data-social-page="profile"
+      data-profile-theme={themes?.active ? '' : undefined}
+      style={themes?.active ? profileThemeVariables(themes.active) as CSSProperties : undefined}
       className="min-h-screen bg-[#100b12] text-white"
       onClick={() => {
         if (menuOpenPostId) {
@@ -2374,7 +2390,7 @@ export default function PerfilPage() {
     >
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         <section
-          className="overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+          className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
           data-profile-layout={user.header_layout ?? 'classic'}
           data-avatar-position={user.avatar_position ?? 'left'}
           style={{
@@ -2483,10 +2499,8 @@ export default function PerfilPage() {
                 )}
 
                 <p
-                  className="mt-1 text-sm"
-                  style={{
-                    color: profileTheme,
-                  }}
+                  className="profile-themed-text mt-1 text-sm"
+                  style={themes?.active ? undefined : { color: profileTheme }}
                 >
                   @{user.username}
                 </p>
@@ -2503,8 +2517,8 @@ export default function PerfilPage() {
                   <button
                     type="button"
                     onClick={openEditor}
-                    className="rounded-full px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
-                    style={{
+                    className="profile-themed-action rounded-full px-6 py-3 text-sm font-bold text-[#180d15] transition hover:brightness-110"
+                    style={themes?.active ? undefined : {
                       backgroundColor:
                         profileTheme,
                     }}
@@ -2518,7 +2532,7 @@ export default function PerfilPage() {
             </div>
 
             <div className="mt-6 max-w-2xl">
-              <p className="text-sm leading-7 text-white/50">
+              <p className="profile-themed-text text-sm leading-7 text-white/50">
                 {user.bio ||
                   'Ainda não há uma bio por aqui.'}
               </p>
@@ -2543,7 +2557,7 @@ export default function PerfilPage() {
         {/* ABAS */}
 
         <section className="mt-6">
-          <div className="grid grid-cols-4 border-b border-white/10">
+          <div className="profile-themed-surface grid grid-cols-4 rounded-xl border-b border-white/10">
             {(
               [
                 ['stories', 'HISTÓRIAS'],
@@ -2559,7 +2573,7 @@ export default function PerfilPage() {
                   onClick={() =>
                     changeTab(tab)
                   }
-                  className={`relative min-w-0 py-4 text-[9px] font-black uppercase tracking-[0.04em] transition sm:text-xs sm:tracking-[0.06em] ${
+                  className={`profile-themed-text relative min-w-0 py-4 text-[9px] font-black uppercase tracking-[0.04em] transition sm:text-xs sm:tracking-[0.06em] ${
                     activeTab === tab
                       ? 'text-[#ff78b9]'
                       : 'text-white/35 hover:text-white/70'
@@ -2571,8 +2585,8 @@ export default function PerfilPage() {
 
                   {activeTab === tab && (
                     <span
-                      className="absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full"
-                      style={{
+                      className="profile-theme-tab-marker absolute bottom-[-1px] left-0 h-0.5 w-full rounded-full"
+                      style={themes?.active ? undefined : {
                         backgroundColor:
                           profileTheme,
                       }}
@@ -2616,7 +2630,7 @@ export default function PerfilPage() {
                 </div>
 
                 {loadingStories ? (
-                  <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
+                  <div className="profile-themed-surface mx-auto max-w-3xl rounded-3xl border border-white/10 bg-[#191219] px-6 py-14 text-center">
                     <p className="text-sm text-white/35">
                       Carregando histórias...
                     </p>
@@ -2652,7 +2666,7 @@ export default function PerfilPage() {
                                 `/historia/${story.id}`
                               )
                             }
-                            className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#1d151d]"
+                            className="profile-themed-surface group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-[#191219] text-left transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-[#1d151d]"
                           >
                             <div className="relative h-36 w-24 shrink-0 overflow-hidden bg-[#241722] sm:h-40 sm:w-28 md:h-44 md:w-32">
                               {story.cover_url ? (
@@ -2687,7 +2701,7 @@ export default function PerfilPage() {
 
                             <div className="min-w-0 flex-1 p-4 sm:p-5">
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <h3 className="line-clamp-2 text-base font-black text-white sm:text-lg">
+                                <h3 className="profile-themed-text line-clamp-2 text-base font-black text-white sm:text-lg">
                                   {
                                     story.title
                                   }
@@ -3584,7 +3598,7 @@ export default function PerfilPage() {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
-          <div className="max-h-[88dvh] overflow-y-auto w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 shadow-2xl">
+          <div className="max-h-[88dvh] overflow-y-auto w-full max-w-lg rounded-3xl border border-white/10 bg-[#191219] p-6 text-white shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black">
@@ -3624,6 +3638,8 @@ export default function PerfilPage() {
                 username={user.username}
                 disabled={saving}
               />
+              {themes ? <ProfileThemeEditor collection={themes} onChange={setThemes} cover={user.cover_url} username={user.username} /> :
+                <p role="status" className="text-sm text-white/75">{themes === undefined ? 'Carregando seus temas…' : 'Meus temas está indisponível no momento.'}</p>}
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-white/80">

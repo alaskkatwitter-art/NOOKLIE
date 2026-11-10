@@ -686,6 +686,49 @@ select {
   color: var(--rose);
   background: #f99ac60d;
 }
+[data-profile-theme] {
+  background: linear-gradient(150deg, var(--profile-theme-gradient), var(--profile-theme-background) 32rem);
+  color: var(--profile-theme-text);
+  font-family: var(--profile-theme-font);
+}
+[data-profile-theme] > div :is(h1, h2),
+[data-profile-theme] .profile-themed-surface {
+  font-family: var(--profile-theme-font);
+}
+[data-profile-theme] .profile-themed-surface,
+.profile-theme-preview {
+  background: var(--profile-theme-surface);
+  border-color: var(--profile-theme-border);
+  color: var(--profile-theme-text);
+}
+[data-profile-theme] .profile-themed-text {
+  color: var(--profile-theme-text);
+}
+[data-profile-theme] .profile-stat-strip {
+  border-color: var(--profile-theme-border);
+}
+[data-profile-theme] .profile-stat-strip span {
+  color: var(--profile-theme-text);
+}
+[data-profile-theme] .profile-themed-action {
+  background: var(--profile-theme-accent);
+  color: var(--profile-theme-accent-text);
+}
+[data-profile-theme] .profile-theme-tab-marker {
+  background: var(--profile-theme-text);
+}
+[data-profile-theme] .profile-banner {
+  background: linear-gradient(130deg, var(--profile-theme-gradient), var(--profile-theme-background));
+}
+[data-profile-theme] .profile-banner::after {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--profile-theme-surface) 45%, transparent), transparent 55%);
+}
+[data-profile-theme] [data-profile-layout="immersive"] > .profile-banner::after {
+  background: linear-gradient(0deg, var(--profile-theme-surface), transparent 75%);
+}
+.profile-theme-preview > .profile-banner {
+  height: 6rem;
+}
 .profile-banner {
   position: relative;
   height: clamp(9rem, 22vw, 14rem);

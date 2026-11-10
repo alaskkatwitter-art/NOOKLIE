@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseProfileTheme } from '@/lib/profile/themes';
 import { createClient } from "@supabase/supabase-js";
 import { getPublicStaffBadges } from "@/lib/admin/public-badges";
 import { getPublicProfileIds, isAccountVisible, currentViewerProfileId, isPublicProfileVisible } from '@/lib/moderation/content-visibility';
@@ -103,7 +104,10 @@ export async function GET(
       return NextResponse.json({ error: "Erro ao buscar perfil." }, { status: 500 });
     }
 
-    const staffBadges = await getPublicStaffBadges(supabase, accountIdentity.user_id);
+    const [staffBadges, publicTheme] = await Promise.all([
+      getPublicStaffBadges(supabase, accountIdentity.user_id),
+      supabase.from('profile_themes').select('active').eq('user_id', accountIdentity.user_id).maybeSingle(),
+    ]);
 
     // =========================================================
     // 2. HISTÓRIAS
@@ -546,6 +550,7 @@ export async function GET(
     return NextResponse.json({
       restricted:false,
       user: { ...profile, pinned_story_id: pinnedChapter?.data && pinnedStory ? pinnedStory.id : null, staff_badges: staffBadges },
+      theme: parseProfileTheme(publicTheme.data?.active),
       stories: stories || [],
       posts: postsWithMedia,
       reading_lists:
