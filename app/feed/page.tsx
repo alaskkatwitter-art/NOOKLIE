@@ -1681,7 +1681,7 @@ function CommentItem({ comment, children, onReply, onChange }: {
     }
   }
 
-  return <article id={'reply-' + comment.id} className="scroll-mt-16 border-b border-white/10 py-4">
+  return <article id={'reply-' + comment.id} className="feed-reply scroll-mt-16 rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:p-4">
     <div className="flex gap-3">
       <Avatar profile={comment.author} size="small" />
       <div className="min-w-0 flex-1">
@@ -2117,7 +2117,7 @@ function FeedPost({
   return (
     <article className="feed-post" onClick={e=>{if(!expanded && e.target instanceof Element && !e.target.closest('a,button,input,textarea,dialog,video,audio,details,label'))window.dispatchEvent(new CustomEvent('nooklie:open-post',{detail:post.id}));}}>
       {post.repost&&<div className="border-b border-white/10 px-5 py-4"><RepostAttribution author={post.repost.author} comment={post.repost.comment}/></div>}
-      <div className="p-5 sm:p-6">
+      <div className="feed-post-content">
         <div className="flex items-start gap-3">
           <Link
             href={
@@ -2172,11 +2172,24 @@ function FeedPost({
               </div>
 
               <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-                <a href={"/feed?post="+post.id} aria-label="Abrir publicação" onClick={e=>{e.preventDefault();if(!expanded) window.dispatchEvent(new CustomEvent("nooklie:open-post",{detail:post.id}));}} className="shrink-0 text-[10px] text-white/50 hover:text-[#ff9bca] sm:text-xs">
-                  {formatPostDateTime(
-                    post.created_at
-                  )}
-                </a>
+                {expanded ? (
+                  <time dateTime={post.created_at} className="text-[10px] text-white/65 sm:text-xs">
+                    {formatPostDateTime(post.created_at)}
+                  </time>
+                ) : (
+                  <a
+                    href={'/feed?post=' + encodeURIComponent(post.id)}
+                    aria-label="Abrir publicação"
+                    onClick={(event) => {
+                      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                      event.preventDefault();
+                      window.dispatchEvent(new CustomEvent('nooklie:open-post', { detail: post.id }));
+                    }}
+                    className="text-[10px] text-white/65 hover:text-pink-200 sm:text-xs"
+                  >
+                    <time dateTime={post.created_at}>{formatPostDateTime(post.created_at)}</time>
+                  </a>
+                )}
                 {viewerId === post.user_id && !post.repost && <details className="relative">
                   <summary aria-label="Opções da publicação" className="grid size-10 cursor-pointer list-none place-items-center rounded-full text-white/65 hover:bg-white/10 hover:text-pink-200 focus-visible:outline-2 focus-visible:outline-pink-300 [&::-webkit-details-marker]:hidden">
                     <Ellipsis aria-hidden="true" className="size-5" />
@@ -2198,7 +2211,7 @@ function FeedPost({
 
         <PostMedia post={post} expanded={expanded} />
 
-        <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3">
+        <div className="feed-post-actions">
           <button
             type="button"
             onClick={toggleLike}
@@ -2259,7 +2272,7 @@ function FeedPost({
       </div>
 
       {commentsOpen && (
-        <div className="border-t border-white/[0.06] bg-black/10 px-5 py-5 sm:px-6">
+        <div className="border-t border-white/10 bg-black/15 px-3 py-5 sm:px-6">
           {replyingTo && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] px-3 py-2">
               <span className="text-xs text-white/50">
@@ -3760,18 +3773,7 @@ export default function FeedPage() {
     'escritor';
 
   return (
-    <main className="min-h-screen bg-[#080609] text-white">
-      {/* =================================================
-          BACKGROUND
-      ================================================= */}
-
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-[-180px] h-[500px] w-[500px] rounded-full bg-[#ff4d9d]/[0.08] blur-[130px]" />
-
-        <div className="absolute right-[-180px] top-[25%] h-[500px] w-[500px] rounded-full bg-[#c63dff]/[0.045] blur-[140px]" />
-
-        <div className="absolute bottom-[-200px] left-[35%] h-[450px] w-[450px] rounded-full bg-[#ff78b9]/[0.035] blur-[130px]" />
-      </div>
+    <main data-social-page="feed" className="feed-page min-h-screen text-white">
 
       {/* =================================================
           DESKTOP MENU
@@ -3835,7 +3837,17 @@ export default function FeedPage() {
               TOP BAR
           ================================================= */}
 
-          <header className="mb-6 flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-[#ffb7da]">Comunidade</p><h1 className="mt-2 text-2xl font-bold">Seu Feed</h1></div><div className="flex gap-2"><button type="button" aria-label="Pesquisar pessoas" onClick={()=>setSearchOpen(true)} className="shell-icon"><SearchIcon /></button><button type="button" aria-label="Atualizar Feed" onClick={()=>{loadFeed(true);loadStories();loadUpcomingUpdates();}} disabled={refreshing} className="shell-icon"><RefreshIcon /></button></div></header>
+          <header className="feed-heading">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-pink-200">Comunidade Nooklie</p>
+              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Seu Feed</h1>
+              <p className="mt-2 text-sm text-white/75">Conversas, histórias e novidades de quem escreve.</p>
+            </div>
+            <div className="flex shrink-0 gap-1 sm:gap-2">
+              <button type="button" aria-label="Pesquisar pessoas" onClick={() => setSearchOpen(true)} className="shell-icon"><SearchIcon /></button>
+              <button type="button" aria-label="Atualizar Feed" onClick={() => { loadFeed(true); loadStories(); loadUpcomingUpdates(); }} disabled={refreshing} className="shell-icon"><RefreshIcon /></button>
+            </div>
+          </header>
           <p role="status" className={deleteNotice ? 'mb-3 text-sm text-pink-200' : 'sr-only'}>{deleteNotice}</p>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <form className="flex min-w-0 items-center gap-2" action="/feed">
@@ -3958,7 +3970,7 @@ export default function FeedPage() {
                   </div>
                 </div>
               ) : (
-                <div className="w-full space-y-5">
+                <div className="feed-post-list">
                   {posts.map(
                     (post) => (
                       <FeedPost
