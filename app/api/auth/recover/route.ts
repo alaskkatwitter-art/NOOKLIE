@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { clientIpForAuth } from '@/lib/security/rate-key';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const clientIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const clientIp = clientIpForAuth(request);
     const limiterKeys = [
       { value: `recovery:user:${username}:ip:${clientIp}`, limit: 10 },
       { value: `recovery:ip:${clientIp}`, limit: 60 },

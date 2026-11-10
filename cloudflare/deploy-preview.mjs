@@ -18,15 +18,16 @@ const supabaseUrl = production
 if (config.name !== 'nooklie-preview') {
   throw new Error('Unexpected base Worker configuration.');
 }
+config.vars = { NOOKLIE_CLOUDFLARE_RUNTIME: '1' };
 if (production) {
   config.name = 'nooklie';
   // Enable a public route only after reviewing the protected production candidate.
   config.workers_dev = process.env.NOOKLIE_WORKERS_DEV === '1';
-  config.vars = {
+  Object.assign(config.vars, {
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  };
+  });
   config.observability.traces = { enabled: true, head_sampling_rate: 0.01 };
   config.placement = { region: 'aws:us-east-2' };
 }

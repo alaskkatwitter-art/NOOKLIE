@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { rateLimitKey } from '@/lib/security/rate-key';
+import { clientIpForAuth, rateLimitKey } from '@/lib/security/rate-key';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     const windowSeconds = 15 * 60;
-    const clientIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const clientIp = clientIpForAuth(request);
     const { data: allowed, error: limitError } = await supabase.rpc('consume_auth_rate_limit', {
       p_key_hash: rateLimitKey('signup:ip', clientIp),
       p_limit: 20,
