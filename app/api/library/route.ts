@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { getPublicProfileIds, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
 
@@ -187,6 +187,45 @@ export async function GET() {
       visibleProfileIds.has(story.author_id)
     );
 
+    const visibleStoryIds = visibleStories.map(story => story.id);
+    if (!visibleStoryIds.length) return NextResponse.json({ items: [] });
+
+    const [progress, favorites] = await Promise.all([
+      supabase.from('reading_progress')
+        .select('story_id, chapter_id, progress_percent, position, chapters!inner(title, story_id)')
+        .eq('user_id', profileId)
+        .eq('chapters.published', true)
+        .in('story_id', visibleStoryIds),
+      supabase.from('stories')
+        .select('id, chapters!inner(chapter_favorites!inner(user_id))')
+        .in('id', visibleStoryIds)
+        .eq('chapters.published', true)
+        .eq('chapters.chapter_favorites.user_id', profileId)
+        .limit(1, { referencedTable: 'chapters' }),
+    ]);
+    const progressByStory = new Map((progress.data ?? []).flatMap(row => {
+      const chapter = Array.isArray(row.chapters) ? row.chapters[0] : row.chapters;
+      return chapter?.story_id === row.story_id ? [[row.story_id, { ...row, chapter_title: chapter.title }] as const] : [];
+    }));
+    const favoritesByStory = new Set((favorites.data ?? []).map(row => row.id));
+    const finishedCandidates = visibleStories
+      .filter(story => story.status?.toLowerCase().trim() === 'concluída' &&
+        Number(progressByStory.get(story.id)?.progress_percent) >= 100)
+      .map(story => story.id);
+    const lastChapters = finishedCandidates.length
+      ? await supabase.from('stories')
+        .select('id, chapters(id)')
+        .in('id', finishedCandidates)
+        .eq('chapters.published', true)
+        .order('chapter_number', { referencedTable: 'chapters', ascending: false })
+        .order('id', { referencedTable: 'chapters', ascending: false })
+        .limit(1, { referencedTable: 'chapters' })
+      : { data: [], error: null };
+    const completedStories = new Set((lastChapters.data ?? [])
+      .filter(row => row.chapters[0]?.id === progressByStory.get(row.id)?.chapter_id)
+      .map(row => row.id));
+    const readingDetailsAvailable = !progress.error && !favorites.error && !lastChapters.error;
+
     const authorIds = Array.from(
       new Set(
         visibleStories
@@ -257,6 +296,7 @@ export async function GET() {
       const list = listMap.get(
         item.list_id
       );
+      const reading = progressByStory.get(story.id);
 
       normalizedItems.push({
         id: item.id,
@@ -265,6 +305,15 @@ export async function GET() {
           list?.name || 'Biblioteca',
         story_id: story.id,
         story_title: story.title,
+        story_description: story.description,
+        story_status: story.status,
+        story_rating: story.rating,
+        chapter_id: reading?.chapter_id ?? null,
+        chapter_title: reading?.chapter_title ?? null,
+        progress_percent: reading?.progress_percent ?? 0,
+        position: reading?.position ?? 0,
+        reading_completed: completedStories.has(story.id),
+        has_favorite_chapter: favoritesByStory.has(story.id),
         title: story.title,
         description: story.description,
         cover_url: story.cover_url,
@@ -291,7 +340,8 @@ export async function GET() {
 
     return NextResponse.json({
       items: normalizedItems,
-    });
+      reading_details_available: readingDetailsAvailable,
+    }, { headers: { 'Cache-Control': 'no-store, private', Vary: 'Cookie' } });
   } catch (error) {
     console.error(
       'GET /api/library:',
