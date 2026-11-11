@@ -5,7 +5,8 @@ import { activeMention } from '@/lib/social/mentions';
 import LinkedNewsCard from './LinkedNewsCard';
 import {isNewsArticle, newsArticles, newsArticleSlugs} from '@/lib/news/articles';
 import {contentMediaUrl} from '@/lib/security/content-media';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type Story = {
   id: string;
@@ -36,6 +37,7 @@ export default function NookPostComposer({
   initialStoryId = '',
   initialBody = '',
 }: Props) {
+  const titleId = useId();
   const [body, setBody] = useState(initialBody);
   const [caret, setCaret] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState(false);
@@ -302,8 +304,8 @@ export default function NookPostComposer({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+  return createPortal(
+    <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
       {/* Fundo clicável */}
       <div
         className="absolute inset-0"
@@ -311,15 +313,15 @@ export default function NookPostComposer({
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/[0.1] bg-[#100c11] shadow-[0_30px_100px_rgba(0,0,0,0.6)]">
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/[0.1] bg-[#100c11] shadow-[0_30px_100px_rgba(0,0,0,0.6)]">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.07] px-5 py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#ff78b9]">
               Nooklie
             </p>
 
-            <h2 className="mt-1 text-lg font-black text-white">
+            <h2 id={titleId} className="mt-1 text-lg font-black text-white">
               {origin === 'mural' ? 'Publicar no mural' : 'Nova publicação'}
             </h2>
           </div>
@@ -336,7 +338,7 @@ export default function NookPostComposer({
         </div>
 
         {/* Conteúdo */}
-        <div className="max-h-[78vh] overflow-y-auto px-5 py-5">
+        <div className="min-h-0 overflow-y-auto px-5 py-5">
           {/* Texto */}
           <textarea
             ref={textInput}
@@ -485,7 +487,7 @@ export default function NookPostComposer({
         </div>
 
         {/* Rodapé */}
-        <div className="flex items-center justify-end gap-3 border-t border-white/[0.07] px-5 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-white/[0.07] px-5 py-4">
           <button
             type="button"
             onClick={handleClose}
@@ -505,6 +507,7 @@ export default function NookPostComposer({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
