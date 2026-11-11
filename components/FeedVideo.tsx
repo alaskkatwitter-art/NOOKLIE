@@ -1,14 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Link2, Repeat2, Video } from 'lucide-react';
-
-const actionClass = 'inline-flex min-h-10 items-center gap-1.5 rounded-full border border-pink-200/20 px-3 text-xs font-semibold text-pink-100 transition hover:bg-pink-300/15 focus-visible:outline-2 focus-visible:outline-pink-300';
+import { Ellipsis, Link2 } from 'lucide-react';
+import { VideoAutoplay } from '@/components/VideoAutoplayPreference';
 
 export default function FeedVideo({ id, standalone = false }: { id: string; standalone?: boolean }) {
   const [notice, setNotice] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const autoplay = useContext(VideoAutoplay);
+  const manual = useRef(false);
+  const automatic = useRef(false);
   const videoPath = '/video/' + id;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !autoplay || !('IntersectionObserver' in window)) return;
+
+    let visible = false;
+    function updatePlayback() {
+      if (!video) return;
+      if (!visible || document.hidden) {
+        if (automatic.current) video.pause();
+        return;
+      }
+      if (!manual.current && video.paused) {
+        video.muted = true;
+        automatic.current = true;
+        void video.play().catch(() => { automatic.current = false; });
+      }
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting && entry.intersectionRatio >= 0.5;
+      updatePlayback();
+    }, { threshold: 0.5 });
+    observer.observe(video);
+    document.addEventListener('visibilitychange', updatePlayback);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', updatePlayback);
+      if (automatic.current) video.pause();
+    };
+  }, [autoplay, id]);
 
   async function copyLink() {
     try {
@@ -19,32 +52,33 @@ export default function FeedVideo({ id, standalone = false }: { id: string; stan
     }
   }
 
-  return <div className="mt-2 overflow-hidden rounded-2xl border border-pink-200/20 bg-gradient-to-br from-[#251423] via-[#19121c] to-[#120e16] shadow-lg shadow-black/20">
-    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-      <span className="inline-flex items-center gap-2 text-sm font-semibold text-pink-100">
-        <Video aria-hidden="true" className="size-4 text-pink-300" /> Vídeo
-      </span>
-      <span className="inline-flex items-center gap-1 rounded-full bg-pink-300/10 px-2 py-1 text-xs text-pink-200">
-        <Repeat2 aria-hidden="true" className="size-3.5" /> Em loop
-      </span>
+  return (
+    <div className="mt-2 min-w-0">
+      <div className="relative w-fit max-w-full overflow-hidden rounded-xl bg-black">
+        <video
+          ref={videoRef}
+          aria-label="Vídeo do Nooklie"
+          src={'/api/nook-posts/video/' + id}
+          controls
+          loop
+          playsInline
+          preload={standalone ? 'metadata' : 'none'}
+          onPointerDown={() => { manual.current = true; }}
+          onKeyDown={() => { manual.current = true; }}
+          className={`block aspect-[auto_16/9] w-auto max-w-full ${standalone ? 'max-h-[70dvh]' : 'max-h-[65dvh]'}`}
+        />
+        {!standalone && (
+          <details className="absolute right-2 top-2 text-sm text-white">
+            <summary className="grid size-11 cursor-pointer list-none place-items-center rounded-full bg-black/75" aria-label="Opções do vídeo"><Ellipsis size={20} /></summary>
+            <div className="absolute right-0 mt-1 w-36 rounded-lg bg-black/90 p-1">
+              <button type="button" onClick={copyLink} className="block min-h-11 w-full px-2 text-left hover:bg-white/15">Copiar link</button>
+              <Link href={videoPath} prefetch={false} className="flex min-h-11 items-center px-2 hover:bg-white/15">Abrir vídeo</Link>
+            </div>
+          </details>
+        )}
+      </div>
+      {standalone && <button type="button" onClick={copyLink} className="mt-2 inline-flex min-h-11 items-center gap-2 px-2 text-sm text-pink-200"><Link2 size={16} aria-hidden="true" /> Copiar link</button>}
+      <span role="status" className={notice ? 'block text-xs text-pink-200' : 'sr-only'}>{notice}</span>
     </div>
-    <video
-      aria-label="Vídeo do Nooklie"
-      src={'/api/nook-posts/video/' + id}
-      controls
-      loop
-      playsInline
-      preload={standalone ? 'metadata' : 'none'}
-      className={`block aspect-video w-full border-y border-pink-200/10 bg-gradient-to-br from-[#201320] to-[#0c090e] object-contain ${standalone ? 'max-h-[70dvh]' : 'max-h-96'}`}
-    />
-    <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-      <button type="button" className={actionClass} onClick={copyLink}>
-        <Link2 aria-hidden="true" className="size-3.5" /> Copiar link
-      </button>
-      {!standalone && <Link href={videoPath} prefetch={false} className={actionClass}>
-        Abrir vídeo <ArrowUpRight aria-hidden="true" className="size-3.5" />
-      </Link>}
-      <span role="status" className="text-xs text-pink-200">{notice}</span>
-    </div>
-  </div>;
+  );
 }

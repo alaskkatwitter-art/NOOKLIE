@@ -187,3 +187,7 @@ body:has([data-visual-shell="neon"]) .site-shell-brand > span { display:none; }
 .feed-post-content > .feed-post-body { margin-top:0; }
 .profile-reference-header .profile-banner::after { background:none; }
 .profile-reference[data-profile-theme] { background:var(--profile-theme-background,#000); }
+
+.feed-story-create { position:relative; }
+.feed-story-add { position:absolute; right:-3px; bottom:-2px; display:grid; place-items:center; width:19px; height:19px; border:2px solid var(--ui-surface); border-radius:50%; background:var(--ui-accent); color:var(--ui-accent-text); }
+.feed-story-strip { padding-inline:4px; }

@@ -86,7 +86,7 @@ export async function GET(request: Request) {
       await supabase
         .from('profiles')
         .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color, is_private, verified, is_official, header_layout, avatar_position'
+          'id, username, display_name, bio, avatar_url, cover_url, theme_color, is_private, verified, is_official, header_layout, avatar_position, video_autoplay'
         )
         .eq('user_id', session.user_id)
         .maybeSingle();
@@ -117,10 +117,10 @@ export async function GET(request: Request) {
     }
 
     if (summary) {
-      const { id, username, display_name, avatar_url, verified, is_official } = profile;
+      const { id, username, display_name, avatar_url, verified, is_official, video_autoplay } = profile;
       return NextResponse.json({
         authenticated: true,
-        user: { id, username, display_name, avatar_url, verified, is_official },
+        user: { id, username, display_name, avatar_url, verified, is_official, video_autoplay },
       });
     }
 

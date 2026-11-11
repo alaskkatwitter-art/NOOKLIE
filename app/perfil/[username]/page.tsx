@@ -1032,7 +1032,16 @@ export default function PublicProfilePage() {
             {/* MURAL */}
 
             <section hidden={activeTab !== 'nook'} className="profile-wall profile-tab-panel w-full shrink-0 px-0.5" aria-label="Mural">
-              {isSelf && <button type="button" className="profile-wall-compose" onClick={() => setComposerOpen(true)}>Escrever no mural</button>}
+              {isSelf && (
+                <button type="button" className="profile-wall-compose" onClick={() => setComposerOpen(true)}>
+                  <span className="profile-wall-compose-avatar" aria-hidden="true">
+                    {user.avatar_url
+                      ? <img src={contentMediaUrl(user.avatar_url)} alt="" />
+                      : getDisplayName(user).charAt(0).toUpperCase()}
+                  </span>
+                  <span>Publique alguma coisa no seu mural…</span>
+                </button>
+              )}
               {posts.length ===
               0 ? (
                 <EmptyState
@@ -1114,7 +1123,7 @@ export default function PublicProfilePage() {
                                   contentMediaUrl(post.image_url)
                                 }
                                 alt=""
-                                className="max-h-[340px] w-full object-contain"
+                                className="nook-post-image"
                               />
                             </div>
                           )}
@@ -1144,7 +1153,7 @@ export default function PublicProfilePage() {
                                         key={
                                           media.id
                                         }
-                                        className="overflow-hidden rounded-2xl border border-white/10 bg-black"
+                                        className="min-w-0"
                                       >
                                         <img
                                           src={
@@ -1294,12 +1303,12 @@ export default function PublicProfilePage() {
               )}
             </section>
 
-            <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div><details className="profile-secondary-section" onToggle={event => setRepostsOpen(event.currentTarget.open)}><summary>Republicados</summary>{repostsOpen && <Republicados profileId={user.id} own={isSelf} active={activeTab === 'about'}/>}</details>{isSelf && <Link className="profile-management-link" href="/configuracoes/conteudo">Gerenciar publicações e listas</Link>}</section>
+            <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div><details className="profile-secondary-section" onToggle={event => setRepostsOpen(event.currentTarget.open)}><summary>Republicados</summary>{repostsOpen && <Republicados profileId={user.id} own={isSelf} active={activeTab === 'about'}/>}</details></section>
           </div>
         </div>
         </>}
       </div>
-      <NookPostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={() => {
+      <NookPostComposer origin="mural" open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={() => {
         void fetch('/api/public-profile/' + encodeURIComponent(user.username), { cache: 'no-store' }).then(async response => { if (response.ok) { const data = await response.json(); setPosts(data.posts || []); } }).catch(() => {});
       }}/>
     </main>

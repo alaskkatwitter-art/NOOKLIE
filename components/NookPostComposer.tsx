@@ -15,6 +15,7 @@ type Story = {
 
 type Props = {
   open: boolean;
+  origin?: 'feed' | 'mural';
   initialNewsSlug?: string;
   initialStoryId?: string;
   initialBody?: string;
@@ -30,6 +31,7 @@ export default function NookPostComposer({
   open,
   onClose,
   onPublished,
+  origin = 'feed',
   initialNewsSlug,
   initialStoryId = '',
   initialBody = '',
@@ -259,7 +261,7 @@ export default function NookPostComposer({
     setError('');
 
     try {
-      const fields = { body: body.trim(), story_id: storyId || null, news_slug: newsSlug || null };
+      const fields = { origin, body: body.trim(), story_id: storyId || null, news_slug: newsSlug || null };
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {
         if (value) form.set(key, value);
@@ -318,7 +320,7 @@ export default function NookPostComposer({
             </p>
 
             <h2 className="mt-1 text-lg font-black text-white">
-              Nova publicação
+              {origin === 'mural' ? 'Publicar no mural' : 'Nova publicação'}
             </h2>
           </div>
 
@@ -353,7 +355,7 @@ export default function NookPostComposer({
               }
             }}
             aria-label="Texto do aviso ou publicação"
-            placeholder="O que você quer compartilhar? Use @ para mencionar alguém ou # para marcar um assunto."
+            placeholder={origin === 'mural' ? 'Publique alguma coisa no seu mural…' : 'O que você quer compartilhar? Use @ para mencionar alguém ou # para marcar um assunto.'}
             rows={5}
             autoFocus
             className="w-full resize-y rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 text-[15px] leading-7 text-white outline-none transition placeholder:text-white/25 focus:border-[#ff78b9]/35"

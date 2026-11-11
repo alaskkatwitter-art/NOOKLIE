@@ -1,11 +1,12 @@
 "use client";
 
+import { SetVideoAutoplay } from '@/components/VideoAutoplayPreference';
 import UiThemeControl from '@/components/UiThemeControl';
 import AccountBadge from '@/components/AccountBadge';
 import { contentMediaUrl } from "@/lib/security/content-media";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useContext, useEffect, useRef, useState } from "react";
 import {
   Bell,
   ArrowLeft,
@@ -28,6 +29,8 @@ import {
   Briefcase,
   Users,
   LogOut,
+  Search,
+  Bookmark,
 } from "lucide-react";
 
 import { notificationReturnParam, notificationsPath } from '@/lib/notifications/presentation';
@@ -55,6 +58,7 @@ const links = [
   ["/escrever", "Escrever", NotebookPen],
 ] as const;
 const drawerLinks = [
+  ["/calendario", "Calendário de atualizações", CalendarDays],
   ["/chat", "Mensagens", MessageCircle],
   ["/minhas-historias", "Minhas histórias", NotebookPen],
   ["/leitura-beta", "Leitura beta", NotebookPen],
@@ -71,6 +75,7 @@ const drawerLinks = [
 export default function SiteNavigation() {
   const pathname = usePathname();
   const router = useRouter();
+  const setVideoAutoplay = useContext(SetVideoAutoplay);
   const drawer = useRef<HTMLDialogElement>(null);
   const profileMenu = useRef<HTMLDetailsElement>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -98,6 +103,7 @@ export default function SiteNavigation() {
         const data = await response.json();
         if (controller.signal.aborted) return;
         setUser(response.ok && data.authenticated ? data.user : null);
+        setVideoAutoplay(response.ok && data.authenticated ? data.user?.video_autoplay !== false : true);
         if (response.ok && data.authenticated) {
           const [access, notifications] = await Promise.all([
             fetch("/api/admin/access", {
@@ -165,7 +171,7 @@ export default function SiteNavigation() {
         refreshNotifications,
       );
     };
-  }, [pathname]);
+  }, [pathname, setVideoAutoplay]);
   async function logout() {
     setBusy(true);
     setError("");
@@ -174,6 +180,7 @@ export default function SiteNavigation() {
       if (!response.ok) throw new Error();
       lastLoaded.current = 0;
       setUser(null);
+      setVideoAutoplay(true);
       setUnread(0);
       profileMenu.current?.removeAttribute("open");
       router.replace("/");
@@ -337,6 +344,14 @@ export default function SiteNavigation() {
           </span>
         </div>
         <nav aria-label="Mais áreas" className="drawer-links">
+          <a href="/feed?buscar=1" onClick={() => drawer.current?.close()}>
+            <span><Search size={20} aria-hidden="true" /></span>
+            Buscar no Feed
+          </a>
+          <Link href="/respostas-salvas">
+            <span><Bookmark size={20} aria-hidden="true" /></span>
+            Respostas salvas
+          </Link>
           {drawerLinks.map(([href, label, Icon]) => (
             <Link
               href={href}

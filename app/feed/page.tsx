@@ -11,7 +11,6 @@ import {contentMediaUrl} from '@/lib/security/content-media';
 import RepostAttribution from '@/components/RepostAttribution';
 import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
-import UpcomingUpdatesCalendar, { type CalendarStatus, type UpcomingUpdate } from '@/components/UpcomingUpdatesCalendar';
 import {
   useCallback,
   useRef,
@@ -20,7 +19,7 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
-import { Ellipsis, Trash2, Heart, Share2 } from 'lucide-react';
+import { Ellipsis, Trash2, Heart, Share2, Plus } from 'lucide-react';
 import { PostMention } from '@/components/PostMention';
 import NookPostComposer from '@/components/NookPostComposer';
 import StoryComposer from '@/components/StoryComposer';
@@ -702,10 +701,12 @@ function Avatar({
 
 function StoriesRow({
   stories,
+  currentUser,
   onOpen,
   onCreateStory,
 }: {
   stories: UserStory[];
+  currentUser: CurrentUser | null;
   onOpen: (story: UserStory) => void;
   onCreateStory: () => void;
 }) {
@@ -721,8 +722,25 @@ function StoriesRow({
     return Array.from(map.values());
   }, [stories]);
 
-  return <section className="feed-stories" aria-label="Stories"><div className="feed-story-strip"><button type="button" onClick={onCreateStory} className="feed-story" aria-label="Criar seu Story"><span className="feed-story-create">+</span><span>Seu Story</span></button>{groupedStories.map(story=><button type="button" key={story.user_id} onClick={()=>onOpen(story)} className="feed-story" aria-label={'Ver Story de @'+story.user.username}><span className="feed-story-ring"><Avatar profile={story.user}/></span><span>@{story.user.username}<AccountBadge account={story.user} /></span></button>)}</div></section>;
-
+  return (
+    <section className="feed-stories" aria-label="Stories">
+      <div className="feed-story-strip">
+        <button type="button" onClick={onCreateStory} className="feed-story" aria-label="Criar seu story">
+          <span className="feed-story-create">
+            <Avatar profile={currentUser} />
+            <span className="feed-story-add"><Plus size={13} aria-hidden="true" /></span>
+          </span>
+          <span>Seu story</span>
+        </button>
+        {groupedStories.map(story => (
+          <button type="button" key={story.user_id} onClick={() => onOpen(story)} className="feed-story" aria-label={'Ver story de @' + story.user.username}>
+            <span className="feed-story-ring"><Avatar profile={story.user} /></span>
+            <span>{story.user_id === currentUser?.id ? 'Ver seu story' : '@' + story.user.username}<AccountBadge account={story.user} /></span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 /* =========================================================
@@ -1131,43 +1149,16 @@ function PostMedia({
   const media =
     getPostMedia(post);
 
-  if (!media.length) {
-    return null;
-  }
-
-  if (media.length === 1) {
-    const item = media[0];
-    if (item.media_type === 'video') return <FeedVideo id={item.id} />;
-
-    return (
-      <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-        <img
-          loading="lazy"
-          src={contentMediaUrl(item.media_url, expanded ? undefined : 'feed')}
-          alt=""
-          className="max-h-[360px] w-full object-contain"
-        />
-      </div>
-    );
-  }
+  if (!media.length) return null;
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-1 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-      {media.map((item) => item.media_type === 'video' ? (
-        <FeedVideo key={item.id} id={item.id} />
-      ) : (
-        <div
-          key={item.id}
-          className="aspect-[4/3] overflow-hidden bg-black/40"
-        >
-          <img
-            loading="lazy"
+    <div className={`mt-3 ${media.length > 1 ? 'grid grid-cols-2 items-start gap-2' : ''}`}>
+      {media.map(item => item.media_type === 'video'
+        ? <FeedVideo key={item.id} id={item.id} />
+        : <img key={item.id} loading="lazy" decoding="async" alt=""
             src={contentMediaUrl(item.media_url, expanded ? undefined : 'feed')}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        </div>
-      ))}
+            className="nook-post-image" />
+      )}
     </div>
   );
 }
@@ -2292,44 +2283,6 @@ function MobileDrawer({
 }
 
 /* =========================================================
-   CALENDÁRIO MOBILE
-========================================================= */
-
-function MobileCalendarModal({
-  open,
-  updates,
-  status,
-  onRetry,
-  onClose,
-}: {
-  open: boolean;
-  updates: UpcomingUpdate[];
-  status: CalendarStatus;
-  onRetry: () => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (open) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [open]);
-
-  return (
-    <dialog
-      ref={dialog}
-      id="feed-updates-calendar"
-      aria-label="Calendário de atualizações"
-      className="m-auto max-h-[90dvh] w-[calc(100%_-_1.5rem)] max-w-[520px] overflow-y-auto overscroll-contain rounded-[26px] border border-pink-200/20 bg-[#17101b] p-0 text-white backdrop:bg-black/70"
-      onCancel={onClose}
-      onClose={onClose}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-    >
-      {open && <UpcomingUpdatesCalendar updates={updates} status={status} onRetry={onRetry} onClose={onClose} />}
-    </dialog>
-  );
-}
-
-/* =========================================================
    BUSCA DE USUÁRIOS
 ========================================================= */
 
@@ -2461,6 +2414,10 @@ function FeedSearchModal({
               </button>
             )}
           </div>
+          <form action="/feed" className="mt-3 flex gap-2">
+            <input name="tag" aria-label="Buscar hashtag no feed" maxLength={65} placeholder="# Buscar hashtag" className="nook-input min-w-0 flex-1" />
+            <button className="discovery-secondary">Buscar hashtag</button>
+          </form>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
@@ -2622,7 +2579,6 @@ export default function FeedPage() {
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [tagInput, setTagInput] = useState('');
   const [quoteBody, setQuoteBody] = useState('');
   useEffect(() => {
     let controller: AbortController | undefined;
@@ -2653,7 +2609,7 @@ export default function FeedPage() {
     const url = new URL(window.location.href);
     const tag = normalizeHashtag(url.searchParams.get('tag') || '');
     setActiveTag(tag);
-    setTagInput(tag);
+    setSearchOpen(url.searchParams.get('buscar') === '1');
     const post = url.searchParams.get('post') || url.hash.match(/^#post-(.+)$/)?.[1];
     if (post) void open(post);
     const quotePost = url.searchParams.get('quotePost');
@@ -2719,25 +2675,6 @@ export default function FeedPage() {
   const [
     storyComposerOpen,
     setStoryComposerOpen,
-  ] = useState(false);
-
-  const [
-    upcomingUpdates,
-    setUpcomingUpdates,
-  ] = useState<
-    UpcomingUpdate[]
-  >([]);
-  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
-  const calendarRequest = useRef<AbortController | null>(null);
-
-  const [
-    drawerOpen,
-    setDrawerOpen,
-  ] = useState(false);
-
-  const [
-    calendarOpen,
-    setCalendarOpen,
   ] = useState(false);
 
   /* =======================================================
@@ -3162,44 +3099,13 @@ export default function FeedPage() {
     }, []);
 
   /* =======================================================
-     PRÓXIMAS ATUALIZAÇÕES
-  ======================================================= */
-
-  const loadUpcomingUpdates = useCallback(async () => {
-    calendarRequest.current?.abort();
-    const request = new AbortController();
-    calendarRequest.current = request;
-    setCalendarStatus('loading');
-    try {
-      const response = await fetch('/api/upcoming-updates', { cache: 'no-store', signal: request.signal });
-      if (request.signal.aborted) return;
-      if (response.status === 401) {
-        setUpcomingUpdates([]);
-        setCalendarStatus('signed-out');
-        return;
-      }
-      if (!response.ok) throw Error('Falha ao carregar o calendário.');
-      const data = await response.json();
-      if (request.signal.aborted) return;
-      setUpcomingUpdates(Array.isArray(data.updates) ? data.updates : []);
-      setCalendarStatus('ready');
-    } catch {
-      if (request.signal.aborted) return;
-      setUpcomingUpdates([]);
-      setCalendarStatus('error');
-    }
-  }, []);
-
-  /* =======================================================
      CARREGAMENTO INICIAL
   ======================================================= */
 
   useEffect(() => {
     loadCurrentUser();
     loadStories();
-    loadUpcomingUpdates();
-    return () => calendarRequest.current?.abort();
-  }, [loadCurrentUser, loadStories, loadUpcomingUpdates]);
+  }, [loadCurrentUser, loadStories]);
 
   useEffect(() => {
     void loadFeed();
@@ -3220,7 +3126,6 @@ export default function FeedPage() {
           document.visibilityState ===
           'visible'
         ) {
-          loadUpcomingUpdates();
           loadStories();
         }
       };
@@ -3237,7 +3142,6 @@ export default function FeedPage() {
       );
     };
   }, [
-    loadUpcomingUpdates,
     loadStories,
   ]);
 
@@ -3267,31 +3171,8 @@ export default function FeedPage() {
     setDeleteNotice('Publicação apagada.');
   }
 
-  const greetingName =
-    currentUser?.username ||
-    currentUser?.display_name ||
-    'escritor';
-
   return (
     <main data-social-page="feed" className="feed-page min-h-screen text-white">
-
-      {/* =================================================
-          DESKTOP MENU
-      ================================================= */}
-
-      <MobileCalendarModal
-        open={calendarOpen}
-        updates={upcomingUpdates}
-        status={calendarStatus}
-        onRetry={loadUpcomingUpdates}
-        onClose={() =>
-          setCalendarOpen(false)
-        }
-      />
-
-      {/* =================================================
-          STORY VIEWER
-      ================================================= */}
 
       <StoryViewer
         story={activeStory}
@@ -3318,6 +3199,9 @@ export default function FeedPage() {
         onFollow={handleFollow}
         onClose={() => {
           setSearchOpen(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('buscar');
+          window.history.replaceState(null, '', url);
           setSearchQuery('');
           setSearchUsers([]);
         }}
@@ -3327,272 +3211,118 @@ export default function FeedPage() {
           CONTEÚDO
       ================================================= */}
 
-      <div
-        className={`relative min-h-screen w-full px-4 pb-20 pt-4 transition-all duration-300 sm:px-6 lg:px-8 lg:pt-6 ${
-          drawerOpen
-            ? 'lg:pl-[320px]'
-            : ''
-        }`}
-      >
-        <div className="mx-auto max-w-[980px]">
-          {/* =================================================
-              TOP BAR
-          ================================================= */}
+      <div className="relative mx-auto min-h-screen w-full max-w-[680px] px-4 pb-20 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+        <StoriesRow
+          stories={stories}
+          currentUser={currentUser}
+          onOpen={setActiveStory}
+          onCreateStory={() => setStoryComposerOpen(true)}
+        />
+        <nav className="feed-timeline-tabs" aria-label="Explorar publicações"><button type="button" aria-pressed={feedScope === 'all'} onClick={() => setFeedScope('all')}>Feed</button><button type="button" aria-pressed={feedScope === 'following'} onClick={() => setFeedScope('following')}>Seguindo</button><Link href="/explorar">Descobrir</Link></nav>
+        <p role="status" className={deleteNotice ? 'my-3 text-sm text-pink-200' : 'sr-only'}>{deleteNotice}</p>
+        {activeTag && <Link href="/feed" className="my-3 inline-flex rounded-full border border-pink-300/30 px-3 py-2 text-sm text-pink-200">#{activeTag} · Limpar filtro</Link>}
+          <div>
 
-          <nav className="feed-timeline-tabs" aria-label="Explorar publicações"><button type="button" aria-pressed={feedScope === 'all'} onClick={() => setFeedScope('all')}>Feed</button><button type="button" aria-pressed={feedScope === 'following'} onClick={() => setFeedScope('following')}>Seguindo</button><Link href="/explorar">Descobrir</Link></nav>
-          <details className="feed-tools"><summary>Buscar, calendário e mais</summary>
-          <header className="feed-heading">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-pink-200">Comunidade Nooklie</p>
-              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Seu Feed</h1>
-              <p className="mt-2 text-sm text-white/75">Conversas, histórias e novidades de quem escreve.</p>
+          <button type="button" onClick={() => setComposerOpen(true)} aria-label="Criar publicação" className="feed-compose"><span className="feed-compose-plus" aria-hidden="true">+</span></button>
+          {/* ERROR */}
+
+          {error && (
+            <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
+              <p className="text-sm font-semibold text-red-300">
+                {error}
+              </p>
+
+              <button
+                type="button"
+                onClick={() =>
+                  loadFeed()
+                }
+                className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+              >
+                Tentar novamente
+              </button>
             </div>
-            <div className="flex shrink-0 gap-1 sm:gap-2">
-              <button type="button" aria-label="Pesquisar pessoas" onClick={() => setSearchOpen(true)} className="shell-icon"><SearchIcon /></button>
-              <button type="button" aria-label="Atualizar Feed" onClick={() => { loadFeed(true); loadStories(); loadUpcomingUpdates(); }} disabled={refreshing} className="shell-icon"><RefreshIcon /></button>
-            </div>
-          </header>
-          <p role="status" className={deleteNotice ? 'mb-3 text-sm text-pink-200' : 'sr-only'}>{deleteNotice}</p>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <form className="flex min-w-0 items-center gap-2" action="/feed">
-              <input name="tag" aria-label="Buscar hashtag no feed" maxLength={65} placeholder="# Buscar hashtag" value={tagInput} onChange={event => setTagInput(event.target.value)} className="nook-input min-w-0" />
-              <button className="discovery-secondary">Buscar</button>
-            </form>
-            <Link href="/respostas-salvas" className="text-sm text-pink-200 hover:underline">Respostas salvas</Link>
-            {activeTag && <a href="/feed" className="rounded-full border border-pink-300/30 px-3 py-2 text-sm text-pink-200">#{activeTag} · Limpar filtro</a>}
-          </div>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setCalendarOpen(true)}
-            aria-haspopup="dialog"
-            aria-controls="feed-updates-calendar"
-            aria-expanded={calendarOpen}
-            className="mb-6 flex min-h-16 w-full items-center gap-3 rounded-2xl border border-[#ff9bca]/25 bg-gradient-to-r from-[#ff78b9]/15 to-[#c798e6]/10 px-4 py-4 text-left transition hover:border-[#ff9bca]/50 hover:bg-[#ff78b9]/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff9bca] xl:hidden"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ff9bca]/15 text-[#ff9bca]"><CalendarIcon /></span>
-            <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#ffd1e7]">Calendário de atualizações</span><span className="mt-1 block text-xs leading-5 text-white/60">Veja os próximos capítulos dos autores que você segue.</span></span>
-            {upcomingUpdates.length > 0 && <span aria-label={`${upcomingUpdates.length} atualizações agendadas`} className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-[#ff9bca] px-2 text-xs font-bold text-[#25121e]">{upcomingUpdates.length}</span>}
-          </button>
+          {/* MURAL */}
 
-          {/* =================================================
-              HERO / BOAS-VINDAS
-          ================================================= */}
-
-          {/* =================================================
-              STORIES
-          ================================================= */}
-
-          <div id="stories" className="scroll-mt-24"><StoriesRow
-            stories={stories}
-            onOpen={setActiveStory}
-            onCreateStory={() =>
-              setStoryComposerOpen(true)
-            }
-          /></div>
-          </details>
-
-          {/* =================================================
-              LAYOUT
-          ================================================= */}
-
-          <div className="flex items-start justify-center gap-7">
-            {/* =================================================
-                COLUNA CENTRAL
-            ================================================= */}
-
-            <div className="w-full max-w-[680px]">
-              {/* CREATE POST */}
-
-              <button type="button" onClick={()=>setComposerOpen(true)} aria-label="Criar publicação" className="feed-compose"><Avatar profile={currentUser}/><span>O que você quer compartilhar?</span><span className="feed-compose-plus" aria-hidden="true">+</span></button>
-              {/* ERROR */}
-
-              {error && (
-                <div className="mb-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] px-5 py-4">
-                  <p className="text-sm font-semibold text-red-300">
-                    {error}
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      loadFeed()
-                    }
-                    className="mt-2 text-xs font-bold text-red-300 underline underline-offset-2"
+          <h2 className="sr-only">Publicações da comunidade</h2>
+          {loading ? (
+            <div className="w-full space-y-5">
+              {[1, 2, 3].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
                   >
-                    Tentar novamente
-                  </button>
-                </div>
-              )}
+                    <div className="flex gap-3">
+                      <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
 
-              {/* MURAL */}
+                      <div className="flex-1">
+                        <div className="h-3 w-32 rounded bg-white/[0.06]" />
 
-              <h2 className="sr-only">Publicações da comunidade</h2>
-              {loading ? (
-                <div className="w-full space-y-5">
-                  {[1, 2, 3].map(
-                    (item) => (
-                      <div
-                        key={item}
-                        className="animate-pulse rounded-[26px] border border-white/[0.06] bg-white/[0.025] p-6"
-                      >
-                        <div className="flex gap-3">
-                          <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
-
-                          <div className="flex-1">
-                            <div className="h-3 w-32 rounded bg-white/[0.06]" />
-
-                            <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
-                          </div>
-                        </div>
-
-                        <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
-
-                        <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
-
-                        <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
+                        <div className="mt-2 h-2 w-20 rounded bg-white/[0.04]" />
                       </div>
-                    )
-                  )}
-                </div>
-              ) : posts.length === 0 ? (
-                <div className="flex min-h-[45vh] items-center justify-center rounded-[26px] border border-white/[0.06] bg-white/[0.015]">
-                  <div className="max-w-md px-6 text-center">
-                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] text-[#ff78b9]/50">
-                      <CloudIcon />
                     </div>
 
-                    <h2 className="mt-6 text-xl font-black text-white">
-                      O Mural está quieto.
-                    </h2>
+                    <div className="mt-5 h-4 w-4/5 rounded bg-white/[0.05]" />
 
-                    <p className="mt-2 text-sm leading-6 text-white/35">
-                      Ainda não há publicações por
-                      aqui. Quando os escritores
-                      começarem a postar, elas
-                      aparecerão aqui.
-                    </p>
+                    <div className="mt-3 h-4 w-3/5 rounded bg-white/[0.04]" />
+
+                    <div className="mt-5 h-32 rounded-2xl bg-white/[0.04]" />
                   </div>
-                </div>
-              ) : (
-                <div className="feed-post-list">
-                  {posts.map(
-                    (post) => (
-                      <FeedPost
-                        key={post.repost?.id||post.id}
-                        post={post}
-                        viewerId={currentUser?.id}
-                        onPostDeleted={removePost}
-                        onPostUpdated={
-                          updatePost
-                        }
-                      />
-                    )
-                  )}
-                </div>
-              )}
-              {!loading && feedCursor && (
-                <button
-                  type="button"
-                  disabled={loadingOlder || refreshing}
-                  onClick={() => void loadFeed(false, feedCursor)}
-                  className="mt-5 min-h-11 w-full rounded-full border border-pink-200/20 px-4 font-semibold text-pink-100 disabled:opacity-50"
-                >
-                  {loadingOlder ? 'Carregando publicações…' : 'Carregar mais publicações'}
-                </button>
+                )
               )}
             </div>
+          ) : posts.length === 0 ? (
+            <div className="flex min-h-[45vh] items-center justify-center rounded-[26px] border border-white/[0.06] bg-white/[0.015]">
+              <div className="max-w-md px-6 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] text-[#ff78b9]/50">
+                  <CloudIcon />
+                </div>
 
-            {/* =================================================
-                LATERAL DIREITA
-            ================================================= */}
+                <h2 className="mt-6 text-xl font-black text-white">
+                  O Mural está quieto.
+                </h2>
 
-            <div className="hidden w-[270px] shrink-0 xl:block">
-              <div className="sticky top-24 space-y-5">
-                {/* MINI STORIES */}
-
-                <aside className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#100c11]/90 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#ff78b9]">
-                        Stories
-                      </p>
-
-                      <p className="mt-1 text-sm font-black text-white">
-                        Quem você segue
-                      </p>
-                    </div>
-
-                    <Link
-                      href="#stories"
-                      className="text-[9px] font-bold text-white/25 hover:text-[#ff78b9]"
-                    >
-                      Ver todos
-                    </Link>
-                  </div>
-
-                  {stories.length === 0 ? (
-                    <p className="py-4 text-center text-[10px] leading-5 text-white/25">
-                      Nenhum story novo.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {Array.from(
-                        new Map(
-                          stories.map(
-                            (story) => [
-                              story.user_id,
-                              story,
-                            ]
-                          )
-                        ).values()
-                      )
-                        .slice(0, 6)
-                        .map(
-                          (story) => (
-                            <button
-                              key={
-                                story.user_id
-                              }
-                              type="button"
-                              onClick={() =>
-                                setActiveStory(
-                                  story
-                                )
-                              }
-                              className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition hover:bg-white/[0.04]"
-                            >
-                              <div className="rounded-full bg-gradient-to-br from-[#ff4d9d] via-[#ff78b9] to-[#c63dff] p-[2px]">
-                                <div className="rounded-full bg-[#100c11] p-[2px]">
-                                  <Avatar
-                                    profile={
-                                      story.user
-                                    }
-                                    size="small"
-                                  />
-                                </div>
-                              </div>
-
-                              <span className="min-w-0 flex-1 truncate text-xs font-bold text-white/65">
-                                @{story.user.username}<AccountBadge account={story.user} />
-                              </span>
-                            </button>
-                          )
-                        )}
-                    </div>
-                  )}
-                </aside>
-
-                {/* CALENDÁRIO */}
-
-                <aside className="max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[26px] border border-pink-200/15 bg-[#17101b]">
-                  <UpcomingUpdatesCalendar updates={upcomingUpdates} status={calendarStatus} onRetry={loadUpcomingUpdates} />
-                </aside>
+                <p className="mt-2 text-sm leading-6 text-white/35">
+                  Ainda não há publicações por
+                  aqui. Quando os escritores
+                  começarem a postar, elas
+                  aparecerão aqui.
+                </p>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="feed-post-list">
+              {posts.map(
+                (post) => (
+                  <FeedPost
+                    key={post.repost?.id||post.id}
+                    post={post}
+                    viewerId={currentUser?.id}
+                    onPostDeleted={removePost}
+                    onPostUpdated={
+                      updatePost
+                    }
+                  />
+                )
+              )}
+            </div>
+          )}
+          {!loading && feedCursor && (
+            <button
+              type="button"
+              disabled={loadingOlder || refreshing}
+              onClick={() => void loadFeed(false, feedCursor)}
+              className="mt-5 min-h-11 w-full rounded-full border border-pink-200/20 px-4 font-semibold text-pink-100 disabled:opacity-50"
+            >
+              {loadingOlder ? 'Carregando publicações…' : 'Carregar mais publicações'}
+            </button>
+          )}
         </div>
-      </div>
+
+  </div>
 
       {/* =====================================================
           NOVA PUBLICAÇÃO
@@ -3607,7 +3337,6 @@ export default function FeedPage() {
           setComposerOpen(false);
           loadFeed(true);
           loadStories();
-          loadUpcomingUpdates();
         }}
       />
 

@@ -54,10 +54,9 @@ body > footer { background:var(--ui-bg); color:var(--ui-muted); border-color:var
 .profile-wall article p.mt-5 { margin-top:8px; font-size:.875rem; line-height:1.5; }
 .profile-wall article img.rounded-full { width:34px; height:34px; }
 .profile-wall .space-y-4 > :not(:last-child) { margin-bottom:10px; }
-.profile-wall-compose { display:block; width:100%; max-width:42rem; min-height:44px; margin:0 auto 12px; padding:10px 14px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-surface); color:var(--ui-accent); text-align:left; font-size:.8125rem; }
-.profile-secondary-section,.profile-management-link { display:block; max-width:42rem; margin:12px auto; border-top:1px solid var(--ui-border); padding:12px 0; font-size:.8125rem; }
+.profile-wall-compose { display:flex; align-items:center; gap:12px; width:100%; max-width:42rem; min-height:44px; margin:0 auto 12px; padding:10px 14px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-surface); color:var(--ui-muted); text-align:left; font-size:.875rem; }
+.profile-secondary-section { display:block; max-width:42rem; margin:12px auto; border-top:1px solid var(--ui-border); padding:12px 0; font-size:.8125rem; }
 .profile-secondary-section summary { min-height:44px; padding:12px; cursor:pointer; color:var(--ui-accent); }
-.profile-management-link { color:var(--ui-accent); }
 .profile-about { max-width:42rem; margin:auto; border-radius:8px; padding:16px; }
 .discovery-card { border-radius:6px; }
 .discovery-card img { border-radius:4px; }
@@ -156,3 +155,15 @@ body:has(.profile-editor-page) .site-navigation { display:none; }
 :root[data-ui-theme="light"] :is(.text-pink-50,.text-pink-100,.text-pink-200,.text-pink-300,.text-pink-400,.text-rose-100,.text-rose-200,.text-fuchsia-100,.text-fuchsia-200):where(:not([data-profile-theme], [data-profile-theme] *, .reader-surface, .reader-surface *)) { color:var(--ui-accent)!important; }
 :root[data-ui-theme="light"] :is(.text-gray-100,.text-gray-200,.text-gray-300,.text-gray-400,.text-slate-100,.text-slate-200,.text-zinc-100,.text-zinc-200):where(:not([data-profile-theme], [data-profile-theme] *, .reader-surface, .reader-surface *)) { color:var(--ui-muted)!important; }
 :root[data-ui-theme="light"] .chat-list-heading .nook-eyebrow { color:var(--ui-accent); }
+
+.profile-wall-compose-avatar { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; overflow:hidden; background:var(--ui-accent); color:var(--ui-accent-text); font-weight:700; }
+.profile-wall-compose-avatar img { width:100%; height:100%; object-fit:cover; }
+[data-social-page="feed"] .feed-post img.nook-post-image,
+[data-social-page="profile"] article img.nook-post-image {
+  display:block;
+  width:auto;
+  height:auto;
+  max-width:100%;
+  max-height:min(70dvh, 44rem);
+  border-radius:12px;
+}

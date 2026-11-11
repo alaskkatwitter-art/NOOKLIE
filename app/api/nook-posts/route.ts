@@ -334,6 +334,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const origin = body.origin ?? 'feed';
+    if (origin !== 'feed' && origin !== 'mural') {
+      return NextResponse.json({ error: 'Origem da publicação inválida.' }, { status: 400 });
+    }
 
     const text =
       typeof body.body === 'string'
@@ -438,6 +442,7 @@ export async function POST(request: Request) {
       .from('nook_posts')
       .insert({
         user_id: userId,
+        publication_origin: origin,
         body: text,
         image_url: imageUrl,
         story_id: storyId,

@@ -1,10 +1,11 @@
 'use client';
 
+import { SetVideoAutoplay } from '@/components/VideoAutoplayPreference';
 import UiThemeControl from '@/components/UiThemeControl';
 import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 type UserProfile = {
   id: string;
@@ -166,15 +167,18 @@ function ChevronIcon() {
 function Toggle({
   enabled,
   onChange,
+  label,
 }: {
   enabled: boolean;
   onChange: () => void;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onChange}
       aria-pressed={enabled}
+      aria-label={label}
       className={`relative h-7 w-12 rounded-full transition ${
         enabled ? 'bg-[#ff68ae]' : 'bg-white/10'
       }`}
@@ -196,6 +200,8 @@ export default function ConfiguracoesPage() {
     useState(true);
   const [socialNotifications, setSocialNotifications] =
     useState(true);
+  const [videoAutoplay, setVideoAutoplay] = useState(true);
+  const updateVideoAutoplay = useContext(SetVideoAutoplay);
   const [privateProfile, setPrivateProfile] = useState(false);
 
   const [preferencesReady,setPreferencesReady]=useState(false);
@@ -223,7 +229,7 @@ export default function ConfiguracoesPage() {
       }
 
       setProfile(data.user);
-      const prefs=await fetch('/api/profile/privacy',{cache:'no-store'});if(!prefs.ok)throw new Error('Preferências indisponíveis');const savedPrefs=await prefs.json();setPrivateProfile(savedPrefs.is_private);setChapterNotifications(savedPrefs.chapter_notifications);setSocialNotifications(savedPrefs.social_notifications);setPreferencesReady(true);
+      const prefs=await fetch('/api/profile/privacy',{cache:'no-store'});if(!prefs.ok)throw new Error('Preferências indisponíveis');const savedPrefs=await prefs.json();setPrivateProfile(savedPrefs.is_private);setChapterNotifications(savedPrefs.chapter_notifications);setSocialNotifications(savedPrefs.social_notifications);setVideoAutoplay(savedPrefs.video_autoplay);setPreferencesReady(true);
     } catch (error) {
       setPreferencesError('Não foi possível carregar suas preferências. Recarregue a página antes de salvar.');
       console.error('Erro ao carregar configurações:', error);
@@ -237,7 +243,7 @@ export default function ConfiguracoesPage() {
     setSaving(true);
     setSaved(false);
 
-    try{const response=await fetch('/api/profile/privacy',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_private:privateProfile,social_notifications:socialNotifications,chapter_notifications:chapterNotifications})});if(!response.ok)throw new Error();setSaved(true);}catch{window.alert('Não foi possível salvar. Tente novamente.');}finally{setSaving(false);}
+    try{const response=await fetch('/api/profile/privacy',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_private:privateProfile,social_notifications:socialNotifications,chapter_notifications:chapterNotifications,video_autoplay:videoAutoplay})});if(!response.ok)throw new Error();updateVideoAutoplay(videoAutoplay);setSaved(true);}catch{window.alert('Não foi possível salvar. Tente novamente.');}finally{setSaving(false);}
   }
 
   async function handleLogout() {
@@ -407,8 +413,7 @@ export default function ConfiguracoesPage() {
                     </h3>
 
                     <p className="mt-1 text-xs leading-5 text-white/35">
-                      Receba notificações sobre curtidas, comentários e outras
-                      interações.
+                      Receba avisos de publicações no mural de quem você segue, curtidas e comentários.
                     </p>
                   </div>
 
@@ -489,6 +494,14 @@ export default function ConfiguracoesPage() {
                   />
                 </div>
               </div>
+            </section>
+
+            <section className="flex items-center justify-between gap-5 rounded-[2rem] border border-white/8 bg-white/[0.025] px-6 py-5">
+              <div>
+                <h2 className="text-sm font-semibold">Reprodução automática de vídeos</h2>
+                <p className="mt-1 text-xs leading-5 text-white/50">Inicia os vídeos sem som quando aparecem na tela.</p>
+              </div>
+              <Toggle enabled={videoAutoplay} onChange={() => setVideoAutoplay(value => !value)} label="Reprodução automática de vídeos" />
             </section>
 
             <section className="overflow-hidden rounded-[2rem] border border-white/8 bg-white/[0.025]">
