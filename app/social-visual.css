@@ -106,9 +106,9 @@ body:has([data-visual-shell="neon"]) .site-shell-brand > span { display:none; }
 /* The banner fades into the identity and the page, including below the tabs. */
 .profile-reference { position:relative; isolation:isolate; background:var(--profile-theme-background,#000); padding-bottom:112px; }
 .profile-reference::before { content:""; position:absolute; z-index:-1; inset:0 0 auto; height:min(54rem,100%); pointer-events:none; background:radial-gradient(ellipse at 75% 20%,rgb(var(--profile-cover-primary,0 0 0) / .24),transparent 60%),radial-gradient(ellipse at 15% 40%,rgb(var(--profile-cover-secondary,0 0 0) / .14),transparent 62%); }
-.profile-reference-inner { padding:0; }
+.profile-reference-inner { --profile-gutter:0px; padding:0 var(--profile-gutter); }
 .profile-reference-header { border:0; border-radius:0; box-shadow:none; background:transparent; }
-.profile-reference-header .profile-banner { height:clamp(12.5rem,38vw,23rem); background:transparent; }
+.profile-reference-header .profile-banner { height:clamp(12.5rem,38vw,23rem); margin-inline:calc(-1 * var(--profile-gutter)); background:transparent; }
 .profile-reference-header[data-profile-layout="immersive"] > .profile-banner { height:clamp(16rem,45vw,28rem); }
 .profile-reference-header .profile-banner::after { background:linear-gradient(0deg,var(--profile-theme-background,#170c16),transparent 85%); }
 .profile-reference-header .profile-banner-image { mask-image:linear-gradient(#000 40%,transparent); }
@@ -144,9 +144,11 @@ body:has([data-visual-shell="neon"]) .site-shell-brand > span { display:none; }
 .profile-media-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-bottom:20px; }
 .profile-media-grid img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; }
 .profile-reference :is(button,a):focus-visible { outline:2px solid var(--profile-theme-accent,#ff91cb); outline-offset:2px; }
+@media (max-width:640px) {
+  .profile-reference-inner { --profile-gutter:12px; }
+}
 @media (min-width:768px) {
-  .profile-reference-inner { padding:20px; }
-  .profile-reference-header { overflow:hidden; border-radius:28px 28px 0 0; }
+  .profile-reference-inner { --profile-gutter:20px; padding-block:20px; }
   .profile-reference .profile-header-avatar > * { width:116px; height:116px; }
   .profile-reference-tabs button { font-size:.8125rem; }
   .chat-layout { grid-template-columns:340px minmax(0,1fr); }

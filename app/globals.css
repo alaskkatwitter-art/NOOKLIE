@@ -1138,7 +1138,7 @@ select {
   [data-social-page="feed"] #stories {
     margin-bottom: 18px;
   }
-  [data-social-page="profile"] > div {
+  [data-social-page="profile"] > div:not(.profile-reference-inner) {
     padding-inline: 12px;
   }
   [data-social-page="profile"] article img:not([class*="rounded-full"]) {
