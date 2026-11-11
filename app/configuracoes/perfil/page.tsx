@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Camera, SlidersHorizontal } from 'lucide-react';
+import AnimatedProfileImage from '@/components/AnimatedProfileImage';
+import { profileGifLimits, type ImageFraming, type ProfileAnimation } from '@/lib/profile/animation';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileThemeEditor from '@/components/ProfileThemeEditor';
 import UiThemeControl from '@/components/UiThemeControl';
@@ -11,7 +13,7 @@ import { parseProfileThemeCollection, type ProfileThemeCollection } from '@/lib/
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import { contentMediaUrl } from '@/lib/security/content-media';
 
-type User = { username: string; display_name: string | null; bio: string | null; avatar_url: string | null; cover_url: string | null; header_layout?: ProfileHeaderLayout; avatar_position?: ProfileAvatarPosition };
+type User = { username: string; display_name: string | null; bio: string | null; avatar_url: string | null; cover_url: string | null; avatar_animation?: ProfileAnimation | null; cover_animation?: ProfileAnimation | null; header_layout?: ProfileHeaderLayout; avatar_position?: ProfileAvatarPosition };
 type Kind = 'avatar' | 'cover';
 
 export default function EditProfilePage() {
@@ -22,7 +24,7 @@ export default function EditProfilePage() {
   const [name, setName] = useState(''), [bio, setBio] = useState('');
   const [layout, setLayout] = useState<ProfileHeaderLayout>('classic');
   const [position, setPosition] = useState<ProfileAvatarPosition>('left');
-  const [crop, setCrop] = useState<{ source: File | string; kind: Kind } | null>(null);
+  const [crop, setCrop] = useState<{ source: File | string; kind: Kind; framing?: ImageFraming } | null>(null);
   const [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const avatarInput = useRef<HTMLInputElement>(null), coverInput = useRef<HTMLInputElement>(null);
 
@@ -48,20 +50,29 @@ export default function EditProfilePage() {
   function choose(event: ChangeEvent<HTMLInputElement>, kind: Kind) {
     const file = event.target.files?.[0]; event.target.value = '';
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Escolha uma imagem JPG, PNG ou WEBP.'); return; }
-    if (file.size > 20 * 1024 * 1024) { setError('Escolha uma imagem de até 20 MB.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) { setError('Escolha uma imagem JPG, PNG, WebP ou GIF.'); return; }
+    const gif = file.type === 'image/gif';
+    const limit = profileGifLimits[kind];
+    if (file.size > (gif ? limit.bytes : 20 * 1024 * 1024)) {
+      setError(gif ? `Use um GIF de até ${limit.label}.` : 'Escolha uma imagem de até 20 MB.');
+      return;
+    }
     setError(''); setNotice(''); setCrop({ source: file, kind });
   }
 
-  async function saveImage(file: File) {
+  async function saveImage(file: File, animation?: { gif: Blob; framing: ImageFraming }) {
     if (!crop) return;
     const kind = crop.kind; setSaving(true); setError('');
     try {
       const form = new FormData(); form.set('file', file);
+      if (animation) {
+        form.set('animation', animation.gif, kind + '.gif');
+        form.set('framing', JSON.stringify(animation.framing));
+      }
       const response = await fetch('/api/profile/' + kind, { method: 'POST', body: form });
       const data = await response.json();
       if (!response.ok) throw Error(data.error || 'Não foi possível salvar a imagem.');
-      setUser(current => current ? { ...current, [kind + '_url']: data[kind + '_url'] } : current);
+      setUser(current => current ? { ...current, [kind + '_url']: data[kind + '_url'], [kind + '_animation']: data[kind + '_animation'] } : current);
       setCrop(null); setNotice(kind === 'cover' ? 'Capa e enquadramento salvos.' : 'Foto de perfil salva.');
     } finally { setSaving(false); }
   }
@@ -83,17 +94,17 @@ export default function EditProfilePage() {
     {!user ? !error && <p role="status">Carregando suas opções…</p> : <>
       <div className="profile-editor-tabs" role="group" aria-label="Opções do perfil">{([['photos','Fotos e capa'],['themes','Temas'],['details','Dados']] as const).map(([value,label]) => <button type="button" key={value} aria-pressed={tab === value} onClick={() => setTab(value)}>{label}</button>)}</div>
       {tab === 'photos' && <section aria-label="Fotos e enquadramento" className="profile-photo-options">
-        <div className="editor-cover"><div>{user.cover_url ? <img src={contentMediaUrl(user.cover_url)} alt="Sua capa atual"/> : <span>Adicione sua capa</span>}</div><div className="editor-photo-actions"><strong>Capa</strong><button type="button" disabled={saving} onClick={() => coverInput.current?.click()}><Camera size={17}/>Trocar</button>{user.cover_url && <button type="button" disabled={saving} onClick={() => setCrop({ source: user.cover_url!, kind: 'cover' })}><SlidersHorizontal size={17}/>Zoom e posição</button>}</div></div>
-        <div className="editor-avatar"><div>{user.avatar_url ? <img src={contentMediaUrl(user.avatar_url)} alt="Sua foto atual"/> : <span>{(name || user.username).charAt(0)}</span>}</div><div className="editor-photo-actions"><strong>Foto de perfil</strong><button type="button" disabled={saving} onClick={() => avatarInput.current?.click()}><Camera size={17}/>Trocar</button>{user.avatar_url && <button type="button" disabled={saving} onClick={() => setCrop({ source: user.avatar_url!, kind: 'avatar' })}><SlidersHorizontal size={17}/>Enquadrar</button>}</div></div>
-        <p className="editor-hint">Ao ajustar uma imagem, você controla o zoom e arrasta para escolher o enquadramento.</p>
+        <div className="editor-cover"><div>{user.cover_animation ? <AnimatedProfileImage poster={user.cover_url} animation={user.cover_animation} kind="cover" alt="Sua capa atual" className="size-full"/> : user.cover_url ? <img src={contentMediaUrl(user.cover_url)} alt="Sua capa atual"/> : <span>Adicione sua capa</span>}</div><div className="editor-photo-actions"><strong>Capa</strong><button type="button" disabled={saving} onClick={() => coverInput.current?.click()}><Camera size={17}/>Trocar</button>{user.cover_url && <button type="button" disabled={saving} onClick={() => setCrop({ source: user.cover_animation?.url || user.cover_url!, kind: 'cover', framing: user.cover_animation || undefined })}><SlidersHorizontal size={17}/>Zoom e posição</button>}</div></div>
+        <div className="editor-avatar"><div>{user.avatar_animation ? <AnimatedProfileImage poster={user.avatar_url} animation={user.avatar_animation} kind="avatar" alt="Sua foto atual" className="size-full"/> : user.avatar_url ? <img src={contentMediaUrl(user.avatar_url)} alt="Sua foto atual"/> : <span>{(name || user.username).charAt(0)}</span>}</div><div className="editor-photo-actions"><strong>Foto de perfil</strong><button type="button" disabled={saving} onClick={() => avatarInput.current?.click()}><Camera size={17}/>Trocar</button>{user.avatar_url && <button type="button" disabled={saving} onClick={() => setCrop({ source: user.avatar_animation?.url || user.avatar_url!, kind: 'avatar', framing: user.avatar_animation || undefined })}><SlidersHorizontal size={17}/>Enquadrar</button>}</div></div>
+        <p className="editor-hint">Arraste e ajuste o zoom para enquadrar. GIFs de até 500 KB na foto de perfil e 2 MB na capa.</p>
       </section>}
       {tab === 'themes' && <section className="profile-editor-themes"><UiThemeControl/><div className="editor-layout-options"><label>Cabeçalho<select value={layout} onChange={event => setLayout(event.target.value as ProfileHeaderLayout)}><option value="classic">Clássico</option><option value="immersive">Imersivo</option></select></label><label>Avatar<select value={position} onChange={event => setPosition(event.target.value as ProfileAvatarPosition)}><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
         {themes ? <ProfileThemeEditor collection={themes} onChange={setThemes} cover={user.cover_url} username={user.username} expanded/> : <p role="status">{themes === undefined ? 'Carregando temas do perfil…' : 'Temas indisponíveis no momento.'}</p>}
       </section>}
       {tab === 'details' && <section className="profile-editor-details"><label>Nome de exibição<input maxLength={50} value={name} onChange={event => setName(event.target.value)}/></label><label>Biografia<textarea rows={4} maxLength={500} value={bio} onChange={event => setBio(event.target.value)}/></label><Link href="/configuracoes">Configurações da conta</Link></section>}
       {tab !== 'photos' && <button type="button" className="editor-save" disabled={saving} onClick={() => void save()}>{saving ? 'Salvando…' : tab === 'themes' ? 'Salvar cabeçalho' : 'Salvar dados'}</button>}
-      <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={event => choose(event, 'avatar')}/><input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={event => choose(event, 'cover')}/>
-      {crop && <ImageCropDialog source={crop.source} kind={crop.kind} onCancel={() => setCrop(null)} onSave={saveImage}/>}
+      <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'avatar')}/><input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'cover')}/>
+      {crop && <ImageCropDialog source={crop.source} kind={crop.kind} allowGif framing={crop.framing} onCancel={() => setCrop(null)} onSave={saveImage}/>}
     </>}
   </div></main>;
 }

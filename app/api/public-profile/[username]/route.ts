@@ -56,6 +56,8 @@ export async function GET(
           bio,
           avatar_url,
           cover_url,
+          avatar_animation,
+          cover_animation,
           header_layout,
           avatar_position,
           verified,

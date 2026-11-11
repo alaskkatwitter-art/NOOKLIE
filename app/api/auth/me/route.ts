@@ -82,14 +82,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data: profile, error: profileError } =
-      await supabase
-        .from('profiles')
-        .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color, is_private, verified, is_official, header_layout, avatar_position, video_autoplay'
-        )
-        .eq('user_id', session.user_id)
-        .maybeSingle();
+    const fields = 'id, username, display_name, bio, avatar_url, cover_url, theme_color, is_private, verified, is_official, header_layout, avatar_position, video_autoplay';
+    const profiles = supabase.from('profiles');
+    const selection = summary
+      ? profiles.select(fields)
+      : profiles.select(`${fields}, avatar_animation, cover_animation`);
+    const { data: profile, error: profileError } = await selection.eq('user_id', session.user_id).maybeSingle();
 
     if (profileError) {
       console.error(

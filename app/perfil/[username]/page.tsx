@@ -3,6 +3,8 @@ import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
 import ProfileStats from '@/components/ProfileStats';
+import AnimatedProfileImage from '@/components/AnimatedProfileImage';
+import type { ProfileAnimation } from '@/lib/profile/animation';
 import ProfileBanner from '@/components/ProfileBanner';
 import NookPostComposer from '@/components/NookPostComposer';
 import Link from 'next/link';
@@ -40,6 +42,8 @@ type User = {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  avatar_animation?: ProfileAnimation | null;
+  cover_animation?: ProfileAnimation | null;
   header_layout?: ProfileHeaderLayout;
   avatar_position?: ProfileAvatarPosition;
   verified?: boolean;
@@ -823,12 +827,15 @@ export default function PublicProfilePage() {
           data-profile-layout={user.header_layout ?? 'classic'}
           data-avatar-position={user.avatar_position ?? 'left'}
         >
-          <ProfileBanner cover={user.cover_url} />
+          <ProfileBanner cover={user.cover_url} animation={user.cover_animation} />
 
           <div className="profile-header-details relative px-5 pb-5 sm:px-8">
             <div className="profile-header-row--visitor -mt-14 flex items-end justify-between gap-2 sm:gap-4">
               <div className="profile-header-avatar shrink-0">
-                {user.avatar_url ? (
+                {user.avatar_animation ? (
+                  <AnimatedProfileImage poster={user.avatar_url} animation={user.avatar_animation} kind="avatar" alt={getDisplayName(user)}
+                    className="size-24 rounded-full border-4 border-[#151015] bg-[#211a21] shadow-xl sm:size-32" />
+                ) : user.avatar_url ? (
                   <img
                     src={
                       contentMediaUrl(user.avatar_url)
