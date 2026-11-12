@@ -30,7 +30,17 @@ export async function isPublicProfileVisible(
     if (fallback.error) throw fallback.error;
     profile = fallback.data;
   }
-  if (!profile || profile.moderation_hidden_at) return false;
+  if (!profile) return false;
+  return isLoadedProfileVisible(supabase, profile, viewerId, basicOnly);
+}
+
+export async function isLoadedProfileVisible(
+  supabase: VisibilityClient,
+  profile: { id: string; user_id: string; moderation_hidden_at: string | null; is_private: boolean | null },
+  viewerId?: string | null,
+  basicOnly = false,
+): Promise<boolean> {
+  if (profile.moderation_hidden_at) return false;
 
   const { data: account, error: accountError } = await supabase
     .from('auth_accounts')
@@ -40,6 +50,14 @@ export async function isPublicProfileVisible(
   if (accountError) throw accountError;
   if(account?.account_status==='suspended')return false;
   if(basicOnly)return true;
+  return canViewerAccessLoadedProfile(supabase, profile, viewerId);
+}
+
+export async function canViewerAccessLoadedProfile(
+  supabase: VisibilityClient,
+  profile: { id: string; is_private: boolean | null },
+  viewerId?: string | null,
+): Promise<boolean> {
   const viewer=viewerId===undefined?await currentViewerProfileId(supabase):viewerId;
   if(viewer&&viewer!==profile.id){const blocks=await supabase.from('chat_blocks').select('blocker_id').or(`and(blocker_id.eq.${viewer},blocked_id.eq.${profile.id}),and(blocker_id.eq.${profile.id},blocked_id.eq.${viewer})`).limit(1);if(blocks.error)throw blocks.error;if(blocks.data?.length)return false;}
   if(!profile.is_private)return true;

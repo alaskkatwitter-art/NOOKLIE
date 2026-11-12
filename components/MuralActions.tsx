@@ -1,6 +1,6 @@
 "use client";
 import AccountBadge from '@/components/AccountBadge';
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Cloud, MessageCircle, Send } from "lucide-react";
 type Comment = {
   id: string;
@@ -8,6 +8,7 @@ type Comment = {
   author?: { username: string; display_name: string | null; verified?: boolean; is_official?: boolean } | null;
 };
 export default function MuralActions({ postId }: { postId: string }) {
+  const actions = useRef<HTMLDivElement>(null);
   const [liked, setLiked] = useState(false),
     [likes, setLikes] = useState(0),
     [count, setCount] = useState(0),
@@ -37,10 +38,21 @@ export default function MuralActions({ postId }: { postId: string }) {
     setComments((await r.json()).comments || []);
   }, [postId]);
   useEffect(() => {
-    void summary().catch(() => {});
+    const node = actions.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      void summary().catch(() => {});
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      void summary().catch(() => {});
+    }, { rootMargin: '160px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [summary]);
   return (
-    <div className="mt-4 border-t border-white/5 pt-2">
+    <div ref={actions} className="mt-4 border-t border-white/5 pt-2">
       <div className="flex gap-4">
         <button
           type="button"

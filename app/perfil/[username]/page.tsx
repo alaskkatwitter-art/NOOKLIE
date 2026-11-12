@@ -119,6 +119,7 @@ type FicClub = {
 
 type ProfileResponse = {
  restricted?:boolean;
+ is_self?: boolean;
   user?: User;
   theme?: ProfileTheme | null;
   stories?: Story[];
@@ -437,6 +438,7 @@ export default function PublicProfilePage() {
     setIsFollowing,
   ] = useState(false);
 
+  const [visiblePostCount, setVisiblePostCount] = useState(12);
   const [isSelf, setIsSelf] =
     useState(false);
 
@@ -467,6 +469,14 @@ export default function PublicProfilePage() {
     const safeUsername =
       username;
 
+    const controller = new AbortController();
+    setVisiblePostCount(12);
+    setFollowersCount(0);
+    setFollowingCount(0);
+    setIsFollowing(false);
+    setRequested(false);
+    setFollowLoading(true);
+
     async function loadProfile() {
       setLoading(true);
       setError('');
@@ -482,11 +492,13 @@ export default function PublicProfilePage() {
             `/api/public-profile/${encodedUsername}`,
             {
               cache: 'no-store',
+              signal: controller.signal,
             }
           );
 
         const data: ProfileResponse =
           await response.json();
+        if (controller.signal.aborted) return;
 
         if (!response.ok) {
           setError(
@@ -503,7 +515,9 @@ export default function PublicProfilePage() {
           return;
         }
 
-        setUser(data.user);setRestricted(Boolean(data.restricted));
+        setUser(data.user);
+        setIsSelf(Boolean(data.is_self));
+        setRestricted(Boolean(data.restricted));
         setTheme(data.restricted ? null : parseProfileTheme(data.theme));
 
         setStories(
@@ -538,6 +552,8 @@ export default function PublicProfilePage() {
             : []
         );
 
+        setLoading(false);
+
         try {
           const followResponse =
             await fetch(
@@ -545,17 +561,15 @@ export default function PublicProfilePage() {
                 data.user.id
               )}`,
               {
-                cache:
-                  'no-store',
+                cache: 'no-store',
+                signal: controller.signal,
               }
             );
 
           const followData: FollowResponse =
             await followResponse.json();
 
-          if (
-            followResponse.ok
-          ) {
+          if (followResponse.ok && !controller.signal.aborted) {
             setFollowersCount(
               followData.followers_count ??
                 0
@@ -578,12 +592,14 @@ export default function PublicProfilePage() {
         } catch (
           followError
         ) {
+          if (controller.signal.aborted) return;
           console.error(
             'Erro ao carregar seguidores:',
             followError
           );
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error(
           'Erro ao carregar perfil público:',
           err
@@ -593,11 +609,15 @@ export default function PublicProfilePage() {
           'Não foi possível carregar este perfil.'
         );
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setFollowLoading(false);
+        }
       }
     }
 
-    loadProfile();
+    void loadProfile();
+    return () => controller.abort();
   }, [username]);
 
   async function handleFollow() {
@@ -996,7 +1016,7 @@ export default function PublicProfilePage() {
 
             {/* HISTÓRIAS */}
 
-            <section hidden={activeTab !== 'stories'} className="profile-tab-panel w-full shrink-0 px-0.5">
+            {activeTab === 'stories' && (<section className="profile-tab-panel w-full shrink-0 px-0.5">
               <div className="mx-auto mb-5 flex w-full max-w-2xl flex-wrap gap-2" role="group" aria-label="Filtrar obras no perfil">
                 {([['', 'Todas'], ['original', 'Originais'], ['fanfic', 'Fanfics']] as const).map(([kind, label]) => (
                   <button type="button" key={kind} aria-pressed={storyFilter === kind} onClick={() => setStoryFilter(kind)} className="min-h-11 rounded-full border border-pink-300/20 px-4 text-sm font-semibold text-pink-100 aria-pressed:bg-pink-300 aria-pressed:text-[#200f1b]">{label}</button>
@@ -1034,7 +1054,7 @@ export default function PublicProfilePage() {
                   ))}
                 </div>
               )}
-            </section>
+            </section>)}
 
             {/* MURAL */}
 
@@ -1058,7 +1078,7 @@ export default function PublicProfilePage() {
                 />
               ) : (
                 <div className="mx-auto w-full max-w-2xl space-y-4">
-                  {posts.map(
+                  {posts.slice(0, visiblePostCount).map(
                     (post) => (
                       <article
                         key={
@@ -1181,11 +1201,16 @@ export default function PublicProfilePage() {
                   )}
                 </div>
               )}
+              {posts.length > visiblePostCount && (
+                <button type="button" className="library-filter mx-auto mt-4 block" onClick={() => setVisiblePostCount(count => count + 12)}>
+                  Mostrar mais publicações
+                </button>
+              )}
             </section>
 
             {/* LISTAS */}
 
-            <section hidden={activeTab !== 'lists'} className="profile-tab-panel w-full shrink-0 px-0.5">
+            {activeTab === 'lists' && (<section className="profile-tab-panel w-full shrink-0 px-0.5">
               {readingLists.length ===
               0 ? (
                 <EmptyState
@@ -1308,14 +1333,14 @@ export default function PublicProfilePage() {
                   )}
                 </div>
               )}
-            </section>
+            </section>)}
 
             <section hidden={activeTab !== 'about'} className="profile-tab-panel w-full shrink-0 px-0.5"><div className="profile-about profile-themed-surface"><h2>Sobre {getDisplayName(user)}</h2><p>{user.bio || 'Este usuário ainda não adicionou uma bio.'}</p>{user.staff_badges?.map((badge, index) => <p key={index}><strong>{badge.title}</strong> · {badge.description}</p>)}</div><details className="profile-secondary-section" onToggle={event => setRepostsOpen(event.currentTarget.open)}><summary>Republicados</summary>{repostsOpen && <Republicados profileId={user.id} own={isSelf} active={activeTab === 'about'}/>}</details></section>
           </div>
         </div>
         </>}
       </div>
-      <NookPostComposer origin="mural" open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={() => {
+      <NookPostComposer origin="mural" author={user} open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={() => {
         void fetch('/api/public-profile/' + encodeURIComponent(user.username), { cache: 'no-store' }).then(async response => { if (response.ok) { const data = await response.json(); setPosts(data.posts || []); } }).catch(() => {});
       }}/>
     </main>
