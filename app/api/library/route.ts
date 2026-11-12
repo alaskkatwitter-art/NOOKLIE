@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { isReadingStatus } from '@/lib/library/reading-status';
 import { getPublicProfileIds, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 const supabase = createClient(
@@ -119,7 +120,7 @@ export async function GET() {
       await supabase
         .from('reading_list_items')
         .select(
-          'id, list_id, story_id, added_at'
+          'id, list_id, story_id, added_at, reading_status'
         )
         .in('list_id', listIds)
         .order('added_at', {
@@ -313,6 +314,7 @@ export async function GET() {
         progress_percent: reading?.progress_percent ?? 0,
         position: reading?.position ?? 0,
         reading_completed: completedStories.has(story.id),
+        reading_status: item.reading_status,
         has_favorite_chapter: favoritesByStory.has(story.id),
         title: story.title,
         description: story.description,
@@ -574,5 +576,36 @@ export async function DELETE(
       },
       { status: 500 }
     );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const profileId = await getCurrentProfileId();
+    if (!profileId) return NextResponse.json({ error: 'Você precisa estar logado.' }, { status: 401 });
+
+    const body = await request.json().catch(() => null);
+    const storyId = body?.story_id;
+    const status = body?.reading_status;
+    if (typeof storyId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(storyId) ||
+        (status !== null && !isReadingStatus(status))) {
+      return NextResponse.json({ error: 'História ou status inválido.' }, { status: 400 });
+    }
+
+    const { data: lists, error: listsError } = await supabase.from('reading_lists')
+      .select('id').eq('user_id', profileId).eq('name', 'Biblioteca');
+    if (listsError) throw listsError;
+    if (!lists?.length) return NextResponse.json({ error: 'História fora da biblioteca.' }, { status: 404 });
+
+    const { data, error } = await supabase.from('reading_list_items')
+      .update({ reading_status: status })
+      .in('list_id', lists.map(list => list.id)).eq('story_id', storyId).select('id');
+    if (error) throw error;
+    if (!data?.length) return NextResponse.json({ error: 'História fora da biblioteca.' }, { status: 404 });
+
+    return NextResponse.json({ reading_status: status });
+  } catch (error) {
+    console.error('PATCH /api/library:', error);
+    return NextResponse.json({ error: 'Não foi possível mudar o status.' }, { status: 500 });
   }
 }

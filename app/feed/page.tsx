@@ -19,7 +19,7 @@ import {
   useState,
 } from 'react';
 import Link from 'next/link';
-import { Ellipsis, Trash2, Heart, Share2, Plus } from 'lucide-react';
+import { Ellipsis, Trash2, Heart, Share2, Plus, Repeat2 } from 'lucide-react';
 import { PostMention } from '@/components/PostMention';
 import NookPostComposer from '@/components/NookPostComposer';
 import StoryComposer from '@/components/StoryComposer';
@@ -1167,9 +1167,10 @@ function PostMedia({
    COMMENTS
 ========================================================= */
 
-function CommentItem({ comment, children, onReply, onChange }: {
+function CommentItem({ comment, children, replyCount, onReply, onChange }: {
   comment: Comment;
   children?: React.ReactNode;
+  replyCount: number;
   onReply: (comment: Comment) => void;
   onChange: (comment: Comment) => void;
 }) {
@@ -1196,7 +1197,27 @@ function CommentItem({ comment, children, onReply, onChange }: {
     }
   }
 
-  return <article id={'reply-' + comment.id} className="feed-reply scroll-mt-16 rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:p-4">
+  const [shareNotice, setShareNotice] = useState('');
+
+  async function shareReply() {
+    setShareNotice('');
+    const url = new URL('/feed', window.location.origin);
+    url.searchParams.set('post', comment.post_id);
+    url.searchParams.set('reply', comment.id);
+    try {
+      if (navigator.share) await navigator.share({ url: url.href });
+      else {
+        await navigator.clipboard.writeText(url.href);
+        setShareNotice('Link da resposta copiado.');
+      }
+    } catch (failure) {
+      if (!(failure instanceof DOMException && failure.name === 'AbortError')) {
+        setShareNotice('Não foi possível compartilhar a resposta.');
+      }
+    }
+  }
+
+  return <article id={'reply-' + comment.id} className="feed-reply scroll-mt-16 border-b border-[var(--ui-border)] px-1 py-3 sm:px-3">
     <div className="flex gap-3">
       <Avatar profile={comment.author} size="small" />
       <div className="min-w-0 flex-1">
@@ -1209,12 +1230,25 @@ function CommentItem({ comment, children, onReply, onChange }: {
         </div>
         <PostBody body={comment.content} />
         {comment.image_url && <img loading="lazy" src={contentMediaUrl(comment.image_url, 'feed')} alt="Imagem anexada à resposta" className="mt-3 max-h-80 w-full rounded-xl object-contain" />}
-        <div className="mt-2 flex flex-wrap gap-x-4 text-sm text-white/70">
-          <button type="button" className="min-h-10 hover:text-pink-200" onClick={() => onReply(comment)}>Responder</button>
-          <button type="button" className="min-h-10 hover:text-pink-200 aria-pressed:text-pink-300" disabled={pending} aria-pressed={comment.liked} onClick={() => void toggle('like')}>{comment.liked ? 'Curtido' : 'Curtir'}{comment.likes > 0 && ' · ' + comment.likes}</button>
-          <a className="inline-flex min-h-10 items-center hover:text-pink-200" href={`/feed?quotePost=${comment.post_id}&quoteReply=${comment.id}`}>Nooklar</a>
-          <button type="button" className="min-h-10 hover:text-pink-200 aria-pressed:text-pink-300" disabled={pending} aria-pressed={comment.saved} onClick={() => void toggle('save')}>{comment.saved ? 'Salva' : 'Salvar'}</button>
+        <div className="feed-post-actions feed-reply-actions">
+          <button type="button" aria-label="Responder" onClick={() => onReply(comment)}>
+            <CommentIcon />{replyCount > 0 && <span>{replyCount}</span>}
+          </button>
+          <a aria-label="Nooklar resposta" href={`/feed?quotePost=${comment.post_id}&quoteReply=${comment.id}`}>
+            <Repeat2 size={21} aria-hidden="true" />
+          </a>
+          <button type="button" aria-label="Curtir resposta" disabled={pending} aria-pressed={comment.liked} onClick={() => void toggle('like')}>
+            <Heart size={21} fill={comment.liked ? 'currentColor' : 'none'} aria-hidden="true" />
+            {comment.likes > 0 && <span>{comment.likes}</span>}
+          </button>
+          <button type="button" aria-label="Salvar resposta" disabled={pending} aria-pressed={comment.saved} onClick={() => void toggle('save')}>
+            <BookmarkIcon filled={comment.saved} />
+          </button>
+          <button type="button" aria-label="Compartilhar resposta" onClick={() => void shareReply()}>
+            <Share2 size={20} aria-hidden="true" />
+          </button>
         </div>
+        {shareNotice && <p role="status" className="text-xs text-[var(--ui-accent)]">{shareNotice}</p>}
         {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}
       </div>
     </div>
@@ -1621,7 +1655,7 @@ function FeedPost({
 
   function renderComment(comment: Comment, depth = 0): React.ReactNode {
     const replies = commentsByParent.get(comment.id) || [];
-    return <CommentItem key={comment.id} comment={comment}
+    return <CommentItem key={comment.id} comment={comment} replyCount={replies.length}
       onChange={updated => setComments(current => current.map(item => item.id === updated.id ? updated : item))}
       onReply={target => { setReplyingTo(target); replyInput.current?.focus(); }}>
       {replies.length > 0 && <div className={depth < 2 ? 'ml-4 border-l border-pink-200/20 pl-3 sm:ml-6' : ''}>
@@ -3330,6 +3364,7 @@ export default function FeedPage() {
 
       <NookPostComposer
         key={quoteBody || 'feed-composer'}
+        author={currentUser}
         initialBody={quoteBody}
         open={composerOpen}
         onClose={() => { setComposerOpen(false); setQuoteBody(''); }}

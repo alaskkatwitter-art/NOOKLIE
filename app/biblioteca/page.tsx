@@ -1,6 +1,7 @@
 'use client';
 
-import AccountBadge, { type AccountBadgeFlags } from '@/components/AccountBadge';
+import type { AccountBadgeFlags } from '@/components/AccountBadge';
+import { isReadingStatus, readingStatuses, type ReadingStatus } from '@/lib/library/reading-status';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import {
   useCallback,
@@ -37,6 +38,7 @@ type LibraryItem = {
   progress_percent?: number | null;
   position?: number | null;
   reading_completed?: boolean;
+  reading_status?: ReadingStatus | null;
   has_favorite_chapter?: boolean;
 
   updated_at?: string | null;
@@ -46,24 +48,22 @@ type LibraryItem = {
 
 const libraryFilters = {
   all: 'Todas',
-  unread: 'Quero ler',
-  reading: 'Lendo',
-  completed: 'Concluídas',
+  ...readingStatuses,
   favorites: 'Favoritas',
 } as const;
 
 type LibraryFilter = keyof typeof libraryFilters;
 type LibraryView = 'grid' | 'shelf';
 
-function matchesFilter(item: LibraryItem, filter: LibraryFilter) {
-  const started = Boolean(item.chapter_id) || (item.progress_percent ?? 0) > 0;
-  switch (filter) {
-    case 'unread': return !started;
-    case 'reading': return started && !item.reading_completed;
-    case 'completed': return item.reading_completed === true;
-    case 'favorites': return item.has_favorite_chapter === true;
-    default: return true;
-  }
+function inferredReadingStatus(item: LibraryItem): ReadingStatus {
+  if (item.reading_completed) return 'completed';
+  return item.chapter_id || (item.progress_percent ?? 0) > 0 ? 'reading' : 'unread';
+}
+
+function matchesFilter(item: LibraryItem, filter: LibraryFilter, readingDetailsAvailable: boolean) {
+  if (filter === 'all') return true;
+  if (filter === 'favorites') return readingDetailsAvailable && item.has_favorite_chapter === true;
+  return (item.reading_status ?? (readingDetailsAvailable ? inferredReadingStatus(item) : null)) === filter;
 }
 
 /* =========================================================
@@ -216,7 +216,31 @@ export default function BibliotecaPage() {
   const [view, setView] = useState<LibraryView>('grid');
   const [filter, setFilter] = useState<LibraryFilter>('all');
   const [readingDetailsAvailable, setReadingDetailsAvailable] = useState(true);
-  const visibleItems = readingDetailsAvailable ? items.filter(item => matchesFilter(item, filter)) : items;
+  const [savingStatus, setSavingStatus] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState('');
+  const visibleItems = items.filter(item => matchesFilter(item, filter, readingDetailsAvailable));
+
+  async function changeReadingStatus(storyId: string, value: string) {
+    if (savingStatus) return;
+    setSavingStatus(storyId);
+    setStatusError('');
+    const status = isReadingStatus(value) ? value : null;
+    try {
+      const response = await fetch('/api/library', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_id: storyId, reading_status: status }),
+      });
+      if (!response.ok) throw new Error('Não foi possível salvar o status da história.');
+      setItems(previous => previous.map(item => item.story_id === storyId
+        ? { ...item, reading_status: status }
+        : item));
+    } catch {
+      setStatusError('Não foi possível salvar o status da história. Tente novamente.');
+    } finally {
+      setSavingStatus(null);
+    }
+  }
 
   function changeView(next: LibraryView) {
     setView(next);
@@ -385,6 +409,7 @@ export default function BibliotecaPage() {
                       )
                     : 0,
                 reading_completed: item.reading_completed === true,
+                reading_status: isReadingStatus(item.reading_status) ? item.reading_status : null,
                 has_favorite_chapter: item.has_favorite_chapter === true,
 
                 updated_at:
@@ -576,18 +601,20 @@ export default function BibliotecaPage() {
             <button type="button" aria-pressed={view === 'shelf'} onClick={() => changeView('shelf')}><LibraryBig size={16} aria-hidden="true" /> Estante</button>
           </div>
         </div>
-        {!loading && items.length > 0 && readingDetailsAvailable && (
+        {!loading && items.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filtrar histórias salvas">
             {(Object.keys(libraryFilters) as LibraryFilter[]).map(key => (
-              <button type="button" key={key} aria-pressed={filter === key} onClick={() => setFilter(key)} className="library-filter">
+              <button type="button" key={key} aria-pressed={filter === key} disabled={key === 'favorites' && !readingDetailsAvailable} onClick={() => setFilter(key)} className="library-filter">
                 {libraryFilters[key]}
               </button>
             ))}
           </div>
         )}
         {!loading && items.length > 0 && !readingDetailsAvailable && (
-          <p role="status" className="mb-4 text-sm text-white/70">Os filtros de leitura estão temporariamente indisponíveis.</p>
+          <p role="status" className="mb-4 text-sm text-white/70">O progresso automático está temporariamente indisponível.</p>
         )}
+
+        {statusError && <p role="alert" className="mb-4 text-sm text-rose-300">{statusError}</p>}
 
         {/* LOADING */}
 
@@ -662,238 +689,41 @@ export default function BibliotecaPage() {
           <p role="status" className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/75">
             {filter === 'favorites' ? 'Nenhuma obra salva tem um capítulo favoritado.' : 'Nenhuma história salva nesta categoria.'}
           </p>
-        ) : view === 'shelf' ? (
-          <ul className="library-shelves" aria-label="Histórias na estante">
-            {visibleItems.map(item => (
-              <li key={item.story_id} className="min-w-0">
-                <Link href={`/historia/${item.story_id}`} className="library-shelf-book">
-                  <div className="library-shelf-cover">
-                    {item.story_cover_url
-                      ? <img src={contentMediaUrl(item.story_cover_url, 'cover')} alt="" loading="lazy" decoding="async" />
-                      : <span className="grid h-full place-items-center text-pink-200" aria-hidden="true"><BookIcon /></span>}
-                  </div>
-                  <span className="library-shelf-title">{item.story_title}</span>
-                  <span className="library-shelf-detail">
-                    {item.reading_completed ? 'Leitura concluída' : item.chapter_id ? `${Math.round(item.progress_percent ?? 0)}% do capítulo` : item.author_display_name || item.author_username || 'Obra salva'}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
         ) : (
-
-          /* CARDS */
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-            {visibleItems.map(
-              (item) => {
-
-                const progress = Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    Number(
-                      item.progress_percent ||
-                        0
-                    )
-                  )
-                );
-
-                const author =
-                  item.author_display_name ||
-                  item.author_username ||
-                  null;
-
-                const href =
-                  `/historia/${item.story_id}`;
-
-                const hasProgress =
-                  progress > 0 ||
-                  Boolean(
-                    item.chapter_id
-                  );
-
-                return (
-
-                  <article
-                    key={item.story_id}
-                    className="group overflow-hidden rounded-[26px] border border-white/[0.07] bg-[#100c11]/90 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:border-[#ff78b9]/20 hover:shadow-[0_20px_70px_rgba(255,120,185,0.06)]"
-                  >
-
-                    {/* CAPA */}
-
-                    <Link
-                      href={href}
-                      className="relative block h-[250px] overflow-hidden bg-[#171117]"
-                    >
-
-                      {item.story_cover_url ? (
-
-                        <img
-                          src={
-                            contentMediaUrl(item.story_cover_url)
-                          }
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
-                        />
-
-                      ) : (
-
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#ff78b9]/[0.12] via-[#171117] to-[#c63dff]/[0.08] text-[#ff78b9]/40">
-                          <CloudIcon />
-                        </div>
-
-                      )}
-
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-
-                      <div className="absolute bottom-4 left-4 right-4">
-
-                        <p className="truncate text-lg font-black text-white">
-                          {item.story_title}
-                        </p>
-
-                        {author && (
-                          <p className="mt-1 truncate text-xs font-semibold text-white/50">
-                            por {author}<AccountBadge account={item.author} />
-                          </p>
-                        )}
-
-                      </div>
-
-                    </Link>
-
-                    {/* CONTEÚDO */}
-
-                    <div className="p-4">
-
-                      {/* STATUS */}
-
-                      <div className="mb-3 flex items-center gap-2">
-
-                        {item.story_status && (
-                          <span className="rounded-full border border-[#ff78b9]/15 bg-[#ff78b9]/[0.05] px-2.5 py-1 text-[10px] font-bold text-[#ff9ac7]">
-                            {item.story_status}
-                          </span>
-                        )}
-
-                        {item.story_rating && (
-                          <span className="rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] font-bold text-white/40">
-                            {item.story_rating}
-                          </span>
-                        )}
-
-                      </div>
-
-                      {/* DESCRIÇÃO */}
-
-                      {item.story_description && (
-                        <p className="mb-4 line-clamp-2 text-xs leading-5 text-white/35">
-                          {item.story_description}
-                        </p>
-                      )}
-
-                      {/* PROGRESSO */}
-
-                      {hasProgress && (
-                        <div className="mb-4">
-
-                          <div className="mb-2 flex items-center justify-between">
-
-                            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">
-                              Progresso
-                            </span>
-
-                            <span className="text-[10px] font-black text-[#ff78b9]">
-                              {Math.round(
-                                progress
-                              )}
-                              %
-                            </span>
-
-                          </div>
-
-                          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#ff68ae] to-[#ff91c4] transition-all"
-                              style={{
-                                width: `${progress}%`,
-                              }}
-                            />
-
-                          </div>
-
-                          {item.chapter_title && (
-                            <p className="mt-2 truncate text-[11px] text-white/30">
-                              Capítulo atual:{' '}
-                              <span className="text-white/50">
-                                {
-                                  item.chapter_title
-                                }
-                              </span>
-                            </p>
-                          )}
-
-                        </div>
-                      )}
-
-                      {/* LISTAS */}
-
-                      {item.lists &&
-                        item.lists.length > 0 && (
-
-                          <div className="mb-4 flex flex-wrap gap-1.5">
-
-                            {item.lists
-                              .slice(0, 3)
-                              .map(
-                                (
-                                  list
-                                ) => (
-
-                                  <span
-                                    key={list}
-                                    className="rounded-full bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/30"
-                                  >
-                                    {list}
-                                  </span>
-
-                                )
-                              )}
-
-                          </div>
-
-                        )}
-
-                      {/* BOTÃO */}
-
-                      <Link
-                        href={item.chapter_id && !item.reading_completed ? `/capitulo/${item.chapter_id}` : href}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-xs font-bold text-white/55 transition hover:border-[#ff78b9]/25 hover:bg-[#ff78b9]/[0.06] hover:text-[#ff78b9]"
-                      >
-                        {item.reading_completed
-                          ? 'Ver obra'
-                          : hasProgress
-                          ? 'Continuar lendo'
-                          : 'Começar a ler'}
-
-                        <ChevronRightIcon />
-                      </Link>
-
+          <ul className={view === 'shelf' ? 'library-shelves' : 'library-compact-grid'} aria-label="Histórias salvas">
+            {visibleItems.map(item => {
+              const href = `/historia/${item.story_id}`;
+              const status = item.reading_status ?? (readingDetailsAvailable ? inferredReadingStatus(item) : null);
+              const onShelf = view === 'shelf';
+              return (
+                <li key={item.story_id} className="min-w-0">
+                  <Link href={href} className={onShelf ? 'library-shelf-book' : 'library-grid-book'}>
+                    <div className={onShelf ? 'library-shelf-cover' : 'library-grid-cover'}>
+                      {item.story_cover_url
+                        ? <img src={contentMediaUrl(item.story_cover_url, 'cover')} alt="" loading="lazy" decoding="async" />
+                        : <span className="grid h-full place-items-center text-pink-300" aria-hidden="true"><BookIcon /></span>}
                     </div>
-
-                  </article>
-
-                );
-              }
-            )}
-
-          </div>
-
+                    <span className={onShelf ? 'library-shelf-title' : 'library-grid-title'}>{item.story_title}</span>
+                  </Link>
+                  <select
+                    className="library-reading-status"
+                    aria-label={`Status de leitura de ${item.story_title}`}
+                    value={item.reading_status ?? ''}
+                    disabled={savingStatus !== null}
+                    onChange={event => void changeReadingStatus(item.story_id, event.target.value)}
+                  >
+                    <option value="">{status && !item.reading_status ? readingStatuses[status] + ' (automático)' : 'Automático'}</option>
+                    {Object.entries(readingStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  {item.chapter_id && status !== 'completed' && (
+                    <Link href={`/capitulo/${item.chapter_id}`} className="library-resume">
+                      Continuar · {Math.round(item.progress_percent ?? 0)}%
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
 
       </div>
