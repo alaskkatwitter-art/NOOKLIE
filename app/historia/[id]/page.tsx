@@ -1,5 +1,7 @@
 "use client";
 
+import { SpotifyCard } from '@/components/SpotifyLink';
+import type { SpotifyLink } from '@/lib/spotify/link';
 import AccountBadge from '@/components/AccountBadge';
 import Link from 'next/link';
 import { chapterKinds, ChapterKind, SeriesBook, storyFormats, storyKinds } from '@/lib/stories/metadata';
@@ -36,6 +38,7 @@ type Chapter = {
 };
 
 type Story = {
+  spotify_link?: SpotifyLink | null;
   series_name?: string;
   series_books?: SeriesBook[];
   story_kind?: keyof typeof storyKinds;
@@ -295,6 +298,8 @@ export default function HistoriaPage() {
                   <p className="text-sm text-white/70">Esta obra ainda não tem sinopse.</p>
                 )}
               </section>
+
+              <SpotifyCard value={story.spotify_link} label="Playlist da história" />
 
               {!!story.tags?.length && (
                 <ul aria-label="Tags da obra" className="mt-4 flex flex-wrap gap-2">

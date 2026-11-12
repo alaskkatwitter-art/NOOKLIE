@@ -86,7 +86,7 @@ export async function GET(request: Request) {
     const profiles = supabase.from('profiles');
     const selection = summary
       ? profiles.select(fields)
-      : profiles.select(`${fields}, avatar_animation, cover_animation`);
+      : profiles.select(`${fields}, avatar_animation, cover_animation, spotify_link`);
     const { data: profile, error: profileError } = await selection.eq('user_id', session.user_id).maybeSingle();
 
     if (profileError) {

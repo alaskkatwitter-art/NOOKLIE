@@ -1,4 +1,5 @@
 'use client';
+import { SpotifyField } from '@/components/SpotifyLink';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import StoryMetadataFields, { StoryKindFields } from '@/components/StoryMetadataFields';
 import WritingPanel from '@/components/WritingPanel';
@@ -17,6 +18,7 @@ export default function CriarPage() {
 
   const [storyMetadata, setStoryMetadata] = useState<StoryMetadata>(emptyStoryMetadata);
   const [title, setTitle] = useState('');
+  const [spotifyUrl, setSpotifyUrl] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Em andamento');
 
@@ -176,6 +178,7 @@ export default function CriarPage() {
 
     try {
       const formData = new FormData();
+      if (spotifyUrl.trim()) formData.set('spotify_url', spotifyUrl);
       Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value ?? '')));
 
       formData.append('title', title);
@@ -307,6 +310,7 @@ export default function CriarPage() {
                 </div>
 
                 <WritingPanel value={description} onChange={setDescription} />
+                <SpotifyField label="Playlist da história" value={spotifyUrl} onChange={setSpotifyUrl} playlistOnly />
               </div>
 
               {/* STATUS */}

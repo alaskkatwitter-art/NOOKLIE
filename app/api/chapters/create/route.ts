@@ -1,3 +1,4 @@
+import { spotifyUpdate } from '@/lib/spotify/resolve';
 import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -395,6 +396,9 @@ export async function POST(request: Request) {
       ? new Date().toISOString()
       : null;
 
+    const music = await spotifyUpdate(data.spotify_url);
+    if (music instanceof NextResponse) return music;
+
     /*
      * Cria o capítulo.
      */
@@ -404,6 +408,7 @@ export async function POST(request: Request) {
     } = await supabase
       .from('chapters')
       .insert({
+        ...music,
         story_id: storyId,
         chapter_number: chapterNumber,
         title,
