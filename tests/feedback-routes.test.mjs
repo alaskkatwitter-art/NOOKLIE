@@ -19,7 +19,7 @@ test('a normal chapter comment still posts without a parent',async()=>{const fix
 test('profile colors accept arbitrary six-digit hex, normalize case and reject CSS injection',async()=>{
  let saved,scope;
  const db={from(table){const q={select(){return q;},eq(key,value){if(table==='profiles')scope=[key,value];return q;},update(row){saved=row;return q;},async maybeSingle(){return{data:{user_id:'signed-in-account',expires_at:new Date(Date.now()+60000).toISOString()},error:null};},async single(){return{data:{theme_color:saved.theme_color},error:null};}};return q;}};
- const route=load('app/api/profile/update/route.ts',{'@supabase/supabase-js':{createClient:()=>db},'@/lib/profile/appearance':load('lib/profile/appearance.ts',{}),'@/lib/spotify/resolve':load('lib/spotify/resolve.ts',{'./link':load('lib/spotify/link.ts',{})})});
+ const route=load('app/api/profile/update/route.ts',{'@supabase/supabase-js':{createClient:()=>db},'@/lib/profile/appearance':load('lib/profile/appearance.ts',{}),'@/lib/spotify/resolve':load('lib/spotify/resolve.ts',{'./link':load('lib/spotify/link.ts',{'../stories/chapter-banner':load('lib/stories/chapter-banner.ts',{'@/lib/social/attachments':load('lib/social/attachments.ts',{})})})})});
  const patch=color=>route.PATCH(new Request('https://nooklie.vercel.app/api/profile/update',{method:'PATCH',headers:{'Content-Type':'application/json',Cookie:'toriland_session=test-token'},body:JSON.stringify({theme_color:color,user_id:'foreign-account'})}));
  assert.equal((await patch('#B91234')).status,200);assert.equal(saved.theme_color,'#b91234');assert.deepEqual(scope,['user_id','signed-in-account']);
  for(const bad of ['red','#fff','#12345678','url(evil)','#ff0000;display:none',null,5])assert.equal((await patch(bad)).status,400);

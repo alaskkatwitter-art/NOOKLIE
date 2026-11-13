@@ -2430,7 +2430,7 @@ export default function EditarHistoriaPage() {
                     </label>
 
                     <WritingPanel value={description} onChange={setDescription} />
-                    <SpotifyField label="Playlist da história" value={storySpotifyUrl} onChange={setStorySpotifyUrl} saved={story?.spotify_link} playlistOnly />
+                    <SpotifyField label="Trilha da história" value={storySpotifyUrl} onChange={setStorySpotifyUrl} saved={story?.spotify_link} playlistOnly />
                     <StoryKindFields value={storyMetadata} onChange={setStoryMetadata} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
