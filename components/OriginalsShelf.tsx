@@ -36,7 +36,7 @@ export default function OriginalsShelf() {
   }, []);
 
   return (
-    <section aria-label="Originais recentes" className="mb-10 rounded-3xl border border-pink-300/20 bg-gradient-to-br from-[#301727] via-[#21131e] to-[#140e16] p-5 text-white sm:p-8">
+    <section aria-label="Originais recentes" className="originals-shelf mb-10 rounded-3xl border border-pink-300/20 bg-gradient-to-br from-[#301727] via-[#21131e] to-[#140e16] p-5 text-white sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Obras da comunidade</p>
@@ -49,7 +49,7 @@ export default function OriginalsShelf() {
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {stories.map(story => (
             <Link key={story.id} href={`/historia/${story.id}`} className="group min-w-0 rounded-2xl focus-visible:outline-pink-300">
-              <div className="grid aspect-[3/4] place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#5a2a46] to-[#1a101d] text-pink-200">
+              <div className="originals-cover grid aspect-[3/4] place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#5a2a46] to-[#1a101d] text-pink-200">
                 {story.cover_url ? <img src={contentMediaUrl(story.cover_url, 'cover')} alt="" loading="lazy" className="h-full w-full object-cover group-hover:opacity-85" /> : <BookOpen size={32} />}
               </div>
               <h3 className="mt-2 line-clamp-2 text-sm font-bold group-hover:text-pink-200">{story.title}</h3>

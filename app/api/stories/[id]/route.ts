@@ -1,3 +1,4 @@
+import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { storyPublication } from '@/lib/stories/publication';
 import { ensureCatalogTag } from '@/lib/stories/tags';
@@ -124,6 +125,7 @@ export async function GET(
         author_id,
         title,
         description,
+        spotify_link,
         cover_url,
         status,
         rating,
@@ -648,6 +650,7 @@ export async function PUT(
         author_id,
         title,
         description,
+        spotify_link,
         cover_url,
         status,
         rating
@@ -712,6 +715,9 @@ export async function PUT(
       await request.formData();
     let storyMetadata;
     try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
+
+    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, existingStory.spotify_link, true);
+    if (music instanceof NextResponse) return music;
 
     const title = String(formData.get('title') ?? existingStory.title ?? '').trim();
     const description = String(formData.get('description') ?? existingStory.description ?? '').trim();
@@ -981,6 +987,7 @@ export async function PUT(
       p_author: userId,
       p_changes: {
         ...storyMetadata,
+        ...music,
         ...(formData.has('title') && { title }),
         ...(formData.has('description') && { description: description || null }),
         ...(formData.has('status') && { status: status || null }),

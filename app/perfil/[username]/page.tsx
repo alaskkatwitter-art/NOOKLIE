@@ -1,4 +1,6 @@
 'use client';
+import { SpotifyCard } from '@/components/SpotifyLink';
+import type { SpotifyLink } from '@/lib/spotify/link';
 import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
@@ -35,6 +37,7 @@ import OfficialBadge from '../../components/OfficialBadge';
 import ProfileActions from '@/components/ProfileActions';
 
 type User = {
+  spotify_link?: SpotifyLink | null;
   pinned_story_id?: string | null;
   id: string;
   username: string;
@@ -945,6 +948,7 @@ export default function PublicProfilePage() {
 
 
             </div>
+            {!restricted && <SpotifyCard value={user.spotify_link} label="Música do perfil" />}
             {!restricted && <ProfileStats profileId={user.id} stories={stories.length} counts={{followers_count:followersCount,following_count:followingCount}}/>}
             {!isSelf&&<div className="mt-4 flex items-center justify-end gap-2"><ProfileActions profileId={user.id} username={user.username}/></div>}
           </div>

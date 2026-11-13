@@ -1,3 +1,4 @@
+import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { chapterKinds } from '@/lib/stories/metadata';
 import {chatActor} from '@/lib/chat/server';
@@ -184,6 +185,7 @@ export async function GET(
           published,
           created_at,
           author_notes,
+          spotify_link,
           original_published_at,
           republished_at,
           updated_at,
@@ -422,6 +424,7 @@ export async function PUT(
         published,
         created_at,
         author_notes,
+        spotify_link,
         original_published_at,
         republished_at,
         updated_at,
@@ -510,6 +513,9 @@ export async function PUT(
 
     const formData =
       await request.formData();
+
+    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, chapter.spotify_link);
+    if (music instanceof NextResponse) return music;
 
     const entryKind = formData.get('entry_kind');
     if (entryKind !== null && (typeof entryKind !== 'string' || !Object.hasOwn(chapterKinds, entryKind))) {
@@ -774,6 +780,7 @@ export async function PUT(
     } = await supabase
       .from('chapters')
       .update({
+        ...music,
         ...(entryKind !== null ? { entry_kind: entryKind } : {}),
         title,
         body,

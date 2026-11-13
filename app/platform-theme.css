@@ -338,3 +338,50 @@ body:has(.profile-editor-page) .site-navigation { display:none; }
   .nook-composer-feed { width: 100%; max-height: 100dvh; height: 100dvh; border: 0; border-radius: 0; }
   .nook-composer-feed .nook-composer-layout { height: 100%; }
 }
+
+.nook-reader-home { color: var(--ui-text); }
+.home-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .5rem 1rem; margin-bottom: 1rem; }
+.home-heading h1 { font-size: clamp(1.8rem, 6vw, 3.2rem); font-weight: 800; line-height: 1.12; overflow-wrap: anywhere; }
+.home-kicker { margin-bottom: .4rem; color: var(--ui-accent); font-size: .75rem; font-weight: 700; }
+.home-text-link { display: inline-flex; min-height: 40px; align-items: center; gap: .4rem; color: var(--ui-accent); font-size: .8125rem; font-weight: 700; }
+.home-text-link:hover { text-decoration: underline; }
+.home-search { display: flex; align-items: center; gap: .65rem; padding: .25rem .35rem .25rem .75rem; border: 1px solid var(--ui-border); border-radius: 6px; background: var(--ui-surface); color: var(--ui-accent); }
+.home-search:focus-within { border-color: var(--ui-accent); }
+.home-search input { flex: 1; min-width: 0; padding-block: .6rem; color: var(--ui-text); font-size: .875rem; outline: none; }
+.home-search input::placeholder { color: var(--ui-muted); }
+.home-search button { min-height: 42px; padding-inline: .85rem; border-radius: 4px; background: var(--ui-accent); color: var(--ui-accent-text); font-size: .8125rem; font-weight: 800; }
+.nook-reader-home :is(.discovery-section, .originals-shelf, .fandom-banner) { margin: 1.6rem 0 0; padding: 1rem 0 0; border: 0; border-top: 1px solid var(--ui-border); border-radius: 0; background: transparent; color: var(--ui-text); }
+.nook-reader-home .discovery-section h2, .nook-reader-home .originals-shelf h2 { font-size: clamp(1.15rem, 4vw, 1.55rem); }
+.nook-reader-home :is(.discovery-section, .originals-shelf, .fandom-banner) p[class*="text-white"] { color: var(--ui-muted); }
+.home-resume-list { display: grid; gap: 0 1.25rem; }
+@media (min-width: 44rem) { .home-resume-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 64rem) { .home-resume-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.nook-reader-home .continue-card { gap: .7rem; padding: .5rem 0; border: 0; border-bottom: 1px solid var(--ui-border); border-radius: 0; background: transparent; }
+.nook-reader-home .continue-card:hover { background: var(--ui-surface); }
+.nook-reader-home .discovery-shelf, .nook-reader-home .originals-shelf > div + div { display: grid; grid-template: auto / none; grid-auto-flow: column; grid-auto-columns: clamp(7rem, 29vw, 9.5rem); gap: .85rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x proximity; }
+.nook-reader-home :is(.discovery-card, .originals-shelf a.group) { width: auto; border-radius: 4px; scroll-snap-align: start; }
+.nook-reader-home :is(.discovery-cover, .originals-cover) { aspect-ratio: 2 / 3; border-radius: 4px; }
+.nook-reader-home .discovery-card h3 { margin-top: .45rem; line-height: 1.35; }
+.nook-reader-home .discovery-card .discovery-cover > span { font-size: .65rem; }
+.nook-reader-home .discovery-empty, .home-empty, .nook-reader-home .originals-shelf > p { padding: .25rem 0; border: 0; border-radius: 0; color: var(--ui-muted); font-size: .8125rem; }
+.nook-reader-home .discovery-secondary { min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--ui-accent); }
+
+.spotify-field { margin-block: .9rem; }
+.spotify-card {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: min(100%, 27rem);
+  min-height: 62px;
+  margin-block: .9rem;
+  padding: .45rem .6rem;
+  border: 1px solid var(--profile-theme-border, var(--ui-border));
+  border-radius: 6px;
+  background: var(--profile-theme-surface, var(--ui-surface));
+  color: var(--profile-theme-text, var(--ui-text));
+  text-align: left;
+  font-size: .875rem;
+}
+.spotify-card:hover, .spotify-card:focus-visible { border-color: var(--profile-theme-accent, var(--ui-accent)); }
+.spotify-cover { display: grid; width: 48px; height: 48px; flex: none; place-items: center; border-radius: 3px; background: var(--ui-surface-raised); color: var(--ui-accent); object-fit: cover; }
+.spotify-label { display: block; color: inherit; opacity: .76; font-size: .75rem; }

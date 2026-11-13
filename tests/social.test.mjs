@@ -126,6 +126,14 @@ test('release gates, durable lists, feed media and wiki reviews preserve ownersh
   assert.equal(details.title, 'A nova edição');
   assert.equal(details.fandom, 'Nookverso');
   assert.equal(details.tags[0].slug, 'romance');
+  await db.exec(await readFile(new URL('../supabase/migrations/20261112234500_spotify_links.sql', import.meta.url), 'utf8'));
+  const playlist = { url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M', title: 'Playlist de teste', image: null };
+  const saveDetails = (actor, changes) => db.query('select save_story_details($1,$2,$3::jsonb,null) details', [story, actor, JSON.stringify(changes)]);
+  assert.equal((await saveDetails(reader, { spotify_link: playlist })).rows[0].details, null);
+  assert.deepEqual((await saveDetails(author, { spotify_link: playlist })).rows[0].details.spotify_link, playlist);
+  assert.deepEqual((await saveDetails(author, { title: 'A nova edição' })).rows[0].details.spotify_link, playlist);
+  assert.equal((await saveDetails(author, { spotify_link: null })).rows[0].details.spotify_link, null);
+
   assert.equal((await rows(`select count(*)::int total from search_catalog_stories(p_include_slugs=>array['nookverso'])`))[0].total, 1);
   const [{ list }] = await rows(`select save_reading_list('${reader}',null,'${story}','Leituras','') list`);
   assert.ok(list);

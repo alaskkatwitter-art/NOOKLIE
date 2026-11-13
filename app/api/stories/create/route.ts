@@ -1,3 +1,4 @@
+import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { ensureCatalogTag } from '@/lib/stories/tags';
 import { parseStoryMetadata } from '@/lib/stories/metadata';
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, null, true);
+    if (music instanceof NextResponse) return music;
     let storyMetadata;
     try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
 
@@ -266,6 +269,7 @@ export async function POST(request: Request) {
         .from('stories')
         .insert({
           ...storyMetadata,
+          ...music,
           author_id: session.user_id,
           title,
           description: description || null,

@@ -1,4 +1,6 @@
 'use client';
+import { SpotifyField } from '@/components/SpotifyLink';
+import type { SpotifyLink } from '@/lib/spotify/link';
 import ChapterBanner from '@/components/ChapterBanner';
 import StoryPublicationControls from '@/components/StoryPublicationControls';
 import type { StoryPublication } from '@/lib/stories/publication';
@@ -45,6 +47,7 @@ type StoryChapter = {
 };
 
 type Story = {
+  spotify_link?: SpotifyLink | null;
   publication?: StoryPublication;
   release_at?: string | null;
   has_content_warnings?: boolean;
@@ -76,6 +79,7 @@ type ChapterMedia = {
 };
 
 type Chapter = {
+  spotify_link?: SpotifyLink | null;
   entry_kind?: ChapterKind;
   id: string;
   story_id: string;
@@ -265,6 +269,8 @@ export default function EditarHistoriaPage() {
     useState('');
 
   const [storyMetadata, setStoryMetadata] = useState<StoryMetadata>(emptyStoryMetadata);
+  const [storySpotifyUrl, setStorySpotifyUrl] = useState('');
+  const [chapterSpotifyUrl, setChapterSpotifyUrl] = useState('');
   const [description, setDescription] =
     useState('');
 
@@ -458,6 +464,7 @@ export default function EditarHistoriaPage() {
           normalizedStory;
 
         setStory(normalizedStory);
+        setStorySpotifyUrl(normalizedStory.spotify_link?.url || '');
 
         setTitle(
           normalizedStory.title || ''
@@ -578,6 +585,7 @@ export default function EditarHistoriaPage() {
           normalizedChapter
         );
 
+        setChapterSpotifyUrl(normalizedChapter.spotify_link?.url || '');
         setEntryKind(normalizedChapter.entry_kind ?? 'chapter');
         setChapterTitle(
           normalizedChapter.title || ''
@@ -745,6 +753,7 @@ export default function EditarHistoriaPage() {
         normalizedNewChapter
       );
 
+      setChapterSpotifyUrl(normalizedNewChapter.spotify_link?.url || '');
       setChapterTitle(
         normalizedNewChapter.title ||
           'Novo capítulo'
@@ -1075,6 +1084,7 @@ export default function EditarHistoriaPage() {
     try {
       const formData =
         new FormData();
+      formData.set('spotify_url', storySpotifyUrl);
       Object.entries(storyMetadata).forEach(([key, value]) => formData.set(key, String(value ?? '')));
 
       formData.append(
@@ -1749,6 +1759,7 @@ export default function EditarHistoriaPage() {
         new FormData();
 
       formData.set('entry_kind', entryKind);
+      formData.set('spotify_url', chapterSpotifyUrl);
       formData.append(
         'title',
         chapterTitle.trim()
@@ -2418,7 +2429,9 @@ export default function EditarHistoriaPage() {
                       Sinopse
                     </label>
 
-                    <WritingPanel value={description} onChange={setDescription} /><StoryKindFields value={storyMetadata} onChange={setStoryMetadata} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
+                    <WritingPanel value={description} onChange={setDescription} />
+                    <SpotifyField label="Playlist da história" value={storySpotifyUrl} onChange={setStorySpotifyUrl} saved={story?.spotify_link} playlistOnly />
+                    <StoryKindFields value={storyMetadata} onChange={setStoryMetadata} /><StoryMetadataFields value={storyMetadata} onChange={setStoryMetadata} />
 
                     <div className="mt-1 text-right text-xs text-gray-600">
                       {description.length}/5000
@@ -2719,6 +2732,7 @@ export default function EditarHistoriaPage() {
         ) : (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
+              <SpotifyField label="Trilha deste capítulo" value={chapterSpotifyUrl} onChange={setChapterSpotifyUrl} saved={chapter.spotify_link} />
               <ChapterBannerEditor key={chapter.id} chapterId={chapter.id} value={chapter.banner_url||null} onChange={banner=>setChapter(old=>old?{...old,banner_url:banner}:old)}/>
               <button type="button" onClick={clearChapterSelection} className="nook-choice w-full">Editar informações da obra</button>
 

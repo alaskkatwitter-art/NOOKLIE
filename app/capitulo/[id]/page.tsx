@@ -1,4 +1,6 @@
 'use client';
+import { SpotifyCard } from '@/components/SpotifyLink';
+import type { SpotifyLink } from '@/lib/spotify/link';
 import ChapterBanner from '@/components/ChapterBanner';
 
 import AccountBadge from '@/components/AccountBadge';
@@ -21,6 +23,7 @@ import { useReaderPreferences } from '@/lib/reader/use-reader-preferences';
 import { readerFontFamily } from '@/lib/reader/preferences';
 
 type Chapter = {
+  spotify_link?: SpotifyLink | null;
   id: string;
   story_id?: string;
   entry_kind?: ChapterKind;
@@ -1104,6 +1107,8 @@ export default function CapituloPage() {
             </p>
           )}
         </header>
+
+        <SpotifyCard value={chapter.spotify_link} label="Trilha deste capítulo" />
 
         {/* CONTEÚDO */}
 

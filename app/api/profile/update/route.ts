@@ -1,3 +1,4 @@
+import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -160,11 +161,21 @@ export async function PATCH(request: Request) {
       updates.avatar_position = body.avatar_position;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && !Object.hasOwn(body, 'spotify_url')) {
       return NextResponse.json(
         { error: 'Nenhuma alteração válida foi informada.' },
         { status: 400 }
       );
+    }
+
+    if (Object.hasOwn(body, 'spotify_url')) {
+      const existing = typeof body.spotify_url === 'string' && body.spotify_url.trim()
+        ? await supabase.from('profiles').select('spotify_link').eq('user_id', session.user_id).maybeSingle()
+        : null;
+      if (existing?.error) throw existing.error;
+      const music = await spotifyUpdate(body.spotify_url, existing?.data?.spotify_link);
+      if (music instanceof NextResponse) return music;
+      Object.assign(updates, music);
     }
 
     const { data: profile, error: profileError } =
@@ -173,7 +184,7 @@ export async function PATCH(request: Request) {
         .update(updates)
         .eq('user_id', session.user_id)
         .select(
-          'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official, header_layout, avatar_position'
+          'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official, header_layout, avatar_position, spotify_link'
         )
         .single();
 

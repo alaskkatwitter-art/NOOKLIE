@@ -54,6 +54,7 @@ export async function GET(
           username,
           display_name,
           bio,
+          spotify_link,
           avatar_url,
           cover_url,
           avatar_animation,
