@@ -16,9 +16,10 @@ export type StoryMetadata = {
   cover_has_ai: boolean;
   content_warnings: string;
   accepts_translation: boolean;
+  allows_download: boolean;
 };
 
-export const emptyStoryMetadata: StoryMetadata = { series_name: '', series_volume: null, story_kind: '', story_format: '', has_content_warnings: false, fandom: '', work_has_ai: false, cover_has_ai: false, content_warnings: '', accepts_translation: false };
+export const emptyStoryMetadata: StoryMetadata = { series_name: '', series_volume: null, story_kind: '', story_format: '', has_content_warnings: false, fandom: '', work_has_ai: false, cover_has_ai: false, content_warnings: '', accepts_translation: false, allows_download: false };
 
 // A missing field on older clients must not erase a saved declaration.
 export function parseStoryMetadata(form: FormData): Partial<StoryMetadata> {
@@ -29,7 +30,7 @@ export function parseStoryMetadata(form: FormData): Partial<StoryMetadata> {
     if (typeof value !== 'string' || value.length > limit) throw new Error(`O campo ${key === 'fandom' ? 'fandom' : 'avisos'} deve ter no máximo ${limit} caracteres.`);
     result[key] = value.trim();
   }
-  for (const key of ['has_content_warnings', 'work_has_ai', 'cover_has_ai', 'accepts_translation'] as const) {
+  for (const key of ['has_content_warnings', 'work_has_ai', 'cover_has_ai', 'accepts_translation', 'allows_download'] as const) {
     if (!form.has(key)) continue;
     const value = form.get(key);
     if (value !== 'true' && value !== 'false') throw new Error('Opção de publicação inválida.');

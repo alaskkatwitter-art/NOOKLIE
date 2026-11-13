@@ -1,5 +1,6 @@
 "use client";
 
+import BookDownloads from '@/components/BookDownloads';
 import { SpotifyCard } from '@/components/SpotifyLink';
 import type { SpotifyLink } from '@/lib/spotify/link';
 import AccountBadge from '@/components/AccountBadge';
@@ -54,6 +55,7 @@ type Story = {
   created_at: string;
   updated_at: string;
   author: Author | null;
+  allows_download?: boolean;
   tags: Tag[];
   chapters: Chapter[];
   likes: number;
@@ -300,6 +302,8 @@ export default function HistoriaPage() {
               </section>
 
               <SpotifyCard value={story.spotify_link} label="Trilha da história" />
+
+              {story.allows_download && story.chapters?.some(chapter => chapter.published) && <BookDownloads id={story.id} />}
 
               {!!story.tags?.length && (
                 <ul aria-label="Tags da obra" className="mt-4 flex flex-wrap gap-2">
