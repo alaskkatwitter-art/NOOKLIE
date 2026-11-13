@@ -129,7 +129,7 @@ export async function GET(
         cover_url,
         status,
         rating,
-        story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation,
+        story_kind, story_format, series_name, series_volume, has_content_warnings, fandom, work_has_ai, cover_has_ai, content_warnings, accepts_translation, allows_download,
         created_at,
         updated_at,
         moderation_hidden_at, release_at

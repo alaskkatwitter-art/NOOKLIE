@@ -133,6 +133,13 @@ test('release gates, durable lists, feed media and wiki reviews preserve ownersh
   assert.deepEqual((await saveDetails(author, { spotify_link: playlist })).rows[0].details.spotify_link, playlist);
   assert.deepEqual((await saveDetails(author, { title: 'A nova edição' })).rows[0].details.spotify_link, playlist);
   assert.equal((await saveDetails(author, { spotify_link: null })).rows[0].details.spotify_link, null);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261113023000_story_download_permission.sql', import.meta.url), 'utf8'));
+  assert.equal((await rows(`select allows_download from stories where id='${story}'`))[0].allows_download, false);
+  assert.equal((await saveDetails(reader, { allows_download: true })).rows[0].details, null);
+  assert.equal((await saveDetails(author, { allows_download: true })).rows[0].details.allows_download, true);
+  assert.equal((await saveDetails(author, { title: 'A nova edição' })).rows[0].details.allows_download, true);
+  assert.equal((await saveDetails(author, { allows_download: false })).rows[0].details.allows_download, false);
+
 
   assert.equal((await rows(`select count(*)::int total from search_catalog_stories(p_include_slugs=>array['nookverso'])`))[0].total, 1);
   const [{ list }] = await rows(`select save_reading_list('${reader}',null,'${story}','Leituras','') list`);

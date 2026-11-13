@@ -60,6 +60,7 @@ type Story = {
   cover_has_ai?: boolean;
   content_warnings?: string;
   accepts_translation?: boolean;
+  allows_download?: boolean;
   id: string;
   title: string;
   description: string;
@@ -296,6 +297,7 @@ export default function EditarHistoriaPage() {
   const [chapterTitle, setChapterTitle] =
     useState('');
 
+  const [importingChapter, setImportingChapter] = useState(false);
   const [chapterBody, setChapterBody] =
     useState('');
 
@@ -473,7 +475,7 @@ export default function EditarHistoriaPage() {
         setDescription(
           normalizedStory.description || ''
         );
-        setStoryMetadata({ series_name: normalizedStory.series_name ?? '', series_volume: normalizedStory.series_volume ?? null, story_kind: normalizedStory.story_kind ?? '', story_format: normalizedStory.story_format ?? '', fandom: normalizedStory.fandom ?? "", work_has_ai: normalizedStory.work_has_ai ?? false, cover_has_ai: normalizedStory.cover_has_ai ?? false, has_content_warnings: normalizedStory.has_content_warnings ?? false, content_warnings: normalizedStory.content_warnings ?? "", accepts_translation: normalizedStory.accepts_translation ?? false });
+        setStoryMetadata({ series_name: normalizedStory.series_name ?? '', series_volume: normalizedStory.series_volume ?? null, story_kind: normalizedStory.story_kind ?? '', story_format: normalizedStory.story_format ?? '', fandom: normalizedStory.fandom ?? "", work_has_ai: normalizedStory.work_has_ai ?? false, cover_has_ai: normalizedStory.cover_has_ai ?? false, has_content_warnings: normalizedStory.has_content_warnings ?? false, content_warnings: normalizedStory.content_warnings ?? "", accepts_translation: normalizedStory.accepts_translation ?? false, allows_download: normalizedStory.allows_download ?? false });
 
         setStatus(
           normalizedStory.status || ''
@@ -1341,6 +1343,45 @@ export default function EditarHistoriaPage() {
     syncEditorBody();
   }
 
+  async function handleImportChapter(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    const editor = editorRef.current;
+    if (!file || !editor) return;
+
+    setImportingChapter(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { importChapter } = await import('@/lib/books/import-chapter');
+      const result = await importChapter(file, Math.max(0, MAX_MEDIA - chapterMedia.length));
+      if (editorRef.current !== editor || input.closest('[data-import-chapter]')?.getAttribute('data-import-chapter') !== chapter?.id) return;
+      const media: EditorMedia[] = result.images.map(({ token, file }) => ({
+        id: token, file, url: URL.createObjectURL(file),
+        type: file.type === 'image/gif' ? 'gif' : 'image', existing: false,
+      }));
+      setChapterMedia(current => [...current, ...media]);
+      const imported = document.createElement('template');
+      imported.innerHTML = result.html;
+      for (const item of media) {
+        const marker = imported.content.querySelector(`[data-pending-media-id="${item.id}"]`);
+        if (!marker) continue;
+        const image = document.createElement('img');
+        image.src = item.url;
+        image.alt = marker.textContent || 'Imagem importada';
+        image.style.cssText = 'display:block;max-width:100%;height:auto;margin:auto';
+        marker.replaceChildren(image);
+      }
+      setChapterBody(editor.innerHTML + imported.innerHTML);
+      setSuccess(result.notice || 'Arquivo importado. Revise o capítulo antes de salvar.');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Não foi possível importar este arquivo.');
+    } finally {
+      setImportingChapter(false);
+    }
+  }
+
   function handleMediaSelect(
     event: ChangeEvent<HTMLInputElement>
   ) {
@@ -1464,11 +1505,7 @@ export default function EditarHistoriaPage() {
           uploadedMedia.media_type +
           '" loading="lazy" style="max-width: 100%; height: auto;">';
 
-        result =
-          result.replace(
-            marker,
-            imageHtml
-          );
+        result = result.replace(marker, imageHtml);
       }
     );
 
@@ -1523,7 +1560,7 @@ export default function EditarHistoriaPage() {
   async function saveChapter(
     targetStatus?: ChapterStatus
   ) {
-    if (!chapter || savingChapter) return;
+    if (!chapter || savingChapter || importingChapter) return;
 
     const finalStatus =
       targetStatus ||
@@ -3270,6 +3307,11 @@ export default function EditarHistoriaPage() {
                             </div>
                           )}
                         </div>
+
+                        <label data-import-chapter={chapter.id} className="mx-5 my-2 inline-flex min-h-11 cursor-pointer items-center rounded-md border border-pink-300/25 px-3 text-sm font-semibold text-pink-100 focus-within:outline-2">
+                          {importingChapter ? 'Importando…' : 'Importar .docx ou PDF'}
+                          <input type="file" className="sr-only" accept=".docx,.doc,.pdf" disabled={importingChapter || savingChapter} onChange={event => void handleImportChapter(event)} />
+                        </label>
 
                         <div
                           ref={
