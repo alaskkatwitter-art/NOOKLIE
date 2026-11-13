@@ -14,7 +14,7 @@ async function resolveSharedLink(value: unknown, playlistOnly: boolean) {
 }
 
 export async function spotifyUpdate(
-  value: unknown, existing?: SpotifyLink | null, playlistOnly = false,
+  value: unknown, existing?: SpotifyLink | null, playlistOnly = false, details?: { title?: unknown; artists?: unknown },
 ): Promise<{ spotify_link?: SpotifyLink | null } | NextResponse> {
   if (value === undefined) return {};
   if (value === null || (typeof value === 'string' && !value.trim())) return { spotify_link: null };
@@ -31,11 +31,25 @@ export async function spotifyUpdate(
     error: playlistOnly ? 'Cole o link de uma playlist do Spotify ou de um vídeo do YouTube.' : 'Cole um link do Spotify ou de um vídeo do YouTube.',
   }, { status: 400 });
 
-  const fallback = { url: parsed.url, title: parsed.label, image: parsed.thumbnail };
+  if ([details?.title, details?.artists].some(value =>
+    value !== undefined && (typeof value !== 'string' || value.length > 300)
+  )) return NextResponse.json({ error: 'Use até 300 caracteres para o título e os artistas.' }, { status: 400 });
+
+  const customTitle = typeof details?.title === 'string' ? details.title.trim() : '';
+  const artists = typeof details?.artists === 'string' ? details.artists.trim() : '';
   const sameLink = existing?.url === parsed.url;
-  if (sameLink && (existing.title !== fallback.title || (parsed.provider === 'Spotify' && existing.image))) return {};
+  if (customTitle || artists) return { spotify_link: {
+    url: parsed.url,
+    title: customTitle || (sameLink ? existing.title : parsed.label),
+    image: parsed.thumbnail ?? (sameLink ? existing.image : null),
+    ...(artists && { artists }),
+  } };
+
+  const fallback = { url: parsed.url, title: parsed.label, image: parsed.thumbnail };
+  if (sameLink && !existing.artists && (existing.title !== fallback.title || (parsed.provider === 'Spotify' && existing.image))) return {};
   const endpoint = new URL(parsed.provider === 'YouTube' ? 'https://www.youtube.com/oembed' : 'https://open.spotify.com/oembed');
   endpoint.searchParams.set('url', parsed.url);
+  if (parsed.provider === 'YouTube') endpoint.searchParams.set('format', 'json');
   try {
     const response = await fetch(endpoint, { signal: AbortSignal.timeout(4000), redirect: 'error' });
     if (response.ok) {
@@ -46,5 +60,5 @@ export async function spotifyUpdate(
   } catch {
     // A valid link remains usable when Spotify's preview endpoint is unavailable.
   }
-  return sameLink ? {} : { spotify_link: fallback };
+  return sameLink && !existing.artists ? {} : { spotify_link: fallback };
 }
