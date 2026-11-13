@@ -1,3 +1,5 @@
+import { youtubeBannerId } from '../stories/chapter-banner';
+
 const labels = { track: 'Música', album: 'Álbum', playlist: 'Playlist' } as const;
 export type SpotifyKind = keyof typeof labels;
 export type SpotifyLink = { url: string; title: string; image: string | null };
@@ -27,4 +29,18 @@ export function spotifyImage(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+export function parseSoundtrackUrl(value: unknown, playlistOnly = false) {
+  const spotify = parseSpotifyUrl(value, playlistOnly);
+  if (spotify) return { ...spotify, provider: 'Spotify', thumbnail: null };
+  if (typeof value !== 'string' || value.length > 512) return null;
+  const id = youtubeBannerId(value);
+  if (!id) return null;
+  return {
+    provider: 'YouTube',
+    url: `https://www.youtube.com/watch?v=${id}`,
+    label: 'Vídeo',
+    thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+  };
 }

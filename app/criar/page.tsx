@@ -310,7 +310,7 @@ export default function CriarPage() {
                 </div>
 
                 <WritingPanel value={description} onChange={setDescription} />
-                <SpotifyField label="Playlist da história" value={spotifyUrl} onChange={setSpotifyUrl} playlistOnly />
+                <SpotifyField label="Trilha da história" value={spotifyUrl} onChange={setSpotifyUrl} playlistOnly />
               </div>
 
               {/* STATUS */}

@@ -299,7 +299,7 @@ export default function HistoriaPage() {
                 )}
               </section>
 
-              <SpotifyCard value={story.spotify_link} label="Playlist da história" />
+              <SpotifyCard value={story.spotify_link} label="Trilha da história" />
 
               {!!story.tags?.length && (
                 <ul aria-label="Tags da obra" className="mt-4 flex flex-wrap gap-2">
