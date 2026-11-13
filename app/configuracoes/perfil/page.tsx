@@ -24,6 +24,8 @@ export default function EditProfilePage() {
   const [themes, setThemes] = useState<ProfileThemeCollection | null>();
   const [tab, setTab] = useState<'photos' | 'themes' | 'details'>('photos');
   const [spotifyUrl, setSpotifyUrl] = useState('');
+  const [spotifyTitle, setSpotifyTitle] = useState('');
+  const [spotifyArtists, setSpotifyArtists] = useState('');
   const [name, setName] = useState(''), [bio, setBio] = useState('');
   const [layout, setLayout] = useState<ProfileHeaderLayout>('classic');
   const [position, setPosition] = useState<ProfileAvatarPosition>('left');
@@ -40,7 +42,7 @@ export default function EditProfilePage() {
         const data = await response.json();
         if (!response.ok || !data.user) throw Error(data.error || 'Não foi possível abrir seu perfil.');
         if (controller.signal.aborted) return;
-        setUser(data.user); setSpotifyUrl(data.user.spotify_link?.url || ''); setName(data.user.display_name || ''); setBio(data.user.bio || '');
+        setUser(data.user); setSpotifyUrl(data.user.spotify_link?.url || ''); setSpotifyTitle(data.user.spotify_link?.title === 'Vídeo' ? '' : data.user.spotify_link?.title || ''); setSpotifyArtists(data.user.spotify_link?.artists || ''); setName(data.user.display_name || ''); setBio(data.user.bio || '');
         setLayout(data.user.header_layout || 'classic'); setPosition(data.user.avatar_position || 'left');
       } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Tente novamente.'); }
     }
@@ -83,7 +85,7 @@ export default function EditProfilePage() {
   async function save() {
     setSaving(true); setError(''); setNotice('');
     try {
-      const response = await fetch('/api/profile/update', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: name, bio, spotify_url: spotifyUrl, header_layout: layout, avatar_position: position }) });
+      const response = await fetch('/api/profile/update', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: name, bio, spotify_url: spotifyUrl, spotify_title: spotifyTitle, spotify_artists: spotifyArtists, header_layout: layout, avatar_position: position }) });
       const data = await response.json(); if (!response.ok) throw Error(data.error || 'Não foi possível salvar.');
       setUser(current => current ? { ...current, ...data.user } : current); setNotice('Perfil atualizado.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Tente novamente.'); }
@@ -104,7 +106,7 @@ export default function EditProfilePage() {
       {tab === 'themes' && <section className="profile-editor-themes"><UiThemeControl/><div className="editor-layout-options"><label>Cabeçalho<select value={layout} onChange={event => setLayout(event.target.value as ProfileHeaderLayout)}><option value="classic">Clássico</option><option value="immersive">Imersivo</option></select></label><label>Avatar<select value={position} onChange={event => setPosition(event.target.value as ProfileAvatarPosition)}><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
         {themes ? <ProfileThemeEditor collection={themes} onChange={setThemes} cover={user.cover_url} username={user.username} expanded/> : <p role="status">{themes === undefined ? 'Carregando temas do perfil…' : 'Temas indisponíveis no momento.'}</p>}
       </section>}
-      {tab === 'details' && <section className="profile-editor-details"><label>Nome de exibição<input maxLength={50} value={name} onChange={event => setName(event.target.value)}/></label><label>Biografia<textarea rows={4} maxLength={500} value={bio} onChange={event => setBio(event.target.value)}/></label><SpotifyField label="Música do perfil" value={spotifyUrl} onChange={setSpotifyUrl} saved={user.spotify_link} /><Link href="/configuracoes">Configurações da conta</Link></section>}
+      {tab === 'details' && <section className="profile-editor-details"><label>Nome de exibição<input maxLength={50} value={name} onChange={event => setName(event.target.value)}/></label><label>Biografia<textarea rows={4} maxLength={500} value={bio} onChange={event => setBio(event.target.value)}/></label><SpotifyField label="Música do perfil" value={spotifyUrl} onChange={url => { setSpotifyUrl(url); setSpotifyTitle(''); setSpotifyArtists(''); }} saved={user.spotify_link} />{spotifyUrl.trim() && <><label>Nome da música<input className="nook-input w-full" maxLength={300} placeholder="Título do vídeo, se disponível" value={spotifyTitle} onChange={event => setSpotifyTitle(event.target.value)} /></label><label>Artistas<input className="nook-input w-full" maxLength={300} placeholder="Opcional" value={spotifyArtists} onChange={event => setSpotifyArtists(event.target.value)} /></label></>}<Link href="/configuracoes">Configurações da conta</Link></section>}
       {tab !== 'photos' && <button type="button" className="editor-save" disabled={saving} onClick={() => void save()}>{saving ? 'Salvando…' : tab === 'themes' ? 'Salvar cabeçalho' : 'Salvar dados'}</button>}
       <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'avatar')}/><input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'cover')}/>
       {crop && <ImageCropDialog source={crop.source} kind={crop.kind} allowGif framing={crop.framing} onCancel={() => setCrop(null)} onSave={saveImage}/>}

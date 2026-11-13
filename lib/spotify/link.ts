@@ -2,7 +2,7 @@ import { youtubeBannerId } from '../stories/chapter-banner';
 
 const labels = { track: 'Música', album: 'Álbum', playlist: 'Playlist' } as const;
 export type SpotifyKind = keyof typeof labels;
-export type SpotifyLink = { url: string; title: string; image: string | null };
+export type SpotifyLink = { url: string; title: string; image: string | null; artists?: string };
 
 export function parseSpotifyUrl(value: unknown, playlistOnly = false) {
   if (typeof value !== 'string' || value.length > 512) return null;

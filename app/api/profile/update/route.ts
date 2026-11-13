@@ -173,7 +173,9 @@ export async function PATCH(request: Request) {
         ? await supabase.from('profiles').select('spotify_link').eq('user_id', session.user_id).maybeSingle()
         : null;
       if (existing?.error) throw existing.error;
-      const music = await spotifyUpdate(body.spotify_url, existing?.data?.spotify_link);
+      const music = await spotifyUpdate(body.spotify_url, existing?.data?.spotify_link, false, {
+        title: body.spotify_title, artists: body.spotify_artists,
+      });
       if (music instanceof NextResponse) return music;
       Object.assign(updates, music);
     }

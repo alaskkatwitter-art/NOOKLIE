@@ -14,6 +14,7 @@ export function SpotifyCard({ value, label }: { value?: SpotifyLink | null; labe
       <span className="min-w-0">
         <span className="spotify-label">{label} · {item.provider}</span>
         <strong className="block break-words">{value.title || item.label}</strong>
+        {value.artists && <span className="spotify-label break-words">{value.artists}</span>}
       </span>
       <ArrowUpRight className="ml-auto shrink-0" size={17} aria-hidden="true" />
       <span className="sr-only">Abrir no {item.provider} em nova aba</span>
