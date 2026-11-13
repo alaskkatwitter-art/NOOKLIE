@@ -19,7 +19,7 @@ export async function spotifyUpdate(
   if (value === undefined) return {};
   if (value === null || (typeof value === 'string' && !value.trim())) return { spotify_link: null };
 
-  let parsed: ReturnType<typeof parseSpotifyUrl>;
+  let parsed: ReturnType<typeof parseSoundtrackUrl>;
   try {
     parsed = await resolveSharedLink(value, playlistOnly);
   } catch {
