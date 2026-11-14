@@ -117,6 +117,7 @@ export async function POST(request: Request) {
         .from('profile-covers')
         .upload(filePath, fileBuffer, {
           contentType: file.type,
+          cacheControl: '3600',
           upsert: false,
         });
 
