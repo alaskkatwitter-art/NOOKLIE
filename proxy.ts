@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const PRODUCTION_HOST = 'nooklie.vercel.app';
+const CLOUDFLARE_HOST = 'nooklie.nooklie-the-app.workers.dev';
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -9,6 +10,19 @@ export function proxy(request: NextRequest) {
   const protocol = process.env.VERCEL === '1' ? 'https:' : request.nextUrl.protocol;
   const originForHost = protocol + '//' + host;
   const isApi = pathname.startsWith('/api/');
+  const isCloudflareProduction = request.nextUrl.hostname === CLOUDFLARE_HOST;
+  if (isCloudflareProduction && request.nextUrl.protocol !== 'https:') {
+    if (!['GET', 'HEAD'].includes(request.method)) {
+      return NextResponse.json(
+        { error: 'Esta requisição exige HTTPS.' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+    const url = request.nextUrl.clone();
+    url.protocol = 'https:';
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
   if (isApi && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
     const origin = request.headers.get('origin');
     if (request.headers.get('sec-fetch-site') === 'cross-site' ||
@@ -21,6 +35,9 @@ export function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+  if (isCloudflareProduction) {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000');
+  }
   if (pathname.startsWith('/api/auth/')) {
     response.headers.set('Cache-Control', 'private, no-store');
   }
