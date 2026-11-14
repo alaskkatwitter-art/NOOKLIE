@@ -31,7 +31,7 @@ export async function uploadFeedAttachments(files: File[], profileId: string, im
     const media = [];
     for (const { buffer, file, mediaType } of validated) {
       const path = `${profileId}/feed-${randomUUID()}.${extensions[file.type]}`;
-      const upload = await chatDb.storage.from('nook-media').upload(path, buffer, { contentType: file.type, upsert: false });
+      const upload = await chatDb.storage.from('nook-media').upload(path, buffer, { contentType: file.type, cacheControl: '3600', upsert: false });
       if (upload.error) throw upload.error;
       paths.push(path);
       media.push({ media_url: chatDb.storage.from('nook-media').getPublicUrl(path).data.publicUrl, media_type: mediaType });
