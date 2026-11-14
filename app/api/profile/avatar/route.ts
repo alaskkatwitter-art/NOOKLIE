@@ -1,3 +1,4 @@
+import { optimizeUploadedImage } from '@/lib/media/optimize-upload';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -105,10 +106,12 @@ export async function POST(request: Request) {
     }
 
 
+    const optimizedBuffer = await optimizeUploadedImage(fileBuffer, file.type, 512);
+
     const { error: uploadError } =
       await supabase.storage
         .from('avatars')
-        .upload(filePath, fileBuffer, {
+        .upload(filePath, optimizedBuffer, {
           contentType: file.type,
           cacheControl: '3600',
           upsert: false,
