@@ -12,7 +12,8 @@ const menu = [
   { label: "Notícias", href: "/noticias" },
 ];
 
-const latestEdition = newsArticles["doacoes-e-novidades"];
+const latestEdition = newsArticles["nooklie-de-volta"];
+const donationsEdition = newsArticles["doacoes-e-novidades"];
 
 const welcome = {
   title: "Bem-vindo ao Nooklie 1.0",
@@ -80,10 +81,16 @@ export default function NoticiasPage() {
 
         <section className="mt-12" aria-label="Edições do Jornal Nooklie">
           <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
-            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · <time dateTime="2026-11-07">7 de novembro de 2026</time></p>
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · <time dateTime="2026-11-14">14 de novembro de 2026</time></p>
             <h2 className="mt-4 text-3xl font-black">{latestEdition.title}</h2>
             <p className="mt-4 max-w-xl leading-7 text-white/75">{latestEdition.description}</p>
-            <Link href="/noticias/doacoes-e-novidades" className="mt-6 inline-flex min-h-11 items-center font-bold text-pink-200 hover:underline">Ler a nova edição →</Link>
+            <Link href="/noticias/nooklie-de-volta" className="mt-6 inline-flex min-h-11 items-center font-bold text-pink-200 hover:underline">Ler a nova edição →</Link>
+          </article>
+          <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · <time dateTime="2026-11-07">7 de novembro de 2026</time></p>
+            <h2 className="mt-4 text-3xl font-black">{donationsEdition.title}</h2>
+            <p className="mt-4 max-w-xl leading-7 text-white/75">{donationsEdition.description}</p>
+            <Link href="/noticias/doacoes-e-novidades" className="mt-6 inline-flex min-h-11 items-center font-bold text-pink-200 hover:underline">Ler a matéria →</Link>
           </article>
           <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
             <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · 6 de novembro de 2026</p>
