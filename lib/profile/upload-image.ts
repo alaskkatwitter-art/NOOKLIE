@@ -1,3 +1,4 @@
+import { optimizeUploadedImage } from '@/lib/media/optimize-upload';
 import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUserContext } from '@/lib/auth/session';
 import { sameOrigin } from '@/lib/chat/server';
@@ -84,7 +85,8 @@ export async function uploadProfileImage(request: Request, kind: ProfileImageKin
     const stem = `${auth.userId}/${kind}-${crypto.randomUUID()}`;
     const posterPath = `${stem}.${extensions[poster.type]}`;
     const gifPath = `${stem}.gif`;
-    const files = [{ path: posterPath, bytes: posterBytes, type: poster.type }];
+    const optimizedPoster = await optimizeUploadedImage(posterBytes, poster.type, kind === 'avatar' ? 512 : 1600);
+    const files = [{ path: posterPath, bytes: optimizedPoster, type: poster.type }];
     if (animationBytes) files.push({ path: gifPath, bytes: animationBytes, type: 'image/gif' });
     for (const file of files) {
       const { error } = await storage.upload(file.path, file.bytes, {
