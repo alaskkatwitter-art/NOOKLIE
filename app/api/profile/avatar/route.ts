@@ -110,6 +110,7 @@ export async function POST(request: Request) {
         .from('avatars')
         .upload(filePath, fileBuffer, {
           contentType: file.type,
+          cacheControl: '3600',
           upsert: false,
         });
 
