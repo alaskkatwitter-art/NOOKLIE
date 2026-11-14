@@ -397,7 +397,7 @@ export async function POST(
           {
             contentType:
               file.type,
-            cacheControl: '0',
+            cacheControl: '3600',
             upsert: false,
           }
         );
