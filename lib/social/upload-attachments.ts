@@ -1,3 +1,4 @@
+import { optimizeUploadedImage } from '@/lib/media/optimize-upload';
 import { randomUUID } from 'node:crypto';
 import { chatDb } from '@/lib/chat/server';
 import { imageMatchesType, videoMatchesType } from '@/lib/security/uploads';
@@ -31,7 +32,8 @@ export async function uploadFeedAttachments(files: File[], profileId: string, im
     const media = [];
     for (const { buffer, file, mediaType } of validated) {
       const path = `${profileId}/feed-${randomUUID()}.${extensions[file.type]}`;
-      const upload = await chatDb.storage.from('nook-media').upload(path, buffer, { contentType: file.type, upsert: false });
+      const optimizedBuffer = mediaType === 'image' ? await optimizeUploadedImage(buffer, file.type, 1600) : buffer;
+      const upload = await chatDb.storage.from('nook-media').upload(path, optimizedBuffer, { contentType: file.type, cacheControl: '3600', upsert: false });
       if (upload.error) throw upload.error;
       paths.push(path);
       media.push({ media_url: chatDb.storage.from('nook-media').getPublicUrl(path).data.publicUrl, media_type: mediaType });
