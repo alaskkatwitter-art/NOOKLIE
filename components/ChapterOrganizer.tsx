@@ -11,12 +11,12 @@ export default function ChapterOrganizer({ chapters, selectedId, onSelect, onMov
   async function move(from: number, to: number) {
     if (working || busy || from === to || from < 0 || to < 0 || to >= chapters.length) return;
     setWorking(true);
-    try { await onMove(from, to); } finally { setWorking(false); }
+    try { await onMove(from, to); } catch { /* The editor displays the error. */ } finally { setWorking(false); }
   }
   async function remove() {
     if (!pendingDelete || busy || working) return;
     setWorking(true);
-    try { await onDelete(pendingDelete); setPendingDelete(null); } finally { setWorking(false); }
+    try { await onDelete(pendingDelete); setPendingDelete(null); } catch { /* Keep the confirmation open on failure. */ } finally { setWorking(false); }
   }
   return <div className="mt-3 space-y-2" aria-label="Organizar capítulos">
     <p className="text-xs text-gray-400">Arraste pela alça para reorganizar ou use as setas. As alterações são salvas automaticamente.</p>
