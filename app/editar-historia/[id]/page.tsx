@@ -1,5 +1,6 @@
 'use client';
 import ChapterBanner from '@/components/ChapterBanner';
+import ChapterOrganizer from '@/components/ChapterOrganizer';
 import StoryPublicationControls from '@/components/StoryPublicationControls';
 import type { StoryPublication } from '@/lib/stories/publication';
 import ChapterBannerEditor from '@/components/ChapterBannerEditor';
@@ -317,6 +318,8 @@ export default function EditarHistoriaPage() {
 
   const [savingChapter, setSavingChapter] =
     useState(false);
+
+  const [managingChapters, setManagingChapters] = useState(false);
 
   const [creatingChapter, setCreatingChapter] =
     useState(false);
@@ -684,6 +687,47 @@ export default function EditarHistoriaPage() {
       window.clearTimeout(timer);
     };
   }, [showLinkBox]);
+
+  async function manageChapterRequest(payload: Record<string, unknown>) {
+    const response = await fetch(`/api/stories/${id}/chapters/manage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível alterar os capítulos.');
+  }
+
+  async function handleMoveChapter(from: number, to: number) {
+    if (!story || managingChapters) return;
+    const previous = story.chapters;
+    const reordered = [...previous];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    const numbered = reordered.map((item, index) => ({ ...item, chapter_number: index + 1 }));
+    setManagingChapters(true); setError(''); setSuccess('');
+    setStory(current => current ? { ...current, chapters: numbered } : current);
+    try {
+      await manageChapterRequest({ action: 'reorder', ids: numbered.map(item => item.id) });
+      setSuccess('Ordem dos capítulos salva.');
+    } catch (cause) {
+      setStory(current => current ? { ...current, chapters: previous } : current);
+      setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a ordem.');
+      throw cause;
+    } finally { setManagingChapters(false); }
+  }
+
+  async function handleDeleteChapter(chapterId: string) {
+    if (!story || managingChapters) return;
+    setManagingChapters(true); setError(''); setSuccess('');
+    try {
+      await manageChapterRequest({ action: 'delete', chapterId });
+      setStory(current => current ? { ...current, chapters: current.chapters.filter(item => item.id !== chapterId).map((item, index) => ({ ...item, chapter_number: index + 1 })) } : current);
+      if (selectedChapterId === chapterId) clearChapterSelection();
+      setSuccess('Capítulo excluído permanentemente.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível excluir o capítulo.');
+      throw cause;
+    } finally { setManagingChapters(false); }
+  }
 
   async function handleCreateChapter() {
     if (creatingChapter) return;
@@ -2655,62 +2699,7 @@ export default function EditarHistoriaPage() {
                       </button>
                     </div>
                   ) : (
-                    story.chapters.map(
-                      (item) => (
-                        <div
-                          key={
-                            item.id
-                          }
-                          className="rounded-xl border border-white/10 bg-black/20 p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-xs text-gray-600">
-                                Capítulo{' '}
-                                {
-                                  item.chapter_number
-                                }
-                              </p>
-
-                              <p className="mt-1 truncate text-sm text-gray-200">
-                                {item.title ||
-                                  'Sem título'}
-                              </p>
-                            </div>
-
-                            <span
-                              className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-medium tracking-wide ${getStatusClass(
-                                item.publication_status ||
-                                  (item.published
-                                    ? 'published'
-                                    : 'draft'),
-                                item.published
-                              )}`}
-                            >
-                              {getStatusLabel(
-                                item.publication_status ||
-                                  (item.published
-                                    ? 'published'
-                                    : 'draft'),
-                                item.published
-                              )}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              selectChapter(
-                                item.id
-                              )
-                            }
-                            className="mt-3 w-full rounded-lg bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
-                          >
-                            EDITAR CAPÍTULO
-                          </button>
-                        </div>
-                      )
-                    )
+                    <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} busy={managingChapters || savingChapter || creatingChapter} />
                   )}
                 </div>
               </div>
@@ -2751,61 +2740,7 @@ export default function EditarHistoriaPage() {
                 </div>
 
                 <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
-                  {story.chapters.map(
-                    (item) => (
-                      <button
-                        key={
-                          item.id
-                        }
-                        type="button"
-                        onClick={() =>
-                          selectChapter(
-                            item.id
-                          )
-                        }
-                        className={`w-full rounded-xl border p-3 text-left transition ${
-                          item.id ===
-                          selectedChapterId
-                            ? 'border-pink-400/40 bg-pink-500/[0.08]'
-                            : 'border-white/10 bg-black/20 hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wider text-gray-600">
-                              Capítulo{' '}
-                              {
-                                item.chapter_number
-                              }
-                            </p>
-
-                            <p className="mt-1 truncate text-sm text-gray-200">
-                              {item.title ||
-                                'Sem título'}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`shrink-0 rounded-full border px-2 py-1 text-[8px] ${getStatusClass(
-                              item.publication_status ||
-                                (item.published
-                                  ? 'published'
-                                  : 'draft'),
-                              item.published
-                            )}`}
-                          >
-                            {getStatusLabel(
-                              item.publication_status ||
-                                (item.published
-                                  ? 'published'
-                                  : 'draft'),
-                              item.published
-                            )}
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  )}
+                  <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} busy={managingChapters || savingChapter || creatingChapter} />
                 </div>
               </div>
             </aside>
