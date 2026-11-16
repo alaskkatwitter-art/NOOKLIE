@@ -27,7 +27,11 @@ export async function GET() {
     return NextResponse.json({
       ...home,
       ...Object.fromEntries(shelves.map(key => [key, home[key].map(addBadge)])),
-      events: home.events.map(event => ({ ...event, stories: event.stories.map(addBadge) })),
+      events: home.events.map(event => ({
+        ...event,
+        description: event.description.length > 240 ? event.description.slice(0, 240).trimEnd() + '…' : event.description,
+        stories: event.stories.map(addBadge),
+      })),
       user: reader.profile,
     }, { headers: privateHeaders });
   } catch {
