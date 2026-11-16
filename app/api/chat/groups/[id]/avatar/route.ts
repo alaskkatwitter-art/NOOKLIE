@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import {
@@ -27,8 +28,7 @@ export async function GET(_request: Request, context: Context) {
       !thread.avatar_path
     )
       return new NextResponse(null, { status: 404, headers: privateHeaders });
-    const result = await chatDb.storage
-      .from(bucket)
+    const result = await mediaStorage(chatDb, bucket)
       .download(thread.avatar_path);
     if (result.error || !result.data)
       return new NextResponse(null, { status: 404, headers: privateHeaders });
@@ -90,8 +90,7 @@ async function change(request: Request, context: Context, remove: boolean) {
           { status: 400, headers: privateHeaders },
         );
       path = `${id}/${randomUUID()}.${file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1]}`;
-      const uploaded = await chatDb.storage
-        .from(bucket)
+      const uploaded = await mediaStorage(chatDb, bucket)
         .upload(path, bytes, { contentType: file.type, upsert: false });
       if (uploaded.error) throw uploaded.error;
     }
@@ -111,14 +110,14 @@ async function change(request: Request, context: Context, remove: boolean) {
     // A null value requires IS rather than EQ; the compare-and-swap protects
     // against concurrent photo edits and ownership changes.
     if (saved.error || !saved.data) {
-      if (path) await chatDb.storage.from(bucket).remove([path]);
+      if (path) await mediaStorage(chatDb, bucket).remove([path]);
       return NextResponse.json(
         { error: 'O grupo mudou. Atualize a conversa e tente novamente.' },
         { status: 409, headers: privateHeaders },
       );
     }
     if (thread.avatar_path)
-      await chatDb.storage.from(bucket).remove([thread.avatar_path]);
+      await mediaStorage(chatDb, bucket).remove([thread.avatar_path]);
     return NextResponse.json({ saved: true }, { headers: privateHeaders });
   } catch {
     return NextResponse.json(

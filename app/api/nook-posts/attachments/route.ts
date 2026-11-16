@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { chatActor, chatDb, privateHeaders, sameOrigin, uuid } from '@/lib/chat/server';
 import { isNewsArticle } from '@/lib/news/articles';
 import { AttachmentError, uploadFeedAttachments } from '@/lib/social/upload-attachments';
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     uploaded = [];
     return respond({ post: { id: result.data } }, 201);
   } catch (error) {
-    if (uploaded.length) await chatDb.storage.from('nook-media').remove(uploaded);
+    if (uploaded.length) await mediaStorage(chatDb, 'nook-media').remove(uploaded);
     if (error instanceof AttachmentError) return respond({ error: error.message }, 400);
     console.error('feed media post', error);
     return respond({ error: 'Não foi possível publicar os arquivos.' }, 500);

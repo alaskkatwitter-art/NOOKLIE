@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { chatActor, chatDb, privateHeaders, uuid } from '@/lib/chat/server';
 import { getPublicProfileIds, isPublicPostVisible } from '@/lib/moderation/content-visibility';
 import { AttachmentError, uploadFeedAttachments } from '@/lib/social/upload-attachments';
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
     const author = await chatDb.from('profiles').select(authorFields).eq('id', actor.profileId).maybeSingle();
     return respond({ comment: { ...result.data, author: author.data ?? null, likes: 0, liked: false, saved: false } }, 201);
   } catch (error) {
-    if (uploaded.length) await chatDb.storage.from('nook-media').remove(uploaded);
+    if (uploaded.length) await mediaStorage(chatDb, 'nook-media').remove(uploaded);
     if (error instanceof AttachmentError) return respond({ error: error.message }, 400);
     console.error('feed replies POST', error);
     return respond({ error: 'Não foi possível enviar a resposta.' }, 500);

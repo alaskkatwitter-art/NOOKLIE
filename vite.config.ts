@@ -6,6 +6,9 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 export default defineConfig({
   resolve: {
     alias: [{
+      find: /^@\/lib\/media\/r2-binding$/,
+      replacement: fileURLToPath(new URL('./cloudflare/media-binding.ts', import.meta.url)),
+    }, {
       find: /^sharp$/,
       replacement: fileURLToPath(new URL('./cloudflare/preview-sharp.ts', import.meta.url)),
     }],

@@ -18,7 +18,16 @@ const supabaseUrl = production
 if (config.name !== 'nooklie-preview') {
   throw new Error('Unexpected base Worker configuration.');
 }
-config.vars = { NOOKLIE_CLOUDFLARE_RUNTIME: '1' };
+config.vars = {
+  NOOKLIE_CLOUDFLARE_RUNTIME: '1',
+  NOOKLIE_MEDIA_ORIGIN: production
+    ? 'https://nooklie.nooklie-the-app.workers.dev'
+    : 'https://nooklie-preview.nooklie-the-app.workers.dev',
+};
+config.r2_buckets = [{
+  binding: 'NOOKLIE_MEDIA',
+  bucket_name: production ? 'nooklie-media' : 'nooklie-preview-media',
+}];
 if (production) {
   config.name = 'nooklie';
   // Enable a public route only after reviewing the protected production candidate.

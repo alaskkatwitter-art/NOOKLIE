@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { storyPublication } from '@/lib/stories/publication';
@@ -912,10 +913,7 @@ export async function PUT(
       const {
         error: uploadError,
       } =
-        await supabase.storage
-          .from(
-            'story-covers'
-          )
+        await mediaStorage(supabase, 'story-covers')
           .upload(
             uploadedFilePath,
             cover,
@@ -949,10 +947,7 @@ export async function PUT(
         data:
           publicUrlData,
       } =
-        supabase.storage
-          .from(
-            'story-covers'
-          )
+        mediaStorage(supabase, 'story-covers')
           .getPublicUrl(
             uploadedFilePath
           );
@@ -1020,10 +1015,7 @@ export async function PUT(
       uploadedFilePath
     ) {
       try {
-        await supabase.storage
-          .from(
-            'story-covers'
-          )
+        await mediaStorage(supabase, 'story-covers')
           .remove([
             uploadedFilePath,
           ]);

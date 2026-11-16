@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { NextResponse } from "next/server";
 import {
   chatActor,
@@ -47,7 +48,7 @@ export async function PUT(
     const link = form.get("youtube");
     let url: string | null = null;
     let path: string | undefined;
-    const storage = chatDb.storage.from("chapter-media");
+    const storage = mediaStorage(chatDb, "chapter-media");
     if (typeof link === "string") {
       const video = youtubeBannerId(link);
       if (!video) return NextResponse.json({ error: "Informe um link válido do YouTube." }, { status: 400 });
@@ -79,12 +80,12 @@ export async function PUT(
       return NextResponse.json({ error: "O banner mudou em outra aba. Atualize a página e tente novamente." }, { status: 409 });
     }
     const old = chapter.data.banner_url;
-    const prefix = chatDb.storage.from("chapter-media").getPublicUrl("")
+    const prefix = mediaStorage(chatDb, "chapter-media").getPublicUrl("")
       .data.publicUrl;
     if (old && old !== url && old.startsWith(prefix)) {
       const oldPath = old.slice(prefix.length);
       if (oldPath.startsWith(`${actor.profileId}/`))
-        await chatDb.storage.from("chapter-media").remove([oldPath]);
+        await mediaStorage(chatDb, "chapter-media").remove([oldPath]);
     }
     return NextResponse.json({ banner_url: url }, { headers: privateHeaders });
   } catch {

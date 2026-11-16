@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
@@ -310,8 +311,7 @@ export async function POST(
     }
     const {
       error: uploadError,
-    } = await supabase.storage
-      .from('nook-media')
+    } = await mediaStorage(supabase, 'nook-media')
       .upload(
         filePath,
         buffer,
@@ -340,8 +340,7 @@ export async function POST(
     const {
       data: publicUrlData,
     } =
-      supabase.storage
-        .from('nook-media')
+      mediaStorage(supabase, 'nook-media')
         .getPublicUrl(
           filePath
         );
@@ -384,8 +383,7 @@ export async function POST(
        * o registro falhou, tenta
        * remover o arquivo órfão.
        */
-      await supabase.storage
-        .from('nook-media')
+      await mediaStorage(supabase, 'nook-media')
         .remove([
           filePath,
         ]);

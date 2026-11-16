@@ -1,3 +1,4 @@
+import { r2MediaResponse } from '@/lib/media/storage';
 import sharp from 'sharp';
 import { discoveryDb as db, privateHeaders } from '@/lib/discovery/server';
 import { getSessionTokenHash } from '@/lib/auth/session';
@@ -86,11 +87,14 @@ export async function GET(request: Request) {
     const upstreamHeaders = new Headers({ apikey: secret, Authorization: 'Bearer ' + secret });
     if (upstreamTags.length) upstreamHeaders.set('If-None-Match', upstreamTags.join(', '));
     if (!width && range && rangeMatch) upstreamHeaders.set('Range', range);
-    const fetchObject = () => fetch(storageUrl + object, {
-      headers: upstreamHeaders,
-      cache: 'no-store',
-      redirect: 'manual',
-    });
+    const fetchObject = async () => {
+      const stored = await r2MediaResponse(bucket, path, upstreamHeaders.get('If-None-Match'));
+      return stored ?? await fetch(storageUrl + object, {
+        headers: upstreamHeaders,
+        cache: 'no-store',
+        redirect: 'manual',
+      });
+    };
     step = 'storage-fetch';
     let upstream = await fetchObject();
     if (upstream.status === 304 && !upstream.headers.has('etag') && upstreamTags.length !== 1) {

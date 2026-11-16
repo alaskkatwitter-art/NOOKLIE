@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { ensureCatalogTag } from '@/lib/stories/tags';
@@ -235,8 +236,7 @@ export async function POST(request: Request) {
 
 
       const { error: uploadError } =
-        await supabase.storage
-          .from('story-covers')
+        await mediaStorage(supabase, 'story-covers')
           .upload(
             uploadedCoverPath,
             fileBuffer,
@@ -257,8 +257,7 @@ export async function POST(request: Request) {
       }
 
       const { data: publicUrlData } =
-        supabase.storage
-          .from('story-covers')
+        mediaStorage(supabase, 'story-covers')
           .getPublicUrl(uploadedCoverPath);
 
       coverUrl = publicUrlData.publicUrl;
@@ -284,8 +283,7 @@ export async function POST(request: Request) {
 
     if (storyError || !story) {
       if (uploadedCoverPath) {
-        await supabase.storage
-          .from('story-covers')
+        await mediaStorage(supabase, 'story-covers')
           .remove([uploadedCoverPath]);
       }
 
@@ -398,8 +396,7 @@ export async function POST(request: Request) {
     );
 
     if (uploadedCoverPath) {
-      await supabase.storage
-        .from('story-covers')
+      await mediaStorage(supabase, 'story-covers')
         .remove([uploadedCoverPath]);
     }
 

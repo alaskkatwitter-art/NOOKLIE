@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import {
@@ -278,8 +279,7 @@ export async function POST(request: Request) {
           { status: 400, headers: privateHeaders },
         );
       uploaded = chatMediaPath(threadId, id);
-      const upload = await chatDb.storage
-        .from(chatMediaBucket)
+      const upload = await mediaStorage(chatDb, chatMediaBucket)
         .upload(uploaded, encryptChat(bytes, `${threadId}:${id}:media`), {
           contentType: "application/octet-stream",
           upsert: false,
@@ -302,7 +302,7 @@ export async function POST(request: Request) {
     );
     if (result.error || !result.data) {
       if (uploaded)
-        await chatDb.storage.from(chatMediaBucket).remove([uploaded]);
+        await mediaStorage(chatDb, chatMediaBucket).remove([uploaded]);
       return NextResponse.json(
         {
           error:
@@ -316,7 +316,7 @@ export async function POST(request: Request) {
       { status: 201, headers: privateHeaders },
     );
   } catch {
-    if (uploaded) await chatDb.storage.from(chatMediaBucket).remove([uploaded]);
+    if (uploaded) await mediaStorage(chatDb, chatMediaBucket).remove([uploaded]);
     return NextResponse.json(
       { error: "Não foi possível enviar. Tente novamente." },
       { status: 503, headers: privateHeaders },

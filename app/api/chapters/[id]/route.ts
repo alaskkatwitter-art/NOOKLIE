@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { chapterKinds } from '@/lib/stories/metadata';
@@ -1044,10 +1045,7 @@ export async function PUT(
           const {
             error: removeError,
           } =
-            await supabase.storage
-              .from(
-                'chapter-media'
-              )
+            await mediaStorage(supabase, 'chapter-media')
               .remove([
                 storagePath,
               ]);
@@ -1171,10 +1169,7 @@ export async function PUT(
       const {
         error: uploadError,
       } =
-        await supabase.storage
-          .from(
-            'chapter-media'
-          )
+        await mediaStorage(supabase, 'chapter-media')
           .upload(
             storagePath,
             fileBuffer,
@@ -1210,10 +1205,7 @@ export async function PUT(
         data:
           publicUrlData,
       } =
-        supabase.storage
-          .from(
-            'chapter-media'
-          )
+        mediaStorage(supabase, 'chapter-media')
           .getPublicUrl(
             storagePath
           );
@@ -1258,10 +1250,7 @@ export async function PUT(
           mediaInsertError
         );
 
-        await supabase.storage
-          .from(
-            'chapter-media'
-          )
+        await mediaStorage(supabase, 'chapter-media')
           .remove([
             storagePath,
           ]);

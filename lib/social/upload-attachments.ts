@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { optimizeUploadedImage } from '@/lib/media/optimize-upload';
 import { randomUUID } from 'node:crypto';
 import { chatDb } from '@/lib/chat/server';
@@ -33,14 +34,14 @@ export async function uploadFeedAttachments(files: File[], profileId: string, im
     for (const { buffer, file, mediaType } of validated) {
       const path = `${profileId}/feed-${randomUUID()}.${extensions[file.type]}`;
       const optimizedBuffer = mediaType === 'image' ? await optimizeUploadedImage(buffer, file.type, 1600) : buffer;
-      const upload = await chatDb.storage.from('nook-media').upload(path, optimizedBuffer, { contentType: file.type, cacheControl: '3600', upsert: false });
+      const upload = await mediaStorage(chatDb, 'nook-media').upload(path, optimizedBuffer, { contentType: file.type, cacheControl: '3600', upsert: false });
       if (upload.error) throw upload.error;
       paths.push(path);
-      media.push({ media_url: chatDb.storage.from('nook-media').getPublicUrl(path).data.publicUrl, media_type: mediaType });
+      media.push({ media_url: mediaStorage(chatDb, 'nook-media').getPublicUrl(path).data.publicUrl, media_type: mediaType });
     }
     return { media, paths };
   } catch (error) {
-    if (paths.length) await chatDb.storage.from('nook-media').remove(paths);
+    if (paths.length) await mediaStorage(chatDb, 'nook-media').remove(paths);
     throw error;
   }
 }

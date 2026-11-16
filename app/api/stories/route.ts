@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { contentMediaUrl } from '@/lib/security/content-media';
 import { privateHeaders } from '@/lib/discovery/server';
@@ -388,9 +389,7 @@ export async function POST(
     const {
       error: uploadError,
     } =
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
+      await mediaStorage(supabaseAdmin, BUCKET)
         .upload(
           storagePath,
           buffer,
@@ -425,9 +424,7 @@ export async function POST(
     const {
       data: publicUrlData,
     } =
-      supabaseAdmin
-        .storage
-        .from(BUCKET)
+      mediaStorage(supabaseAdmin, BUCKET)
         .getPublicUrl(
           storagePath
         );
@@ -437,9 +434,7 @@ export async function POST(
         ?.publicUrl;
 
     if (!mediaUrl) {
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
+      await mediaStorage(supabaseAdmin, BUCKET)
         .remove([
           storagePath,
         ]);
@@ -528,9 +523,7 @@ export async function POST(
        * remove o arquivo que acabou
        * de ser enviado.
        */
-      await supabaseAdmin
-        .storage
-        .from(BUCKET)
+      await mediaStorage(supabaseAdmin, BUCKET)
         .remove([
           storagePath,
         ]);
@@ -571,9 +564,7 @@ export async function POST(
 
     if (uploadedPath) {
       try {
-        await supabaseAdmin
-          .storage
-          .from(BUCKET)
+        await mediaStorage(supabaseAdmin, BUCKET)
           .remove([
             uploadedPath,
           ]);
@@ -730,9 +721,7 @@ export async function DELETE(
         const {
           error: storageError,
         } =
-          await supabaseAdmin
-            .storage
-            .from(BUCKET)
+          await mediaStorage(supabaseAdmin, BUCKET)
             .remove([
               storagePath,
             ]);

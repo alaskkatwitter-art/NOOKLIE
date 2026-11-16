@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
@@ -167,8 +168,7 @@ const arrayBuffer = await file.arrayBuffer();
     }
 
 
-const { error: uploadError } = await supabase.storage
-  .from('stickers')
+const { error: uploadError } = await mediaStorage(supabase, 'stickers')
   .upload(filePath, arrayBuffer, {
     contentType: file.type,
     upsert: false,
@@ -185,8 +185,7 @@ if (uploadError) {
 
 const {
   data: publicUrlData,
-} = supabase.storage
-  .from('stickers')
+} = mediaStorage(supabase, 'stickers')
   .getPublicUrl(filePath);
 
 const imageUrl = publicUrlData.publicUrl;
@@ -207,8 +206,7 @@ const { data: sticker, error: stickerError } =
     .single();
 
 if (stickerError) {
-  await supabase.storage
-    .from('stickers')
+  await mediaStorage(supabase, 'stickers')
     .remove([filePath]);
 
   return NextResponse.json(

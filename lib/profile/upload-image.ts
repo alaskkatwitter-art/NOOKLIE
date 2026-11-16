@@ -1,3 +1,4 @@
+import { mediaStorage } from '@/lib/media/storage';
 import { optimizeUploadedImage } from '@/lib/media/optimize-upload';
 import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUserContext } from '@/lib/auth/session';
@@ -34,7 +35,7 @@ export async function uploadProfileImage(request: Request, kind: ProfileImageKin
   const gifLimit = profileGifLimits[kind];
   const urlColumn = `${kind}_url` as const;
   const animationColumn = `${kind}_animation` as const;
-  const storage = supabase.storage.from(bucket);
+  const storage = mediaStorage(supabase, bucket);
   const uploaded: string[] = [];
   let retainUploads = false;
   const failure = (message: string, status: number) => Response.json({ error: message }, { status });
@@ -117,9 +118,13 @@ export async function uploadProfileImage(request: Request, kind: ProfileImageKin
     const previousAnimation = previous.data[animationColumn];
     if (previousAnimation) {
       const prefix = storage.getPublicUrl(`${auth.userId}/`).data.publicUrl;
+      const legacyPrefix = supabase.storage.from(bucket).getPublicUrl(`${auth.userId}/`).data.publicUrl;
       const owned = [previousUrl, previousAnimation.url]
-        .filter((value): value is string => typeof value === 'string' && value.startsWith(prefix))
-        .map(value => value.slice(prefix.length))
+        .flatMap(value => {
+          if (typeof value !== 'string') return [];
+          const ownerPrefix = [prefix, legacyPrefix].find(candidate => value.startsWith(candidate));
+          return ownerPrefix ? [value.slice(ownerPrefix.length)] : [];
+        })
         .filter(name => new RegExp(`^${kind}-[0-9a-f-]{36}\\.(webp|gif)$`, 'i').test(name))
         .map(name => `${auth.userId}/${name}`);
       if (owned.length) await storage.remove(owned).catch(() => undefined);
