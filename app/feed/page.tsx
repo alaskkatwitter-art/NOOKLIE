@@ -1,6 +1,7 @@
 'use client';
 import QuotedReply from '@/components/QuotedReply';
 import FeedVideo from '@/components/FeedVideo';
+import SantaHat from './SantaHat';
 import { feedImageTypes, maxFeedUploadBytes } from '@/lib/social/attachments';
 import { notificationReturnParam, notificationsPath } from '@/lib/notifications/presentation';
 import { feedTokenPattern, linkedVideoId, normalizeHashtag } from '@/lib/social/feed-links';
@@ -1971,7 +1972,10 @@ function SideMenu({
             className="flex items-center gap-3"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff78b9]/15 bg-[#ff78b9]/[0.06] text-[#ff78b9]">
-              <CloudIcon />
+              <span className="relative inline-flex">
+                <CloudIcon />
+                <SantaHat />
+              </span>
             </div>
 
             <div>
