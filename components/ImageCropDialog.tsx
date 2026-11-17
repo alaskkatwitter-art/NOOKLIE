@@ -5,10 +5,12 @@ import { defaultImageFraming, validateProfileGif, type ImageFraming } from '@/li
 import { exportProfilePhoto, profilePhotoError, profilePhotoType } from '@/lib/profile/photo-client';
 import { cropRect } from '@/lib/images/crop';
 
-export default function ImageCropDialog({ source, kind, allowGif = false, framing = defaultImageFraming, onCancel, onSave }: {
+export default function ImageCropDialog({ source, kind, allowGif = false, framing = defaultImageFraming, shape, title, onCancel, onSave }: {
   source: File | string;
   kind: 'avatar' | 'cover';
   allowGif?: boolean;
+  shape?: 'square' | 'circle';
+  title?: string;
   framing?: ImageFraming;
   onCancel: () => void;
   onSave: (file: File, animation?: { gif: Blob; framing: ImageFraming }) => Promise<void>;
@@ -81,9 +83,9 @@ export default function ImageCropDialog({ source, kind, allowGif = false, framin
   }, [image, aspect, zoom, x, y]);
   return <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} aria-labelledby="crop-title" className="nook-dialog w-[min(94vw,640px)]">
     <div className="space-y-5 p-2">
-      <h2 id="crop-title" className="text-xl font-bold">Ajustar {kind === 'avatar' ? 'foto de perfil' : 'capa'}</h2>
+      <h2 id="crop-title" className="text-xl font-bold">{title ?? (kind === 'avatar' ? 'Ajustar foto de perfil' : 'Ajustar capa')}</h2>
       <p className="text-sm text-white/65">Arraste a imagem ou ajuste os controles. A prévia mostra o enquadramento que será salvo.</p>
-      <div className={`relative overflow-hidden ${kind === 'avatar' ? 'mx-auto max-w-80 rounded-full' : 'rounded-xl'}`}>
+      <div className={`relative overflow-hidden ${kind === 'avatar' ? 'mx-auto max-w-80 ' + (shape === 'square' ? 'rounded-lg' : 'rounded-full') : 'rounded-xl'}`}>
       <canvas ref={canvas} width={loadedImage?.gif ? (kind === 'avatar' ? 320 : 1200) : (kind === 'avatar' ? 512 : 1500)} height={loadedImage?.gif ? (kind === 'avatar' ? 320 : 400) : (kind === 'avatar' ? 512 : 500)} aria-label="Prévia do enquadramento" style={{aspectRatio: String(aspect), touchAction: 'none'}} className="block w-full bg-black/30"
         onPointerDown={event => { if (!image || busy) return; event.currentTarget.setPointerCapture(event.pointerId); drag.current = {x: event.clientX, y: event.clientY, positionX: x, positionY: y}; }}
         onPointerMove={event => { if (!drag.current || !image) return; const bounds = event.currentTarget.getBoundingClientRect(); const rect = cropRect(image.naturalWidth,image.naturalHeight,aspect,zoom,x,y); const overflowX = image.naturalWidth - rect.sw, overflowY = image.naturalHeight - rect.sh; if (overflowX > 0) setX(Math.max(0,Math.min(100,drag.current.positionX - (event.clientX-drag.current.x) / bounds.width * rect.sw / overflowX * 100))); if (overflowY > 0) setY(Math.max(0,Math.min(100,drag.current.positionY - (event.clientY-drag.current.y) / bounds.height * rect.sh / overflowY * 100))); }}

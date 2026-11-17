@@ -1,4 +1,5 @@
 'use client';
+import ReadingListImage from '@/components/ReadingListImage';
 import { SpotifyCard } from '@/components/SpotifyLink';
 import type { SpotifyLink } from '@/lib/spotify/link';
 import { PostMentions } from '@/components/PostMention';
@@ -100,6 +101,7 @@ type ReadingListItem = {
 };
 
 type ReadingList = {
+  image_url: string | null;
   id: string;
   user_id: string;
   name: string;
@@ -1215,6 +1217,7 @@ export default function PublicProfilePage() {
             {/* LISTAS */}
 
             {activeTab === 'lists' && (<section className="profile-tab-panel w-full shrink-0 px-0.5">
+              {isSelf && <Link href="/listas-de-leitura" className="mb-4 inline-flex min-h-11 items-center gap-2 px-2 text-sm font-semibold text-pink-200">Organizar minhas listas</Link>}
               {readingLists.length ===
               0 ? (
                 <EmptyState
@@ -1230,12 +1233,13 @@ export default function PublicProfilePage() {
                         key={
                           list.id
                         }
-                        className="profile-themed-surface overflow-hidden rounded-3xl border border-white/10 bg-[#151015]"
+                        className="profile-themed-surface overflow-hidden rounded-lg border border-white/10 bg-[#151015]"
                       >
                         <div className="border-b border-white/10 p-5">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h2 className="text-lg font-black">
+                          <div className="flex items-start gap-4">
+                            <ReadingListImage src={list.image_url} className="w-24 sm:w-28" />
+                            <div className="min-w-0 flex-1">
+                              <h2 className="break-words text-lg font-black">
                                 {
                                   list.name
                                 }
@@ -1250,9 +1254,8 @@ export default function PublicProfilePage() {
                               )}
                             </div>
 
-                            <span className="shrink-0 rounded-full bg-[#ff78b9]/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-[#ff9aca]">
-                              Pública
-                            </span>
+                            {isSelf && <Link href={'/listas-de-leitura/' + list.id}
+                              className="shrink-0 py-2 text-xs font-semibold text-pink-200">Editar</Link>}
                           </div>
                         </div>
 

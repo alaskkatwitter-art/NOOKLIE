@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import ReadingListImage from '@/components/ReadingListImage';
 import ReadingListForm from '@/components/ReadingListForm';
 
-type ReadingList = { id: string; name: string; description: string; count: number };
+type ReadingList = { id: string; name: string; description: string; count: number; image_url: string | null };
 
 export default function ListasDeLeituraPage() {
+  const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const [lists, setLists] = useState<ReadingList[] | null>(null);
   const [error, setError] = useState('');
@@ -43,10 +46,13 @@ export default function ListasDeLeituraPage() {
     {!lists && !error && <p role="status">Carregando suas listas…</p>}
     {lists?.length === 0 && <p>Você ainda não criou nenhuma lista.</p>}
     <div className="grid gap-4 sm:grid-cols-2">
-      {lists?.map(list => <Link key={list.id} href={'/listas-de-leitura/' + list.id} className="rounded-2xl border border-pink-300/20 bg-pink-300/5 p-5 hover:border-pink-300/60">
-        <h2 className="text-lg font-bold">{list.name}</h2>
+      {lists?.map(list => <Link key={list.id} href={'/listas-de-leitura/' + list.id} className="flex items-start gap-4 rounded-lg border border-pink-300/20 bg-pink-300/5 p-4 hover:border-pink-300/60">
+        <ReadingListImage src={list.image_url} className="w-24" />
+        <div className="min-w-0">
+        <h2 className="break-words text-lg font-bold">{list.name}</h2>
         {list.description && <p className="mt-1 break-words text-white/70">{list.description}</p>}
         <p className="mt-3 text-sm text-pink-200">{list.count} {list.count === 1 ? 'história' : 'histórias'}</p>
+        </div>
       </Link>)}
     </div>
     <dialog ref={dialog} className="nook-dialog" aria-label="Criar lista de leitura">
@@ -54,7 +60,7 @@ export default function ListasDeLeituraPage() {
         <h2 className="text-lg font-bold">Criar lista de leitura</h2>
         <button type="button" onClick={() => dialog.current?.close()} className="p-2 text-sm">Fechar</button>
       </div>
-      <ReadingListForm key={revision} onCreated={() => { dialog.current?.close(); setRevision(value => value + 1); }} />
+      <ReadingListForm key={revision} onCreated={id => { dialog.current?.close(); setRevision(value => value + 1); router.push('/listas-de-leitura/' + id); }} />
     </dialog>
   </main>;
 }

@@ -1,3 +1,4 @@
+import { readingListImageUrl } from '@/lib/reading-lists/image';
 import { NextRequest, NextResponse } from "next/server";
 import { parseProfileTheme } from '@/lib/profile/themes';
 import { createClient } from "@supabase/supabase-js";
@@ -156,6 +157,7 @@ export async function GET(
         name,
         description,
         is_public,
+        image_path,
         created_at
         `
       )
@@ -292,10 +294,12 @@ export async function GET(
             id,
             list_id,
             story_id,
+            position,
             added_at
             `
           )
           .in("list_id", listIds)
+          .order("position", { ascending: true })
           .order("added_at", {
             ascending: false,
           });
@@ -362,8 +366,9 @@ export async function GET(
       }
 
       const readingListsWithItems =
-        (readingLists || []).map((list) => ({
+        (readingLists || []).map(({ image_path, ...list }) => ({
           ...list,
+          image_url: readingListImageUrl(list.id, image_path),
           items: readingListItems
             .filter(
               (item) =>
