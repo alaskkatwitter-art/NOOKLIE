@@ -1,9 +1,9 @@
 'use client';
 import { useRef, useState } from 'react';
 
-type Chapter = { id: string; chapter_number: number; title: string; published: boolean; publication_status?: string };
-type Props = { chapters: Chapter[]; selectedId?: string | null; onSelect: (id: string) => void; onMove: (from: number, to: number) => Promise<void>; onDelete: (id: string) => Promise<void>; busy: boolean };
-export default function ChapterOrganizer({ chapters, selectedId, onSelect, onMove, onDelete, busy }: Props) {
+type Chapter = { id: string; chapter_number: number; title: string; published: boolean; publication_status?: 'draft' | 'scheduled' | 'published' | 'unpublished' };
+type Props = { chapters: Chapter[]; selectedId?: string | null; onSelect: (id: string) => void; onMove: (from: number, to: number) => Promise<void>; onDelete: (id: string) => Promise<void>; statusLabel: (status: NonNullable<Chapter['publication_status']>, published: boolean) => string; busy: boolean };
+export default function ChapterOrganizer({ chapters, selectedId, onSelect, onMove, onDelete, statusLabel, busy }: Props) {
   const dragged = useRef<number | null>(null);
   const touchIndex = useRef<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export default function ChapterOrganizer({ chapters, selectedId, onSelect, onMov
         style={{ touchAction: 'none' }}
         className="cursor-grab select-none rounded px-1 py-3 text-gray-400 active:cursor-grabbing">⠿</span>
       <button type="button" onClick={() => onSelect(chapter.id)} className="min-w-0 flex-1 text-left" disabled={busy || working}>
-        <span className="block text-xs text-pink-300">Capítulo {index + 1} · {chapter.publication_status === 'published' || chapter.published ? 'Publicado' : 'Rascunho'}</span>
+        <span className="block text-xs text-pink-300">Capítulo {index + 1} · <span className="capitalize">{statusLabel(chapter.publication_status ?? 'draft', chapter.published).toLowerCase()}</span></span>
         <span className="block truncate text-sm text-white">{chapter.title || 'Sem título'}</span>
       </button>
       <div className="flex shrink-0 flex-col gap-1">

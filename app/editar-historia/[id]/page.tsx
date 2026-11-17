@@ -2749,7 +2749,7 @@ export default function EditarHistoriaPage() {
                       </button>
                     </div>
                   ) : (
-                    <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} busy={managingChapters || savingChapter || creatingChapter} />
+                    <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} statusLabel={getStatusLabel} busy={managingChapters || savingChapter || creatingChapter} />
                   )}
                 </div>
               </div>
@@ -2791,7 +2791,7 @@ export default function EditarHistoriaPage() {
                 </div>
 
                 <div className="mt-3 max-h-[500px] overflow-y-auto space-y-2 pr-1">
-                  <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} busy={managingChapters || savingChapter || creatingChapter} />
+                  <ChapterOrganizer chapters={story.chapters} selectedId={selectedChapterId} onSelect={selectChapter} onMove={handleMoveChapter} onDelete={handleDeleteChapter} statusLabel={getStatusLabel} busy={managingChapters || savingChapter || creatingChapter} />
                 </div>
               </div>
             </aside>
