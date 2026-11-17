@@ -1,4 +1,4 @@
-# Migração D1: autenticação, perfis, permissões e leitura
+# Migração D1: contas, perfis, histórias, comentários e leitura beta
 
 Estado em 17/11/2026: banco `nooklie-migration` criado na conta Cloudflare do
 Nooklie, UUID `fcea4d88-3c18-4c21-a6c1-af13c72caa00`, região ENAM.
@@ -53,7 +53,7 @@ enquanto contas, perfis e autorização não tiverem sido migrados em conjunto.
 
 O inventário `d1/source-inventory.json` registra as 72 tabelas e 86 assinaturas
 de funções encontradas no banco de origem. As três tabelas de autenticação e as
-11 da segunda fase e 13 da terceira estão estruturadas no D1. Isso ainda não significa que todos
+11 da segunda fase, 13 da terceira e sete da quarta estão estruturadas no D1. Isso ainda não significa que todos
 os fluxos que as usam tenham sido migrados. Não copiar SQL PostgreSQL diretamente
 para o D1 (SQLite).
 
@@ -61,7 +61,7 @@ para o D1 (SQLite).
    D1 não reproduz as políticas RLS da Supabase: cada operação de servidor deve
    validar a sessão, o proprietário e as permissões explicitamente. Um selo
    visual nunca pode conceder privilégio administrativo.
-2. Concluir os fluxos de edição, leitura, listas, progresso, votos e comentários;
+2. Integrar e concluir os fluxos de edição, leitura, listas, progresso, votos e comentários;
    preservar chaves, relações, regras de publicação e operações atômicas.
 3. Adaptar feed, eventos, notificações, moderação e chat; conservar os textos
    cifrados e a chave `CHAT_ENCRYPTION_KEY_V2`, sem expô-la ou recriá-la.
@@ -199,3 +199,61 @@ As 58 verificações de histórias/leitura passaram no D1 remoto usando os mesmo
 métodos do repositório. A limpeza confirmou zero contas, perfis, histórias,
 capítulos, itens de lista ou comandos de teste restantes. A verificação de FKs
 terminou sem inconsistências e a FK de história fixada foi conferida no D1 real.
+
+## Quarta fase: comentários, preferências e leitura beta
+
+`0004_comments_reader_beta.sql` adapta as 41 colunas de `comments`,
+`comment_likes`, `user_stickers`, `reader_preferences`, `beta_reading_invites`,
+`beta_reading_notes` e `user_notifications`, com índices e relações originais.
+São 34 tabelas de origem estruturadas e uma tabela interna de comandos.
+Uma consulta na origem confirmou zero respostas ligadas a outro capítulo;
+o D1 reforça isso com uma FK composta comentário/capítulo.
+
+`d1-reader.ts` inclui consulta paginada e publicação de comentários, respostas,
+comentários por trecho e figurinhas pertencentes ao autor. Apenas capítulos
+publicados de obras liberadas podem receber comentários. Perfil privado,
+bloqueios, moderação e suspensão são conferidos no SQL. Curtidas são idempotentes
+e sua remoção exige a sessão da pessoa que curtiu. A biblioteca de figurinhas
+é privada; excluir a figurinha conserva o comentário com referência nula.
+Uploads e limpeza física de figurinhas ainda dependem da integração R2.
+
+Preferências são vinculadas ao ID da conta obtido pela sessão, com o validador
+existente `isReaderPreferences` obrigatório. O CHECK SQLite e os triggers exigem
+exatamente as cinco chaves esperadas, tipos e faixas corretos, fontes e temas
+permitidos, recusando chaves extras, ausentes ou duplicadas. Não é aceito um
+user_id fornecido no payload para escolher qual conta alterar.
+
+`d1-beta.ts` inclui convite, listagem sem corpo do rascunho, aceite, leitura,
+anotações e revogação. O autor só convida outra conta ativa para um capítulo
+não publicado de obra original. Apenas o convidado aceita; antes do aceite não
+há leitura nem anotações pelo convidado. Autor e convidado aceito podem ler,
+mas somente o leitor convidado escreve as notas. Publicar, bloquear, suspender
+ou ocultar o conteúdo impede o acesso. Participantes podem encerrar o convite,
+inclusive após bloqueio, e a revogação remove as notas relacionadas.
+
+A prévia beta exige um sanitizador dedicado (`safeBetaHtml`) que conserva
+formatação básica e remove imagens, links e conteúdo executável. O teste local
+confere esse sanitizador real tanto isoladamente quanto no fluxo de leitura.
+O runner remoto aceita somente texto simples para verificar as regras SQL.
+
+Comentários, respostas, curtidas e convites beta geram notificações no mesmo
+INSERT por triggers. O view interno `d1_notification_events` respeita conta
+ativa, moderação, bloqueios, silenciamentos, opção de notificações e ausência
+de autonotificação. Chaves de origem impedem duplicação; quando o autor da obra
+é também o destinatário da resposta, não é criado um segundo aviso para ele.
+Listagem e marcação de leitura usam exclusivamente a conta da sessão.
+Notificações de outros recursos (feed, eventos, follows, publicação etc.)
+ainda serão adaptadas com os respectivos fluxos.
+
+Nenhuma rota publicada foi trocada. Os editores, as rotas HTTP e os componentes
+do leitor ainda precisam ser ligados aos repositórios D1 depois da adaptação dos
+demais recursos. O banco permanece sem importação de contas reais.
+
+Resultado: 15 testes de integração locais e TypeScript passaram. Os 53 cenários
+compartilhados desta fase passaram no D1 remoto, com os métodos reais e o
+validador existente de preferências. A limpeza confirmou zero contas, comentários,
+convites, notas, preferências, notificações ou figurinhas de teste restantes.
+A verificação de chaves estrangeiras terminou sem inconsistências. Os cenários
+da fase anterior foram repetidos localmente com o novo esquema, incluindo uma
+exclusão de capítulo com comentários, respostas, curtidas e notas beta reais de
+teste para validar as cascatas.
