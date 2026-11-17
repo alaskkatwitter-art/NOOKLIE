@@ -1,4 +1,4 @@
-# Migração D1: contas, perfis, histórias, comentários e leitura beta
+# Migração D1: contas, leitura e comunidade
 
 Estado em 17/11/2026: banco `nooklie-migration` criado na conta Cloudflare do
 Nooklie, UUID `fcea4d88-3c18-4c21-a6c1-af13c72caa00`, região ENAM.
@@ -53,7 +53,7 @@ enquanto contas, perfis e autorização não tiverem sido migrados em conjunto.
 
 O inventário `d1/source-inventory.json` registra as 72 tabelas e 86 assinaturas
 de funções encontradas no banco de origem. As três tabelas de autenticação e as
-11 da segunda fase, 13 da terceira e sete da quarta estão estruturadas no D1. Isso ainda não significa que todos
+11 da segunda fase, 13 da terceira, sete da quarta e 13 da quinta estão estruturadas no D1. Isso ainda não significa que todos
 os fluxos que as usam tenham sido migrados. Não copiar SQL PostgreSQL diretamente
 para o D1 (SQLite).
 
@@ -257,3 +257,74 @@ A verificação de chaves estrangeiras terminou sem inconsistências. Os cenári
 da fase anterior foram repetidos localmente com o novo esquema, incluindo uma
 exclusão de capítulo com comentários, respostas, curtidas e notas beta reais de
 teste para validar as cascatas.
+
+## Quinta fase: feed, mural, eventos e estrutura de enquetes
+
+`0005_feed_events.sql` adapta 13 tabelas: `nook_posts`, `nook_post_media`,
+`nook_post_reactions`, `nook_comments`, `nook_comment_reactions`, `nook_reposts`,
+`nook_saved_posts`, `nook_saved_replies`, `story_events`, `story_event_entries`,
+`polls`, `poll_options` e `poll_votes`. Agora são 47 tabelas de origem e duas
+tabelas internas. Os campos de imagens/vídeos, notícia/obra vinculada, hashtags,
+origem da publicação e detalhes/regras dos eventos são preservados.
+
+Arrays PostgreSQL (`hashtags`) passam a JSON TEXT validado como array. O índice
+GIN original não é compatível com SQLite e não foi copiado: busca/indexação de
+hashtags ainda precisa ser adaptada na fase de descoberta. Os demais índices
+btree são conservados. Consultas na origem confirmaram zero respostas apontando
+para outro post e zero votos apontando para opção de outra enquete; FKs compostas
+reforçam essas relações no D1.
+
+`d1-feed.ts` implementa publicação de texto com origem feed/mural, edição e
+exclusão pelo autor, leitura direta, feed paginado por data/ID, comentários e
+respostas, reações permitidas, republicação e posts salvos privados. O SQL
+reavalia sessão, privacidade, bloqueios, suspensão e moderação. Silenciamentos
+retiram o autor do feed, sem impedir uma abertura direta voluntária. Posts salvos
+não contornam bloqueios e edições conservam vínculos de notícia/obra existentes.
+
+Os triggers notificam seguidores somente quando a origem é `mural`, respeitando
+as regras do view de notificações da fase anterior. Posts da origem `feed` não
+enviam esse aviso. Comentários, respostas, reações e republicações têm avisos
+deduplicados para seus destinatários, com as mesmas restrições de bloqueio,
+silenciamento e preferências. Alterar texto não reenvia o aviso do mural.
+
+`d1-events.ts` implementa criação/edição básica e ativação por administração
+principal autenticada. A edição usa comparação da revisão para recusar um
+editor desatualizado. Os campos ricos `details` são conservados ao editar os
+campos básicos. Datas são verificadas com `julianday`, evitando comparar strings
+em fusos/formatações diferentes.
+
+Publicar/ativar um evento vigente gera aviso oficial uma única vez por conta
+ativa, conforme a política atual (não depende da preferência de avisos sociais).
+Reativar não duplica avisos já existentes. Inscrição exige obra própria liberada,
+evento ativo, início já alcançado e prazo aberto. Não há limite de obras por
+autor. A lista pública de participantes aplica a privacidade de cada obra.
+Retirada exige autoria. A operação de voto valida opção pertencente à enquete,
+capítulo publicado/obra visível e uma linha de voto por pessoa/enquete.
+
+Ainda não são fluxos completos do site: anexos/figurinhas/imagens em replies,
+criação atômica de posts com upload, edição rica dos detalhes de eventos,
+menções/extração e busca de hashtags, timeline de republicados com sua
+privacidade própria, salvos de replies, contagens/enriquecimento e paginação
+completa de comentários precisam ser integrados/concluídos antes da virada.
+As rotas atuais e os dados reais continuam na Supabase.
+
+`0006_notification_import_guard.sql` acrescenta `d1_runtime_flags` e a chave
+interna `suppress_notifications`. Antes de copiar dados históricos, definir
+essa chave para `'1'`: o view de avisos sociais e os avisos oficiais de eventos
+deixam de emitir notificações automáticas. Os registros originais de
+`user_notifications` ainda podem ser importados normalmente. Somente restaurar
+`'0'` depois de concluir a cópia dessas notificações e suas chaves de origem.
+Não existe endpoint de navegador para alterar esse controle. Os testes verificam
+supressão de avisos de mural, comentários e eventos, e retomada da entrega normal.
+
+Esse modo suprime emissões de notificações, não todos os efeitos dos triggers:
+o importador ainda precisa conservar/restaurar metadados derivados, como
+`user_stickers.last_used_at`, e conferir relações/campos após a cópia. Não
+interpretar a flag como autorização para copiar tabelas em qualquer ordem.
+
+Resultado: 17 testes locais e TypeScript passaram. As 51 verificações finais da
+comunidade/eventos (incluindo modo de importação) passaram no D1 remoto. Os 53
+cenários da fase anterior foram repetidos localmente com o novo esquema.
+A limpeza confirmou zero contas, posts, eventos, votos ou notificações de teste,
+com o modo de supressão restaurado a `'0'`, e a verificação de FKs não encontrou
+inconsistências. Nenhuma notificação foi enviada a usuários reais.

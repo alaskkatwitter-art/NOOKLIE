@@ -1,0 +1,118 @@
+export async function verifyD1Community(db,feedFactory,eventFactory) {
+ const feed=feedFactory(db),events=eventFactory(db),checks=[];
+ const tokens={author:'a'.repeat(64),reader:'b'.repeat(64),other:'c'.repeat(64),admin:'d'.repeat(64)};
+ const run=(sql,...params)=>db.prepare(sql).bind(...params).run(),one=(sql,...params)=>db.prepare(sql).bind(...params).first();
+ function check(ok,label){if(!ok)throw new Error(label);checks.push(label);}
+ async function fails(fn,label){let failed=false;try{await fn();}catch{failed=true;}check(failed,label);}
+ const start=new Date(Date.now()-3600000).toISOString(),end=new Date(Date.now()+3600000).toISOString();
+ try {
+  for(const [name,token] of Object.entries(tokens)){
+   await run('INSERT INTO auth_accounts(id,username,password_hash,recovery_key_hash) VALUES(?,?,?,?)','c5_'+name,'c5_'+name,'password','key-'+name);
+   await run('INSERT INTO profiles(id,user_id,username) VALUES(?,?,?)','c5p_'+name,'c5_'+name,'c5_'+name);
+   await run('INSERT INTO auth_sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,?)','c5s_'+name,'c5_'+name,token,end);
+  }
+  await run("INSERT INTO platform_admins(user_id) VALUES('c5_admin')");
+  await run("INSERT INTO follows(follower_id,following_id) VALUES('c5p_reader','c5p_author')");
+  check(await feed.create('f'.repeat(64),'c5_fake','Forged')===null,'forged session cannot post');
+  await feed.create(tokens.author,'c5_feed','Feed','feed');
+  check((await one("SELECT count(*) n FROM user_notifications WHERE user_id='c5_reader'")).n===0,'direct feed posts do not notify followers');
+  await feed.create(tokens.author,'c5_mural','Mural','mural');
+  check((await one("SELECT count(*) n FROM user_notifications WHERE user_id='c5_reader'")).n===1,'mural posts notify followers once');
+  check(await feed.post(null,'c5_feed')!==null,'public post can be opened directly');
+  check((await feed.feed('f'.repeat(64))).length===0,'invalid session cannot load feed');
+  check((await feed.feed(tokens.reader)).length===2,'signed-in reader sees public feed posts');
+  const page=await feed.feed(tokens.reader,1),next=await feed.feed(tokens.reader,1,{date:page[0].created_at,id:page[0].id});
+  check(next.length===1&&next[0].id!==page[0].id,'feed cursor pagination does not repeat post');
+  check(await feed.edit(tokens.reader,'c5_feed','Hacked')===null,'outsider cannot edit post');
+  check(await feed.remove(tokens.reader,'c5_feed')===null,'outsider cannot delete post');
+  await feed.edit(tokens.author,'c5_feed','Edited');
+  check((await feed.post(null,'c5_feed')).body==='Edited','owner can edit own post');
+  await run("UPDATE nook_posts SET news_slug='boas-vindas' WHERE id='c5_feed'");
+  await feed.edit(tokens.author,'c5_feed','');
+  check((await feed.post(null,'c5_feed')).news_slug==='boas-vindas','editing a news-only post preserves its article link');
+  await feed.comment(tokens.reader,'c5_comment','c5_feed','Comment');
+  await feed.comment(tokens.other,'c5_reply','c5_feed','Reply','c5_comment');
+  check((await feed.comments(null,'c5_feed')).length===2,'post supports comments and same-post replies');
+  check(await feed.comment(tokens.other,'c5_cross','c5_mural','Wrong','c5_comment')===null,'reply cannot target another posts comment');
+  await feed.react(tokens.reader,'c5_react','post','c5_feed','❤️');await feed.react(tokens.reader,'c5_react2','post','c5_feed','❤️');
+  check((await one("SELECT count(*) n FROM nook_post_reactions WHERE post_id='c5_feed'")).n===1,'post reactions are idempotent');
+  await fails(()=>feed.react(tokens.reader,'c5_bad','post','c5_feed','bad'),'unsupported reaction rejected');
+  check(await feed.unreact(tokens.other,'post','c5_feed','❤️')===null,'another reader cannot remove reaction');
+  await feed.react(tokens.author,'c5_comment_react','comment','c5_comment','🔥');
+  check((await one("SELECT count(*) n FROM nook_comment_reactions")).n===1,'comment reactions target visible comments');
+  await feed.save(tokens.reader,'c5_save','c5_feed');
+  check((await feed.saved(tokens.reader)).length===1,'saved posts are available to owner');
+  check((await feed.saved(tokens.other)).length===0,'saved posts are private');
+  check(await feed.unsave(tokens.other,'c5_feed')===null,'outsider cannot remove saved post');
+  await feed.repost(tokens.reader,'c5_repost','c5_feed','Quote');await feed.repost(tokens.reader,'c5_repost2','c5_feed');
+  check((await one("SELECT count(*) n FROM nook_reposts")).n===1,'reposts have one identity per reader and post');
+  check(await feed.unrepost(tokens.other,'c5_feed')===null,'outsider cannot remove repost');
+  await run("INSERT INTO profile_mutes(user_id,target_id) VALUES('c5p_reader','c5p_author')");
+  check((await feed.feed(tokens.reader)).length===0,'mute removes actor from feed');
+  check(await feed.post(tokens.reader,'c5_feed')!==null,'mute preserves intentional direct profile access');
+  const countBefore=(await one("SELECT count(*) n FROM user_notifications WHERE user_id='c5_reader'")).n;
+  await feed.create(tokens.author,'c5_muted','Muted mural','mural');
+  check((await one("SELECT count(*) n FROM user_notifications WHERE user_id='c5_reader'")).n===countBefore,'muted author does not generate mural notice');
+  await run("DELETE FROM profile_mutes WHERE user_id='c5p_reader' AND target_id='c5p_author'");
+  await run("UPDATE profiles SET is_private=1 WHERE id='c5p_author'");
+  check(await feed.post(tokens.other,'c5_feed')===null,'private author requires accepted follower');
+  check(await feed.post(tokens.reader,'c5_feed')!==null,'accepted follower can read private authors posts');
+  await run("INSERT INTO chat_blocks(blocker_id,blocked_id) VALUES('c5p_author','c5p_reader')");
+  check(await feed.post(tokens.reader,'c5_feed')===null,'block revokes direct post access');
+  check((await feed.saved(tokens.reader)).length===0,'saved post cannot bypass block');
+  check(await feed.comment(tokens.reader,'c5_blocked_comment','c5_feed','Forbidden')===null,'block prevents comments');
+  await run("DELETE FROM chat_blocks WHERE blocker_id='c5p_author' AND blocked_id='c5p_reader'");
+  await run("UPDATE profiles SET is_private=0 WHERE id='c5p_author'");
+  check(await events.create(tokens.reader,'c5_forbidden_event','v1','Event','Description',start,end)===null,'only platform administrators can create events');
+  await events.create(tokens.admin,'c5_event','v1','Event','Description',start,end);
+  check((await events.list()).length===1,'active event is discoverable');
+  check((await one("SELECT count(*) n FROM user_notifications WHERE notification_type='literary_event'")).n===4,'new literary event notifies every active account');
+  check(await events.edit(tokens.reader,'c5_event','v1','v2','Hack','',start,end)===null,'non-admin cannot edit event');
+  check(await events.edit(tokens.admin,'c5_event','wrong','v2','Stale','',start,end)===null,'event revision rejects stale editor');
+  await events.edit(tokens.admin,'c5_event','v1','v2','Edited event','Rules preserved',start,end);
+  check((await events.list())[0].title==='Edited event','admin can update current event revision');
+  await events.setActive(tokens.admin,'c5_event','v2','v3',false);await events.setActive(tokens.admin,'c5_event','v3','v4',true);
+  check((await one("SELECT count(*) n FROM user_notifications WHERE notification_type='literary_event'")).n===4,'event reactivation does not duplicate announcements');
+  await run("INSERT INTO stories(id,author_id,title) VALUES('c5_story','c5p_author','Story'),('c5_story2','c5p_author','Story 2'),('c5_draft','c5p_author','Draft')");
+  await run("INSERT INTO chapters(id,story_id,chapter_number,title,body,published,publication_status) VALUES('c5_chapter','c5_story',1,'Chapter','Body',1,'published'),('c5_chapter2','c5_story2',1,'Chapter 2','Body',1,'published')");
+  check(await events.enter(tokens.reader,'c5_event','c5_story')===null,'reader cannot enroll another authors story');
+  check(await events.enter(tokens.author,'c5_event','c5_draft')===null,'unpublished story cannot enroll');
+  await events.enter(tokens.author,'c5_event','c5_story');await events.enter(tokens.author,'c5_event','c5_story2');
+  check((await events.entries(null,'c5_event')).length===2,'one author can enroll multiple published works');
+  check(await events.withdraw(tokens.reader,'c5_event','c5_story')===null,'outsider cannot withdraw entry');
+  await run("UPDATE profiles SET is_private=1 WHERE id='c5p_author'");
+  check((await events.entries(null,'c5_event')).length===0,'event entries do not leak private stories');
+  await run("UPDATE profiles SET is_private=0 WHERE id='c5p_author'");
+  await run("INSERT INTO polls(id,chapter_id,question) VALUES('c5_poll','c5_chapter','Question'),('c5_poll2','c5_chapter2','Other')");
+  await run("INSERT INTO poll_options(id,poll_id,option_text) VALUES('c5_option','c5_poll','Yes'),('c5_other_option','c5_poll2','No')");
+  check(await events.vote(tokens.reader,'c5_poll','c5_other_option')===null,'poll cannot accept option belonging to another poll');
+  await events.vote(tokens.reader,'c5_poll','c5_option');await events.vote(tokens.reader,'c5_poll','c5_option');
+  check((await one("SELECT count(*) n FROM poll_votes")).n===1,'poll records at most one vote per account');
+  await events.edit(tokens.admin,'c5_event','v4','v5','Future','',new Date(Date.now()+600000).toISOString(),end);
+  await events.withdraw(tokens.author,'c5_event','c5_story');
+  check(await events.enter(tokens.author,'c5_event','c5_story')===null,'future event does not accept early enrollment');
+  const noticesBefore=(await one('SELECT count(*) n FROM user_notifications')).n;
+  await run("UPDATE d1_runtime_flags SET value='1' WHERE key='suppress_notifications'");
+  await run("INSERT INTO follows(follower_id,following_id) VALUES('c5p_reader','c5p_author')");
+  await feed.create(tokens.author,'c5_import_post','Historical mural','mural');
+  await feed.comment(tokens.reader,'c5_import_comment','c5_import_post','Historical comment');
+  await events.create(tokens.admin,'c5_import_event','v1','Historical event','',start,end);
+  check((await one('SELECT count(*) n FROM user_notifications')).n===noticesBefore,'import mode suppresses historical mural, comment and event notifications');
+  await run("UPDATE d1_runtime_flags SET value='0' WHERE key='suppress_notifications'");
+  await feed.create(tokens.author,'c5_resumed_post','New mural','mural');
+  check((await one('SELECT count(*) n FROM user_notifications')).n>noticesBefore,'normal notification delivery resumes after import mode');
+  await feed.remove(tokens.author,'c5_feed');
+  check((await one("SELECT (SELECT count(*) FROM nook_comments WHERE post_id='c5_feed')+(SELECT count(*) FROM nook_post_reactions WHERE post_id='c5_feed')+(SELECT count(*) FROM nook_comment_reactions)+(SELECT count(*) FROM nook_reposts)+(SELECT count(*) FROM nook_saved_posts) n")).n===0,'post removal cascades through comments, reactions, reposts and saved items');
+  await run("UPDATE nook_posts SET moderation_hidden_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='c5_mural'");
+  check(await feed.post(tokens.author,'c5_mural')===null,'moderated post stays hidden even from author repository');
+  await run("UPDATE auth_accounts SET account_status='suspended' WHERE id='c5_author'");
+  check(await feed.create(tokens.author,'c5_suspended','No')===null,'suspended account cannot post');
+  await run("UPDATE auth_sessions SET expires_at='2000-01-01T00:00:00Z' WHERE user_id='c5_admin'");
+  check(await events.setActive(tokens.admin,'c5_event','v5','v6',false)===null,'expired admin session cannot manage event');
+  return {passed:checks.length,checks};
+ }finally{
+  await run("UPDATE d1_runtime_flags SET value='0' WHERE key='suppress_notifications'");
+  await run("DELETE FROM story_events WHERE id IN ('c5_event','c5_import_event')");await run("DELETE FROM platform_admins WHERE user_id='c5_admin'");
+  for(const name of Object.keys(tokens)){await run('DELETE FROM profiles WHERE id=?','c5p_'+name);await run('DELETE FROM auth_accounts WHERE id=?','c5_'+name);}
+ }
+}

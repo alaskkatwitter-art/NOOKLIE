@@ -2,12 +2,14 @@
   "database_name": "nooklie-migration",
   "database_id": "fcea4d88-3c18-4c21-a6c1-af13c72caa00",
   "binding": "NOOKLIE_DB",
-  "stage": "isolated-auth-social-books-reader-beta",
+  "stage": "isolated-auth-social-books-reader-community",
   "applied_migrations": [
     "0001_auth_foundation.sql",
     "0002_profiles_social_permissions.sql",
     "0003_books_reading.sql",
-    "0004_comments_reader_beta.sql"
+    "0004_comments_reader_beta.sql",
+    "0005_feed_events.sql",
+    "0006_notification_import_guard.sql"
   ],
   "production_cutover": false,
   "user_data_imported": false
