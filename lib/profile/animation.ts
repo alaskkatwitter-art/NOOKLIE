@@ -4,6 +4,10 @@ export type ImageFraming = { zoom: number; x: number; y: number };
 export type ProfileAnimation = ImageFraming & { url: string };
 
 export const defaultImageFraming: ImageFraming = { zoom: 1, x: 50, y: 50 };
+export const profileImageLimits = {
+  avatar: { maxBytes: 5 * 1024 * 1024, previewBytes: 160_000 },
+  cover: { maxBytes: 8 * 1024 * 1024, previewBytes: 500_000 },
+};
 export const profileGifLimits = {
   avatar: { bytes: 500_000, label: '500 KB', side: 512, framePixels: 16_000_000 },
   cover: { bytes: 2_000_000, label: '2 MB', side: 1600, framePixels: 40_000_000 },
