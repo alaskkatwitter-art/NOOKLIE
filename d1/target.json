@@ -2,10 +2,11 @@
   "database_name": "nooklie-migration",
   "database_id": "fcea4d88-3c18-4c21-a6c1-af13c72caa00",
   "binding": "NOOKLIE_DB",
-  "stage": "isolated-auth-profiles-social-permissions",
+  "stage": "isolated-auth-social-books-reading",
   "applied_migrations": [
     "0001_auth_foundation.sql",
-    "0002_profiles_social_permissions.sql"
+    "0002_profiles_social_permissions.sql",
+    "0003_books_reading.sql"
   ],
   "production_cutover": false,
   "user_data_imported": false

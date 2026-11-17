@@ -1,4 +1,4 @@
-# Migração D1: autenticação, perfis e permissões
+# Migração D1: autenticação, perfis, permissões e leitura
 
 Estado em 17/11/2026: banco `nooklie-migration` criado na conta Cloudflare do
 Nooklie, UUID `fcea4d88-3c18-4c21-a6c1-af13c72caa00`, região ENAM.
@@ -53,15 +53,15 @@ enquanto contas, perfis e autorização não tiverem sido migrados em conjunto.
 
 O inventário `d1/source-inventory.json` registra as 72 tabelas e 86 assinaturas
 de funções encontradas no banco de origem. As três tabelas de autenticação e as
-11 da segunda fase estão estruturadas no D1. Isso ainda não significa que todos
+11 da segunda fase e 13 da terceira estão estruturadas no D1. Isso ainda não significa que todos
 os fluxos que as usam tenham sido migrados. Não copiar SQL PostgreSQL diretamente
 para o D1 (SQLite).
 
-1. Adaptar perfis, bloqueios, seguidores, cargos e verificações de permissão.
+1. Concluir a integração de perfis, bloqueios, seguidores, cargos e permissões.
    D1 não reproduz as políticas RLS da Supabase: cada operação de servidor deve
    validar a sessão, o proprietário e as permissões explicitamente. Um selo
    visual nunca pode conceder privilégio administrativo.
-2. Adaptar histórias, capítulos, listas, progresso, votos e comentários;
+2. Concluir os fluxos de edição, leitura, listas, progresso, votos e comentários;
    preservar chaves, relações, regras de publicação e operações atômicas.
 3. Adaptar feed, eventos, notificações, moderação e chat; conservar os textos
    cifrados e a chave `CHAT_ENCRYPTION_KEY_V2`, sem expô-la ou recriá-la.
@@ -95,11 +95,11 @@ perfil para conta e a validação cargo/departamento foram precedidas por
 consultas na origem: não há perfis órfãos, user_ids duplicados ou cargos em
 departamentos divergentes.
 
-**Dependência pendente:** a coluna `profiles.pinned_story_id` está preservada,
-mas sua FK para `stories` não está instalada porque a tabela de histórias ainda
-não foi criada no D1. Ela deve ser adicionada/reconstruída e validada na próxima
-fase, antes de qualquer importação real ou troca de produção. O editor D1 desta
-etapa não escreve essa coluna.
+**Dependência resolvida na terceira fase:** a FK de `profiles.pinned_story_id`
+para `stories` foi instalada com `ON DELETE SET NULL`. A tabela de perfis foi
+reconstruída enquanto o banco isolado continuava vazio, com guardas que abortam
+se já houver contas/perfis importados. Todos os índices e o view de atores
+foram recriados e os cenários da segunda fase foram repetidos.
 
 `d1-social.ts` permite consultar conteúdo de perfil respeitando conta ativa,
 moderação, privacidade, seguidores aceitos e bloqueios nos dois sentidos.
@@ -134,3 +134,68 @@ Resultado desta etapa: seis testes de integração locais passaram (os quatro
 anteriores e os dois novos), assim como `npx tsc --noEmit`. As 41 verificações
 compartilhadas passaram também no D1 remoto. Os registros sintéticos foram
 removidos e a verificação de chaves estrangeiras terminou sem inconsistências.
+
+## Terceira fase: histórias, capítulos, biblioteca e listas
+
+`0003_books_reading.sql` adapta 91 colunas das tabelas `stories`, `chapters`,
+`chapter_media`, `chapter_likes`, `chapter_favorites`, `story_likes`,
+`reading_lists`, `reading_list_items`, `reading_progress`, `scheduled_chapters`,
+`tags`, `tag_categories` e `story_tags`. Mantém classificação, avisos de conteúdo,
+permissão de download, marcações de IA, séries, músicas, tipos de capítulo,
+imagem da lista e demais campos existentes, além dos índices e relações.
+
+Há 27 tabelas de origem estruturadas e uma tabela interna `d1_book_commands`.
+Essa tabela interna fica vazia após cada operação; seu trigger aplica
+reordenação/exclusão com validação e alterações dentro da mesma transação.
+Ela não é um endpoint público nem uma fila de tarefas.
+
+As consultas na origem confirmaram que não havia números de capítulo não
+positivos, progresso fora de faixa, progresso apontando capítulo de outra obra
+ou múltiplas Bibliotecas para uma mesma pessoa. O esquema D1 acrescenta a relação
+composta capítulo/obra para o progresso e um índice único da Biblioteca principal.
+
+`d1-books.ts` deriva autoria e propriedade da sessão dentro do SQL. Implementa:
+
+- Criação/edição básica da obra, criação/edição do texto de capítulos e
+  publicação/retirada manual. Novas obras e capítulos começam sem publicação.
+- Consulta da obra/sumário/capítulo, com prévia de rascunho restrita ao autor,
+  capítulos publicados para leitores e respeito a privacidade, bloqueios,
+  suspensão, moderação e data de liberação.
+- Reordenação completa e exclusão permanente de capítulo. A lista de IDs é
+  validada no banco; uma ordem incompleta, duplicada, desatualizada ou contendo
+  capítulo de outra obra aborta. A numeração restante é compactada atomicamente.
+- Fixação da própria obra, com FK real e limpeza da referência quando removida.
+- Criação de listas privadas, visibilidade explícita, conteúdo filtrado para
+  cada leitor, inclusão/remoção de obras e reordenação pelo proprietário.
+- Biblioteca principal única e privada, remoção de obras e estados quero ler,
+  lendo e já li. Progresso e posição só podem ser gravados/restaurados pela sessão
+  do leitor e para um capítulo da obra indicada.
+
+O repositório exige que o servidor forneça o sanitizador existente
+`safeChapterHtml`; não há fallback que salve HTML sem sanitização. O teste local
+usa esse sanitizador real. A verificação SQL remota aceita apenas texto simples,
+para testar as regras de dados sem substituir a dependência de sanitização.
+
+`'infinity'` de `release_at` continua significando obra retirada. É conservado
+como texto e não passa pela condição de data do view `released_stories`.
+`expires_at` é preservado; o view original não o usa para expirar obras, e esta
+migração também não altera esse comportamento. Datas finitas serão normalizadas
+para UTC ISO na importação. Votos/favoritos, metadados de mídias, agendamentos e
+progresso ligados a um capítulo são removidos por cascata ao excluir o capítulo.
+
+As rotas existentes continuam no banco atual. Ainda faltam integrar os editores
+e uploads às novas operações, preservar validações completas de classificação,
+tags e políticas no fluxo de edição, adaptar filtros de descoberta/contagens,
+comentários, leitura beta, geração de downloads, notificações de publicação e o
+cron. A exclusão física de arquivos R2 deve ser integrada ao fluxo de limpeza;
+esta etapa valida a exclusão dos registros, sem apagar arquivos reais.
+
+Os novos testes verificam também que uma falha de exclusão faz rollback sem
+alterar a numeração, que a reconstrução de perfis recusa um banco preenchido e
+que os 41 cenários anteriores continuam passando após a terceira migração.
+
+Resultado: dez testes de integração locais passaram, assim como TypeScript.
+As 58 verificações de histórias/leitura passaram no D1 remoto usando os mesmos
+métodos do repositório. A limpeza confirmou zero contas, perfis, histórias,
+capítulos, itens de lista ou comandos de teste restantes. A verificação de FKs
+terminou sem inconsistências e a FK de história fixada foi conferida no D1 real.

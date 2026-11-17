@@ -4,6 +4,7 @@ export type D1Value = string | number | null;
 export interface D1Statement {
   bind(...values: D1Value[]): D1Statement;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ success: boolean; results: T[] }>;
   run(): Promise<{ success: boolean; meta: { changes?: number } }>;
 }
 export interface NooklieD1 {
