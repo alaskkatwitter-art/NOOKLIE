@@ -4,16 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUserContext } from '@/lib/auth/session';
 import { sameOrigin } from '@/lib/chat/server';
 import { imageMatchesType } from '@/lib/security/uploads';
-import { parseImageFraming, profileGifLimits, validateProfileGif, type ProfileImageKind } from './animation';
+import { parseImageFraming, profileGifLimits, profileImageLimits, validateProfileGif, type ProfileImageKind } from './animation';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!,
 );
-const imageOptions = {
-  avatar: { bucket: 'avatars', maxBytes: 5 * 1024 * 1024, previewBytes: 160_000 },
-  cover: { bucket: 'profile-covers', maxBytes: 8 * 1024 * 1024, previewBytes: 500_000 },
-};
+const imageBuckets = { avatar: 'avatars', cover: 'profile-covers' };
 const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 function staticImage(bytes: Buffer, type: string) {
@@ -31,7 +28,8 @@ function staticImage(bytes: Buffer, type: string) {
 }
 
 export async function uploadProfileImage(request: Request, kind: ProfileImageKind) {
-  const { bucket, maxBytes, previewBytes } = imageOptions[kind];
+  const bucket = imageBuckets[kind];
+  const { maxBytes, previewBytes } = profileImageLimits[kind];
   const gifLimit = profileGifLimits[kind];
   const urlColumn = `${kind}_url` as const;
   const animationColumn = `${kind}_animation` as const;
@@ -63,8 +61,8 @@ export async function uploadProfileImage(request: Request, kind: ProfileImageKin
     let framing = null;
     let animationBytes = null;
     if (gif !== null) {
-      if (!(gif instanceof File) || gif.type !== 'image/gif' || poster.type !== 'image/webp') {
-        return failure('Envie um GIF e sua miniatura WebP estática.', 400);
+      if (!(gif instanceof File) || gif.type !== 'image/gif') {
+        return failure('Envie um GIF com uma miniatura estática.', 400);
       }
       if (gif.size > gifLimit.bytes) return failure(`Use um GIF de até ${gifLimit.label}.`, 413);
       if (typeof rawFraming !== 'string' || rawFraming.length > 256) return failure('Enquadramento inválido.', 400);
@@ -125,7 +123,7 @@ export async function uploadProfileImage(request: Request, kind: ProfileImageKin
           const ownerPrefix = [prefix, legacyPrefix].find(candidate => value.startsWith(candidate));
           return ownerPrefix ? [value.slice(ownerPrefix.length)] : [];
         })
-        .filter(name => new RegExp(`^${kind}-[0-9a-f-]{36}\\.(webp|gif)$`, 'i').test(name))
+        .filter(name => new RegExp(`^${kind}-[0-9a-f-]{36}\\.(jpg|png|webp|gif)$`, 'i').test(name))
         .map(name => `${auth.userId}/${name}`);
       if (owned.length) await storage.remove(owned).catch(() => undefined);
     }

@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import AnimatedProfileImage from './AnimatedProfileImage';
-import { defaultImageFraming, profileGifLimits, validateProfileGif, type ImageFraming } from '@/lib/profile/animation';
+import { defaultImageFraming, validateProfileGif, type ImageFraming } from '@/lib/profile/animation';
+import { exportProfilePhoto, profilePhotoError, profilePhotoType } from '@/lib/profile/photo-client';
 import { cropRect } from '@/lib/images/crop';
 
 export default function ImageCropDialog({ source, kind, allowGif = false, framing = defaultImageFraming, onCancel, onSave }: {
@@ -25,18 +26,46 @@ export default function ImageCropDialog({ source, kind, allowGif = false, framin
     const controller = new AbortController(); let url: string | undefined;
     void (async () => {
       try {
-        const file = typeof source === 'string' ? await fetch(source, {signal: controller.signal}).then(r => { if (!r.ok) throw Error(); return r.blob(); }) : source;
-        const gif = allowGif && file.type === 'image/gif' ? file : undefined;
+        const file = typeof source === 'string'
+          ? await fetch(source, { signal: controller.signal }).then(response => {
+              if (!response.ok) throw new Error('Não foi possível abrir a imagem atual. Tente selecionar o arquivo novamente.');
+              return response.blob();
+            })
+          : source;
+        const fileError = profilePhotoError(file, kind, allowGif);
+        if (fileError) throw new Error(fileError);
+        const type = profilePhotoType(file);
+        const imageBlob = type === file.type ? file : file.slice(0, file.size, type);
+        const gif = type === 'image/gif' ? imageBlob : undefined;
         if (gif) {
-          if (gif.size > profileGifLimits[kind].bytes) throw Error(`Use um GIF de até ${profileGifLimits[kind].label}.`);
           const gifError = validateProfileGif(new Uint8Array(await gif.arrayBuffer()), kind);
-          if (gifError) throw Error(gifError);
-        } else if (file.size > 20 * 1024 * 1024 || !['image/jpeg','image/png','image/webp'].includes(file.type)) {
-          throw Error('Use uma imagem JPG, PNG ou WebP de até 20 MB.');
+          if (gifError) throw new Error(gifError);
         }
         if (controller.signal.aborted) return;
-        url = URL.createObjectURL(file);
-        const loaded = new Image(); loaded.src = url; await loaded.decode();
+
+        const loaded = new Image();
+        url = URL.createObjectURL(imageBlob);
+        loaded.src = url;
+        try {
+          await loaded.decode();
+        } catch {
+          if (controller.signal.aborted) return;
+          if (type !== 'image/heic' && type !== 'image/heif') {
+            throw new Error('Não foi possível abrir a imagem. Tente selecionar outro arquivo.');
+          }
+          try {
+            const { heicTo } = await import('heic-to/csp');
+            if (controller.signal.aborted) return;
+            const jpeg = await heicTo({ blob: imageBlob, type: 'image/jpeg', quality: 0.92 });
+            if (controller.signal.aborted) return;
+            URL.revokeObjectURL(url);
+            url = URL.createObjectURL(jpeg);
+            loaded.src = url;
+            await loaded.decode();
+          } catch {
+            throw new Error('Não foi possível abrir esta foto em HEIC ou HEIF. Tente exportá-la como JPG e escolha o arquivo novamente.');
+          }
+        }
         if (loaded.naturalWidth * loaded.naturalHeight > 50000000) throw Error('Escolha uma imagem com resolução menor.');
         if (!controller.signal.aborted) setLoadedImage({ image: loaded, gif, url });
       } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error && e.message ? e.message : 'Não foi possível abrir a imagem. Escolha o arquivo novamente.'); }
@@ -62,10 +91,15 @@ export default function ImageCropDialog({ source, kind, allowGif = false, framin
         {loadedImage?.gif && <AnimatedProfileImage animation={{ url: loadedImage.url, zoom, x, y }} kind={kind} className="profile-crop-animation" />}
       </div>
       {[['Zoom',zoom,1,3,0.01,setZoom],['Posição horizontal',x,0,100,1,setX],['Posição vertical',y,0,100,1,setY]].map(([label,value,min,max,step,setter]) => <label key={label as string} className="block text-sm">{label as string}<input type="range" aria-label={label as string} min={min as number} max={max as number} step={step as number} value={value as number} disabled={busy || !image} onChange={event => (setter as (value:number)=>void)(Number(event.target.value))} className="mt-2 block w-full accent-pink-400" /></label>)}
+      {!image && !error && <p role="status" className="text-sm text-white/65">Preparando a imagem…</p>}
       {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}
       <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={onCancel} className="nook-choice">Cancelar</button><button type="button" disabled={!image || busy} className="nook-primary" onClick={async () => {
         if (!canvas.current) return; setBusy(true); setError('');
-        try { const output = await new Promise<Blob>((resolve,reject) => canvas.current!.toBlob(blob => blob ? resolve(blob) : reject(Error('Não foi possível preparar a imagem.')), 'image/webp', loadedImage?.gif ? 0.78 : 0.9)); await onSave(new File([output], kind+'.webp', {type:'image/webp'}), loadedImage?.gif ? { gif: loadedImage.gif, framing: { zoom, x, y } } : undefined); }
+        try {
+          const gif = loadedImage?.gif;
+          const file = await exportProfilePhoto(canvas.current, kind, Boolean(gif));
+          await onSave(file, gif ? { gif, framing: { zoom, x, y } } : undefined);
+        }
         catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível salvar. Tente novamente.'); }
         finally { setBusy(false); }
       }}>{busy ? 'Salvando…' : 'Salvar enquadramento'}</button></div>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Camera, SlidersHorizontal } from 'lucide-react';
 import AnimatedProfileImage from '@/components/AnimatedProfileImage';
 import { profileGifLimits, type ImageFraming, type ProfileAnimation } from '@/lib/profile/animation';
+import { profilePhotoAccept, profilePhotoError } from '@/lib/profile/photo-client';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import ProfileThemeEditor from '@/components/ProfileThemeEditor';
 import UiThemeControl from '@/components/UiThemeControl';
@@ -55,13 +56,8 @@ export default function EditProfilePage() {
   function choose(event: ChangeEvent<HTMLInputElement>, kind: Kind) {
     const file = event.target.files?.[0]; event.target.value = '';
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) { setError('Escolha uma imagem JPG, PNG, WebP ou GIF.'); return; }
-    const gif = file.type === 'image/gif';
-    const limit = profileGifLimits[kind];
-    if (file.size > (gif ? limit.bytes : 20 * 1024 * 1024)) {
-      setError(gif ? `Use um GIF de até ${limit.label}.` : 'Escolha uma imagem de até 20 MB.');
-      return;
-    }
+    const fileError = profilePhotoError(file, kind, true);
+    if (fileError) { setError(fileError); return; }
     setError(''); setNotice(''); setCrop({ source: file, kind });
   }
 
@@ -75,8 +71,8 @@ export default function EditProfilePage() {
         form.set('framing', JSON.stringify(animation.framing));
       }
       const response = await fetch('/api/profile/' + kind, { method: 'POST', body: form });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.error || 'Não foi possível salvar a imagem.');
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.[kind + '_url']) throw Error(data?.error || 'Não foi possível salvar a imagem.');
       setUser(current => current ? { ...current, [kind + '_url']: data[kind + '_url'], [kind + '_animation']: data[kind + '_animation'] } : current);
       setCrop(null); setNotice(kind === 'cover' ? 'Capa e enquadramento salvos.' : 'Foto de perfil salva.');
     } finally { setSaving(false); }
@@ -108,7 +104,7 @@ export default function EditProfilePage() {
       </section>}
       {tab === 'details' && <section className="profile-editor-details"><label>Nome de exibição<input maxLength={50} value={name} onChange={event => setName(event.target.value)}/></label><label>Biografia<textarea rows={4} maxLength={500} value={bio} onChange={event => setBio(event.target.value)}/></label><SpotifyField label="Música do perfil" value={spotifyUrl} onChange={url => { setSpotifyUrl(url); setSpotifyTitle(''); setSpotifyArtists(''); }} saved={user.spotify_link} />{spotifyUrl.trim() && <><label>Nome da música<input className="nook-input w-full" maxLength={300} placeholder="Título do vídeo, se disponível" value={spotifyTitle} onChange={event => setSpotifyTitle(event.target.value)} /></label><label>Artistas<input className="nook-input w-full" maxLength={300} placeholder="Opcional" value={spotifyArtists} onChange={event => setSpotifyArtists(event.target.value)} /></label></>}<Link href="/configuracoes">Configurações da conta</Link></section>}
       {tab !== 'photos' && <button type="button" className="editor-save" disabled={saving} onClick={() => void save()}>{saving ? 'Salvando…' : tab === 'themes' ? 'Salvar cabeçalho' : 'Salvar dados'}</button>}
-      <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'avatar')}/><input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => choose(event, 'cover')}/>
+      <input ref={avatarInput} type="file" accept={profilePhotoAccept} hidden onChange={event => choose(event, 'avatar')}/><input ref={coverInput} type="file" accept={profilePhotoAccept} hidden onChange={event => choose(event, 'cover')}/>
       {crop && <ImageCropDialog source={crop.source} kind={crop.kind} allowGif framing={crop.framing} onCancel={() => setCrop(null)} onSave={saveImage}/>}
     </>}
   </div></main>;
