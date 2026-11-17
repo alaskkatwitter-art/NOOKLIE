@@ -27,7 +27,7 @@ function visibleEvents(canManage: boolean) {
   const query = discoveryDb.from('story_events').select(fields);
   if (canManage) return query;
   const now = new Date().toISOString();
-  return query.eq('active', true).lte('starts_at', now).gt('ends_at', now);
+  return query.eq('active', true).gt('ends_at', now);
 }
 
 function imagePath(eventId: string, image: EventImage) {
@@ -36,9 +36,15 @@ function imagePath(eventId: string, image: EventImage) {
 
 export async function GET(request: Request) {
   try {
+    const params = new URL(request.url).searchParams;
+    if (params.get('destaque') === '1') {
+      const { data, error } = await discoveryDb.from('story_events').select('id,title')
+        .eq('active', true).gt('ends_at', new Date().toISOString()).order('starts_at').limit(1).maybeSingle();
+      if (error) throw error;
+      return json({ event: data });
+    }
     const [staff, reader] = await Promise.all([getStaffContext(), getDiscoveryReader()]);
     const canManage = Boolean(reader && staff?.isPlatformAdmin);
-    const params = new URL(request.url).searchParams;
     const imageId = params.get('image');
     if (imageId !== null) {
       const eventId = params.get('event') || '';
@@ -54,7 +60,11 @@ export async function GET(request: Request) {
         headers: { ...privateHeaders, 'Content-Type': image.type, 'X-Content-Type-Options': 'nosniff' },
       });
     }
-    const { data, error } = await visibleEvents(canManage).order('starts_at', { ascending: false }).limit(50);
+    const eventId = params.get('evento');
+    if (eventId && !uuid.test(eventId)) return problem('Evento inválido.', 400);
+    const query = visibleEvents(canManage);
+    if (eventId) query.eq('id', eventId);
+    const { data, error } = await query.order('starts_at', { ascending: false }).limit(50);
     if (error) throw error;
     return json({ events: data || [], can_manage: canManage });
   } catch {

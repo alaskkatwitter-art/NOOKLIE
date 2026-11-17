@@ -58,7 +58,17 @@ type Message = {
   reply_to: string | null;
   created_at: string;
   read_at: string | null;
+  edited_at: string | null;
+  revoked_at: string | null;
 };
+function latestMessage(current: Message | undefined, incoming: Message) {
+  if (!current) return incoming;
+  const currentVersion = current.revoked_at || current.edited_at || '';
+  const incomingVersion = incoming.revoked_at || incoming.edited_at || '';
+  return currentVersion && Date.parse(currentVersion) > (Date.parse(incomingVersion) || 0)
+    ? { ...incoming, ...current, read_at: incoming.read_at ?? current.read_at }
+    : incoming;
+}
 type Member = { profile_id: string; status: string; profile: Peer | null };
 function Avatar({
   peer,
@@ -107,6 +117,11 @@ export default function ChatClient() {
     [more, setMore] = useState(false),
     [ready, setReady] = useState(false),
     [reportedMessage, setReportedMessage] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [editText, setEditText] = useState('');
+  const editDialog = useRef<HTMLDialogElement>(null);
+  const oldestVisible = useRef('');
+  const openedAt = useRef('');
   const input = useRef<HTMLInputElement>(null),
     stickerInput = useRef<HTMLInputElement>(null),
     audioInput = useRef<HTMLInputElement>(null),
@@ -136,7 +151,9 @@ export default function ChatClient() {
             ? fetch("/api/chat", { cache: "no-store", signal })
             : Promise.resolve(null),
           selected
-            ? fetch("/api/chat?thread=" + selected, {
+            ? fetch("/api/chat?" + new URLSearchParams({
+                thread: selected, visible_since: oldestVisible.current, changed_since: openedAt.current,
+              }), {
                 cache: "no-store",
                 signal,
               })
@@ -169,7 +186,12 @@ export default function ChatClient() {
                 !d.messages.some((n: Message) => n.id === m.id) &&
                 m.created_at < (d.messages[0]?.created_at || ""),
             );
-            return [...older, ...d.messages];
+            const previous = new Map(old.map(m => [m.id, m]));
+            const changes = new Map<string, Message>((d.changes ?? []).map((m: Message) => [m.id, m]));
+            return [
+              ...older.map(m => changes.has(m.id) ? latestMessage(m, changes.get(m.id)!) : m),
+              ...d.messages.map((m: Message) => latestMessage(previous.get(m.id), m)),
+            ];
           });
           setMore(Boolean(d.has_more));
         } else {
@@ -187,6 +209,43 @@ export default function ChatClient() {
     },
     [router, selected],
   );
+  async function changeMessage(message: Message, revoke: boolean) {
+    if (busy || (revoke && !window.confirm('Cancelar o envio desta mensagem para todos?'))) return;
+    const threadId = selected;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/chat/messages/' + message.id, {
+        method: revoke ? 'DELETE' : 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thread_id: threadId, body: revoke ? undefined : editText }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      if (activeThread.current !== threadId) return;
+      setMessages(current => current.map(m => m.id !== message.id ? m : revoke
+        ? { ...m, revoked_at: data.revoked_at, body: '', media_url: null, media_type: null, is_sticker: false, reply_to: null }
+        : { ...m, edited_at: data.edited_at, body: data.body }));
+      if (revoke) setReply(current => current?.id === message.id ? null : current);
+      editDialog.current?.close();
+      void refresh(undefined, false);
+    } catch (failure) {
+      if (activeThread.current !== threadId) return;
+      editDialog.current?.close();
+      setError(failure instanceof Error ? failure.message : 'Não foi possível alterar a mensagem.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    setReply(previous => {
+      if (!previous) return previous;
+      const message = messages.find(item => item.id === previous.id);
+      return message?.revoked_at ? null : message ?? previous;
+    });
+  }, [messages]);
+
   function stopRecord(cancel = false) {
     intent.current = false;
     if (cancel) cancelRecording.current = true;
@@ -194,6 +253,9 @@ export default function ChatClient() {
   }
   useEffect(() => {
     activeThread.current = selected;
+    oldestVisible.current = '';
+    openedAt.current = new Date(Date.now() - 60_000).toISOString();
+    editDialog.current?.close();
     cancelRecording.current = true;
     intent.current = false;
     if (recorder.current?.state === "recording") recorder.current.stop();
@@ -455,7 +517,9 @@ export default function ChatClient() {
       const d = await r.json();
       pinned.current = false;
       const height = scroll.current?.scrollHeight || 0;
-      setMessages((current) => [...d.messages, ...current]);
+      if (activeThread.current !== selected) return;
+      if (d.messages.length) oldestVisible.current = d.messages[0].created_at;
+      setMessages(current => [...d.messages.filter((message: Message) => !current.some(m => m.id === message.id)), ...current]);
       setMore(d.has_more);
       requestAnimationFrame(() => {
         if (scroll.current)
@@ -724,6 +788,8 @@ export default function ChatClient() {
                     )}
                     {messages.map((m) => {
                       const mine = m.sender_id === me;
+                      const canChange = mine && !m.revoked_at && thread.status === 'accepted' &&
+                        Date.now() - Date.parse(m.created_at) < 2 * 60 * 60 * 1000;
                       const quoted = messages.find((n) => n.id === m.reply_to);
                       const author = members.find(
                         (v) => v.profile_id === m.sender_id,
@@ -733,6 +799,7 @@ export default function ChatClient() {
                           key={m.id}
                           className={"chat-message-row " + (mine ? "mine" : "")}
                         >
+                          {groupChat && <Avatar peer={author} />}
                           <article
                             className={
                               "chat-bubble " +
@@ -746,8 +813,7 @@ export default function ChatClient() {
                             )}
                             {m.reply_to && (
                               <blockquote>
-                                {quoted?.body?.slice(0, 120) ||
-                                  "Mensagem anterior ou anexo"}
+                                {quoted?.revoked_at ? "Mensagem apagada" : quoted?.body?.slice(0, 120) || "Mensagem anterior ou anexo"}
                               </blockquote>
                             )}
                             {m.media_url &&
@@ -780,6 +846,7 @@ export default function ChatClient() {
                               ) : (
                                 <ChatAudio src={m.media_url} />
                               ))}
+                            {m.revoked_at && <p className="chat-message-text opacity-70 italic">Mensagem apagada</p>}
                             {m.body && (
                               <p className="chat-message-text">{m.body}</p>
                             )}
@@ -793,11 +860,22 @@ export default function ChatClient() {
                                   ? " · Lida"
                                   : ""}
                               </time>
-                              <details className="chat-message-menu">
+                              {m.edited_at && !m.revoked_at && <span>· Editada</span>}
+                              {!m.revoked_at && <details className="chat-message-menu">
                                 <summary aria-label="Opções da mensagem">
                                   <MoreHorizontal size={15} />
                                 </summary>
                                 <div>
+                                  {canChange && m.body && !thread.blocked && <button type="button" disabled={busy} onClick={(event) => {
+                                    event.currentTarget.closest('details')?.removeAttribute('open');
+                                    setEditing(m);
+                                    setEditText(m.body);
+                                    editDialog.current?.showModal();
+                                  }}><Pencil size={15} /> Editar mensagem</button>}
+                                  {canChange && <button type="button" disabled={busy} onClick={(event) => {
+                                    event.currentTarget.closest('details')?.removeAttribute('open');
+                                    void changeMessage(m, true);
+                                  }}><Trash2 size={15} /> Apagar para todos</button>}
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -824,7 +902,7 @@ export default function ChatClient() {
                                     Denunciar
                                   </button>
                                 </div>
-                              </details>
+                              </details>}
                             </footer>
                             {mine && needsSupport(m.body) && (
                               <aside className="chat-support">
@@ -1180,6 +1258,20 @@ export default function ChatClient() {
             <Users size={17} />
             {busy ? "Criando…" : "Criar e enviar convites"}
           </button>
+        </form>
+      </dialog>
+      <dialog ref={editDialog} className="nook-dialog" aria-label="Editar mensagem">
+        <form className="space-y-4 p-4" onSubmit={event => {
+          event.preventDefault();
+          if (editing) void changeMessage(editing, false);
+        }}>
+          <label className="block font-semibold" htmlFor="chat-edit-body">Editar mensagem</label>
+          <textarea id="chat-edit-body" className="w-full rounded-lg border border-white/25 bg-transparent p-3"
+            rows={4} maxLength={4000} value={editText} onChange={event => setEditText(event.target.value)} />
+          <div className="flex justify-end gap-3">
+            <button type="button" className="discovery-secondary" onClick={() => editDialog.current?.close()}>Cancelar</button>
+            <button type="submit" className="discovery-primary" disabled={busy || !editText.trim()}>Salvar</button>
+          </div>
         </form>
       </dialog>
       <dialog ref={report} className="nook-dialog">

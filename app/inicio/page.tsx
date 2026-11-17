@@ -1,4 +1,5 @@
 'use client';
+import LiteraryEventHighlight from '@/components/LiteraryEventHighlight';
 import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import OriginalsShelf from '@/components/OriginalsShelf';
@@ -25,6 +26,7 @@ export default function ReaderHome() {
     void load();return()=>controller.abort();
   },[router,revision]);
   return <main className="discovery-home nook-reader-home"><div className="mx-auto max-w-6xl px-4 pb-16 pt-7 sm:px-8 sm:pt-12">
+    <LiteraryEventHighlight />
     <header className="home-heading">
       <div>
         <p className="home-kicker">Início</p>

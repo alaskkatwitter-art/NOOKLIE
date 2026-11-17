@@ -112,7 +112,7 @@ export async function GET(request: Request) {
     let query = chatDb
       .from("chat_messages")
       .select(
-        "id,thread_id,sender_id,body_cipher,media_type,is_sticker,reply_to,created_at,read_at",
+        "id,thread_id,sender_id,body_cipher,media_type,is_sticker,reply_to,created_at,read_at,edited_at,revoked_at",
       )
       .eq("thread_id", id)
       .eq("cipher_version", chatCipherVersion())
@@ -127,9 +127,7 @@ export async function GET(request: Request) {
     }
     const result = await query;
     if (result.error) throw result.error;
-    const messages = (result.data || [])
-      .reverse()
-      .map((m) => ({
+    const serializeMessage = (m: NonNullable<typeof result.data>[number]) => ({
         id: m.id,
         sender_id: m.sender_id,
         body: decryptChat(
@@ -142,7 +140,27 @@ export async function GET(request: Request) {
         reply_to: m.reply_to,
         created_at: m.created_at,
         read_at: m.read_at,
-      }));
+        edited_at: m.edited_at,
+        revoked_at: m.revoked_at,
+      });
+    const messages = (result.data || []).reverse().map(serializeMessage);
+    const onlyLatest = messages[0]?.created_at;
+    const visibleSince = params.get("visible_since");
+    const changedSince = params.get("changed_since");
+    const changes = [];
+    if (!before && visibleSince && Number.isFinite(Date.parse(visibleSince)) && onlyLatest && visibleSince < onlyLatest && changedSince && Number.isFinite(Date.parse(changedSince))) {
+      // Refresh previously paginated messages that could have changed during this visit.
+      for (let offset = 0; ; offset += 500) {
+        const batch = await chatDb.from("chat_messages")
+          .select("id,thread_id,sender_id,body_cipher,media_type,is_sticker,reply_to,created_at,read_at,edited_at,revoked_at")
+          .eq("thread_id", id).eq("cipher_version", chatCipherVersion())
+          .gte("created_at", visibleSince).lt("created_at", onlyLatest)
+          .or(`edited_at.gte.${new Date(changedSince).toISOString()},revoked_at.gte.${new Date(changedSince).toISOString()}`).order("id").range(offset, offset + 499);
+        if (batch.error) throw batch.error;
+        changes.push(...batch.data.map(serializeMessage));
+        if (batch.data.length < 500) break;
+      }
+    }
     if (thread.kind === "direct") {
       const read = await chatDb
         .from("chat_messages")
@@ -169,6 +187,7 @@ export async function GET(request: Request) {
         me: actor.profileId,
         thread,
         messages,
+        changes,
         members,
         has_more: messages.length === 60,
       },
@@ -248,6 +267,7 @@ export async function POST(request: Request) {
     if (reply) {
       const original = await chatDb.from("chat_messages").select("id")
         .eq("id", String(reply))
+        .is("revoked_at", null)
         .eq("thread_id", threadId)
         .eq("cipher_version", chatCipherVersion())
         .maybeSingle();

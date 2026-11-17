@@ -1,4 +1,4 @@
-import { chatActor, chatDb, privateHeaders, uuid } from '@/lib/chat/server';
+import { chatActor, chatDb, privateHeaders, sameOrigin, uuid } from '@/lib/chat/server';
 import { getPublicProfileIds, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
 function respond(data: object, status = 200) {
@@ -68,5 +68,27 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('reading lists POST', error);
     return respond({ error: 'Não foi possível salvar sua lista.' }, 500);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    if (!sameOrigin(request)) return respond({ error: 'Acesso restrito.' }, 403);
+    const actor = await chatActor();
+    if (!actor) return respond({ error: 'Entre para organizar suas listas.' }, 401);
+    const { listId, storyId } = await request.json().catch(() => ({})) ?? {};
+    if ([listId, storyId].some(id => typeof id !== 'string' || !uuid.test(id))) {
+      return respond({ error: 'Identificador inválido.' }, 400);
+    }
+    const list = await chatDb.from('reading_lists').select('id')
+      .eq('id', listId).eq('user_id', actor.profileId).neq('name', 'Biblioteca').maybeSingle();
+    if (list.error) throw list.error;
+    if (!list.data) return respond({ error: 'Lista indisponível.' }, 404);
+    const { error } = await chatDb.from('reading_list_items').delete().eq('list_id', listId).eq('story_id', storyId);
+    if (error) throw error;
+    return respond({ removed: true });
+  } catch (error) {
+    console.error('reading lists DELETE', error);
+    return respond({ error: 'Não foi possível retirar a história da lista.' }, 500);
   }
 }

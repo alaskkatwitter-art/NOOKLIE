@@ -242,6 +242,25 @@ export default function BibliotecaPage() {
     }
   }
 
+  async function removeStory(storyId: string) {
+    if (savingStatus) return;
+    setSavingStatus(storyId);
+    setStatusError('');
+    try {
+      const response = await fetch('/api/library', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_id: storyId }),
+      });
+      if (!response.ok) throw new Error();
+      setItems(previous => previous.filter(item => item.story_id !== storyId));
+    } catch {
+      setStatusError('Não foi possível retirar a história da biblioteca. Tente novamente.');
+    } finally {
+      setSavingStatus(null);
+    }
+  }
+
   function changeView(next: LibraryView) {
     setView(next);
     if (!currentUser) return;
@@ -715,6 +734,10 @@ export default function BibliotecaPage() {
                     <option value="">{status && !item.reading_status ? readingStatuses[status] + ' (automático)' : 'Automático'}</option>
                     {Object.entries(readingStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
+                  <button type="button" className="library-resume" disabled={savingStatus !== null}
+                    aria-label={`Retirar ${item.story_title} da biblioteca`} onClick={() => void removeStory(item.story_id)}>
+                    Retirar da biblioteca
+                  </button>
                   {item.chapter_id && status !== 'completed' && (
                     <Link href={`/capitulo/${item.chapter_id}`} className="library-resume">
                       Continuar · {Math.round(item.progress_percent ?? 0)}%

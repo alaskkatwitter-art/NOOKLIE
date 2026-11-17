@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CalendarDays, Pencil, Plus } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, Share2 } from 'lucide-react';
 import EventEditor from './EventEditor';
 import { eventContent, eventImageUrl, type EventImage, type LiteraryEvent } from '@/lib/discovery/events';
 
@@ -14,6 +15,12 @@ function EventPicture({ eventId, image, className }: { eventId: string; image: E
 }
 
 export default function EventsPage() {
+  return <Suspense fallback={<main className="discovery-home p-5">Carregando eventos…</main>}><EventList /></Suspense>;
+}
+
+function EventList() {
+  const sharedEvent = useSearchParams().get('evento') || '';
+  const [sharedUrl, setSharedUrl] = useState('');
   const [events, setEvents] = useState<LiteraryEvent[]>([]);
   const [stories, setStories] = useState<OwnStory[]>([]);
   const [admin, setAdmin] = useState(false);
@@ -29,7 +36,8 @@ export default function EventsPage() {
     const options = { cache: 'no-store' as const, signal: controller.signal };
     async function load() {
       try {
-        const [res, own] = await Promise.all([fetch('/api/events', options), fetch('/api/profile/stories', options)]);
+        const endpoint = sharedEvent ? '/api/events?evento=' + encodeURIComponent(sharedEvent) : '/api/events';
+        const [res, own] = await Promise.all([fetch(endpoint, options), fetch('/api/profile/stories', options)]);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         const mine = own.ok ? await own.json() : null;
@@ -45,7 +53,7 @@ export default function EventsPage() {
     }
     void load();
     return () => controller.abort();
-  }, [retry]);
+  }, [retry, sharedEvent]);
 
   async function send(body: FormData | Record<string, unknown>, method = 'POST') {
     setBusy(true);
@@ -75,6 +83,24 @@ export default function EventsPage() {
     }
   }
 
+  async function shareEvent(event: LiteraryEvent) {
+    const url = new URL('/eventos', window.location.origin);
+    url.searchParams.set('evento', event.id);
+    setError('');
+    setSharedUrl('');
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: event.title, url: url.href });
+      } else {
+        await navigator.clipboard.writeText(url.href);
+        setMessage('Link do evento copiado.');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setSharedUrl(url.href);
+    }
+  }
+
   return (
     <main className="discovery-home">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-12">
@@ -82,8 +108,9 @@ export default function EventsPage() {
           <div>
             <CalendarDays size={30} className="text-[#ffc4df]" aria-hidden="true" />
             <h1 className="mt-3 text-3xl font-bold">Eventos literários</h1>
+            {sharedEvent && <Link href="/eventos" className="mt-2 inline-block text-sm text-[#ffc4df] hover:underline">Ver todos os eventos</Link>}
           </div>
-          {admin && !editor && (
+          {admin && !editor && !sharedEvent && (
             <button type="button" disabled={busy} onClick={() => setEditor('create')} className="discovery-secondary">
               <Plus size={17} aria-hidden="true" /> Criar evento
             </button>
@@ -91,6 +118,10 @@ export default function EventsPage() {
         </div>
         {error && <p role="alert" className="my-5 text-rose-200">{error}</p>}
         {message && <p role="status" className="my-5 text-[#ffc4df]">{message}</p>}
+        {sharedUrl && <label className="my-4 block text-sm">Link do evento
+          <input readOnly value={sharedUrl} onFocus={event => event.currentTarget.select()}
+            className="mt-1 block w-full rounded-lg border border-white/20 bg-transparent p-2" />
+        </label>}
         {!ready && !error && <p className="py-8" role="status">Carregando eventos…</p>}
         {admin && editor && (
           <EventEditor
@@ -127,6 +158,11 @@ export default function EventsPage() {
                     <p className="mt-2 text-sm text-white/65">
                       Até {new Date(event.ends_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </p>
+                    {event.active && Date.parse(event.ends_at) > now && (
+                      <button type="button" className="discovery-secondary mt-3" onClick={() => void shareEvent(event)}>
+                        <Share2 size={16} aria-hidden="true" /> Compartilhar evento
+                      </button>
+                    )}
                   </header>
                   {(content.format || content.eligibility || content.entry_limit) && (
                     <dl className="grid gap-3 rounded-xl border border-white/10 p-4 text-sm sm:grid-cols-3">
@@ -185,7 +221,7 @@ export default function EventsPage() {
           })}
         </div>
         {ready && !events.length && !editor && (
-          <p className="mt-2 rounded-xl border border-dashed border-white/20 p-6 text-white/70">Nenhum evento em andamento no momento.</p>
+          <p className="mt-2 rounded-xl border border-dashed border-white/20 p-6 text-white/70">{sharedEvent ? 'Este evento está indisponível.' : 'Nenhum evento publicado no momento.'}</p>
         )}
         {error && <button type="button" onClick={() => setRetry(n => n + 1)} className="discovery-secondary mt-5">Tentar novamente</button>}
       </div>

@@ -1425,10 +1425,13 @@ body:has(.chat-page) > footer {
   display: flex;
   justify-content: flex-start;
   margin-block: 6px;
+  gap: 6px;
 }
 .chat-message-row.mine {
   justify-content: flex-end;
 }
+.chat-message-row > .chat-avatar { width: 26px; height: 26px; flex: 0 0 26px; margin-top: 5px; font-size: .7rem; }
+.chat-message-row.mine > .chat-avatar { order: 1; }
 .chat-bubble {
   max-width: min(80%, 440px);
   min-width: 70px;

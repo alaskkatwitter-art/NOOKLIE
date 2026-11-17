@@ -66,62 +66,13 @@ async function epub(book: Book) {
   return new Blob([new Uint8Array(data)], { type: 'application/epub+zip' });
 }
 
-async function pdf(book: Book) {
-  const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ format: 'a5', unit: 'mm', compress: true });
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-  const credit = `@${book.author}`;
-  doc.setProperties({ title: book.title, author: credit });
-  const imageUrls: string[] = [];
-  try {
-    const content = document.createElement('article');
-    content.style.cssText = 'width:460px;background:white;color:black;font-family:Times New Roman,serif;font-size:16px;line-height:1.5;overflow-wrap:anywhere';
-    for (const chapter of book.chapters) {
-      const heading = document.createElement('h1');
-      heading.textContent = chapter.title;
-      content.append(heading, chapterDocument(chapter.html));
-    }
-    for (const image of content.querySelectorAll('img')) {
-      const url = URL.createObjectURL(await loadImage(image));
-      imageUrls.push(url);
-      image.src = url;
-      image.style.cssText = 'display:block;max-width:100%;max-height:480px;object-fit:contain;margin:12px auto';
-      await image.decode();
-    }
-    await doc.html(content, { x: 0, y: 0, margin: [13, 14, 15, 14], width: width - 28, windowWidth: 460, autoPaging: 'text', html2canvas: { logging: false, allowTaint: false } });
-  } finally {
-    imageUrls.forEach(url => URL.revokeObjectURL(url));
-  }
-  doc.insertPage(1);
-  doc.setPage(1);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(23);
-  const title = doc.splitTextToSize(book.title, width - 28);
-  doc.text(title, width / 2, 68, { align: 'center' });
-  const creditY = 78 + title.length * 9;
-  doc.setFont('times', 'normal');
-  doc.setFontSize(14);
-  doc.text(credit, width / 2, creditY, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text(doc.splitTextToSize(permission, width - 28), width / 2, creditY + 8, { align: 'center' });
-
-  for (let page = 1; page <= doc.getNumberOfPages(); page++) {
-    doc.setPage(page);
-    doc.setFont('times', 'normal');
-    doc.setFontSize(9);
-    doc.text(credit, 14, height - 7);
-    doc.text(String(page), width - 14, height - 7, { align: 'right' });
-  }
-  return doc.output('blob');
-}
-
 export async function downloadBook(id: string, format: 'epub' | 'pdf') {
   const response = await fetch(`/api/stories/${encodeURIComponent(id)}/book`, { cache: 'no-store' });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Download indisponível.');
   const book: Book = data;
-  const blob = await (format === 'epub' ? epub(book) : pdf(book));
+  const blob = format === 'epub' ? await epub(book) :
+    await (await import('./pdf')).generateBookPdf(book, permission, chapterDocument, loadImage);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
