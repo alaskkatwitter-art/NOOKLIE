@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { sameOrigin, uuid } from '@/lib/chat/server';
 import { isReadingStatus } from '@/lib/library/reading-status';
 import { getPublicProfileIds, isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
@@ -477,6 +478,7 @@ export async function DELETE(
   request: Request
 ) {
   try {
+    if (!sameOrigin(request)) return NextResponse.json({ error: 'Acesso restrito.' }, { status: 403 });
     const profileId =
       await getCurrentProfileId();
 
@@ -490,12 +492,12 @@ export async function DELETE(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const storyId = body?.story_id;
 
     if (
       typeof storyId !== 'string' ||
-      !storyId.trim()
+      !uuid.test(storyId)
     ) {
       return NextResponse.json(
         {
@@ -510,7 +512,8 @@ export async function DELETE(
       await supabase
         .from('reading_lists')
         .select('id')
-        .eq('user_id', profileId);
+        .eq('user_id', profileId)
+        .eq('name', 'Biblioteca');
 
     if (listsError) {
       console.error(

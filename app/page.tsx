@@ -29,6 +29,7 @@ const menu = [
   { label: "Explorar", href: "/explorar" },
   { label: "Escrever", href: "/escrever" },
   { label: "Fandoms", href: "/fandoms" },
+  { label: "Eventos", href: "/eventos" },
   { label: "Notícias", href: "/noticias" },
   { label: "Oportunidades", href: "/oportunidades" },
 ];

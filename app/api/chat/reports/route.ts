@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         .from("chat_messages")
         .select("id")
         .eq("id", b.message_id)
+        .is("revoked_at", null)
         .eq("thread_id", b.thread_id)
         .eq("cipher_version", chatCipherVersion())
         .maybeSingle();
@@ -75,37 +76,23 @@ export async function GET() {
       return new NextResponse(null, { status: 403, headers: privateHeaders });
     const reports = await chatDb
       .from("chat_reports")
-      .select("id,reporter_id,thread_id,message_id,reason,created_at,status")
+      .select("id,reporter_id,thread_id,message_id,reason,created_at,status,message_snapshot")
       .order("created_at", { ascending: false })
       .limit(100);
     if (reports.error) throw reports.error;
     // Only the message explicitly selected by its participant is shared. No conversation export.
     const result = [];
-    for (const report of reports.data || []) {
-      let evidence = null;
-      if (report.message_id) {
-        const m = await chatDb
-          .from("chat_messages")
-          .select("id,thread_id,body_cipher,sender_id,media_type,created_at")
-          .eq("id", report.message_id)
-          .eq("thread_id", report.thread_id)
-          .eq("cipher_version", chatCipherVersion())
-          .maybeSingle();
-        if (m.error) throw m.error;
-        if (m.data) {
-          const v = m.data;
-          evidence = {
-            id: v.id,
-            sender_id: v.sender_id,
-            body: decryptChat(
-              decodeChatBody(v.body_cipher),
-              `${v.thread_id}:${v.id}:body`,
-            ).toString("utf8"),
-            has_attachment: Boolean(v.media_type),
-            created_at: v.created_at,
-          };
-        }
-      }
+    for (const { message_snapshot: snapshot, ...report } of reports.data || []) {
+      const evidence = snapshot?.cipher_version === chatCipherVersion() ? {
+        id: snapshot.id,
+        sender_id: snapshot.sender_id,
+        body: decryptChat(
+          decodeChatBody(snapshot.body_cipher),
+          `${snapshot.thread_id}:${snapshot.id}:body`,
+        ).toString("utf8"),
+        has_attachment: Boolean(snapshot.media_type),
+        created_at: snapshot.created_at,
+      } : null;
       result.push({ ...report, evidence });
     }
     const profileIds = [

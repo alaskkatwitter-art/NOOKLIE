@@ -1,4 +1,5 @@
 'use client';
+import LiteraryEventHighlight from '@/components/LiteraryEventHighlight';
 import QuotedReply from '@/components/QuotedReply';
 import FeedVideo from '@/components/FeedVideo';
 import SantaHat from './SantaHat';
@@ -3250,6 +3251,7 @@ export default function FeedPage() {
       ================================================= */}
 
       <div className="relative mx-auto min-h-screen w-full max-w-[680px] px-4 pb-20 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+        <LiteraryEventHighlight />
         <StoriesRow
           stories={stories}
           currentUser={currentUser}
