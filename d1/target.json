@@ -1,0 +1,8 @@
+{
+  "database_name": "nooklie-migration",
+  "database_id": "fcea4d88-3c18-4c21-a6c1-af13c72caa00",
+  "binding": "NOOKLIE_DB",
+  "stage": "isolated-foundation",
+  "production_cutover": false,
+  "user_data_imported": false
+}

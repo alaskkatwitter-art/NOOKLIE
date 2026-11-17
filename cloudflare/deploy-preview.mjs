@@ -28,6 +28,17 @@ config.r2_buckets = [{
   binding: 'NOOKLIE_MEDIA',
   bucket_name: production ? 'nooklie-media' : 'nooklie-preview-media',
 }];
+// Opt-in for an isolated migration preview only. This does not switch any route
+// to D1 and must never attach the migration database to production accidentally.
+if (process.env.NOOKLIE_D1_MIGRATION === '1') {
+  if (production) throw new Error('D1 migration preview cannot target production.');
+  const target = JSON.parse(readFileSync('d1/target.json', 'utf8'));
+  config.d1_databases = [{
+    binding: target.binding,
+    database_name: target.database_name,
+    database_id: target.database_id,
+  }];
+}
 if (production) {
   config.name = 'nooklie';
   // Enable a public route only after reviewing the protected production candidate.

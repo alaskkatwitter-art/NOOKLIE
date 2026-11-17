@@ -1,0 +1,511 @@
+{
+  "observed_at": "2026-11-17",
+  "source_project": "fwwgoyburkdybbqmvljk",
+  "tables": [
+    "admin_audit_log",
+    "applications",
+    "auth_accounts",
+    "auth_rate_limits",
+    "auth_sessions",
+    "beta_reading_invites",
+    "beta_reading_notes",
+    "chapter_favorites",
+    "chapter_likes",
+    "chapter_media",
+    "chapters",
+    "chat_audit_access",
+    "chat_blocks",
+    "chat_group_invite_links",
+    "chat_group_members",
+    "chat_messages",
+    "chat_reports",
+    "chat_threads",
+    "comment_likes",
+    "comments",
+    "departments",
+    "discovery_preferences",
+    "fic_club_members",
+    "fic_clubs",
+    "follow_requests",
+    "follows",
+    "moderation_reports",
+    "moderation_warnings",
+    "news_comments",
+    "nook_comment_reactions",
+    "nook_comments",
+    "nook_post_media",
+    "nook_post_reactions",
+    "nook_posts",
+    "nook_reposts",
+    "nook_saved_posts",
+    "nook_saved_replies",
+    "official_signup_tokens",
+    "opportunities",
+    "permissions",
+    "platform_admins",
+    "poll_options",
+    "poll_votes",
+    "polls",
+    "post_likes",
+    "posts",
+    "profile_mutes",
+    "profile_themes",
+    "profiles",
+    "reader_preferences",
+    "reading_list_items",
+    "reading_lists",
+    "reading_progress",
+    "scheduled_chapters",
+    "social_stories",
+    "stories",
+    "story_daily_engagement",
+    "story_event_entries",
+    "story_events",
+    "story_likes",
+    "story_tags",
+    "support_tickets",
+    "tag_categories",
+    "tags",
+    "team_memberships",
+    "team_role_permissions",
+    "team_roles",
+    "user_notifications",
+    "user_stickers",
+    "wiki_character_edits",
+    "wiki_character_favorites",
+    "wiki_characters"
+  ],
+  "functions": [
+    {
+      "name": "admin_assert_permission",
+      "language": "plpgsql",
+      "arguments": "p_actor uuid, p_permission_code text, p_department_id uuid"
+    },
+    {
+      "name": "admin_assign_team_member",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_target_user_id uuid, p_role_id uuid"
+    },
+    {
+      "name": "admin_create_department",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_name text, p_slug text, p_description text, p_sort_order integer"
+    },
+    {
+      "name": "admin_create_opportunity",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text"
+    },
+    {
+      "name": "admin_create_team_role",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_department_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_permission_codes text[]"
+    },
+    {
+      "name": "admin_current_actor",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text"
+    },
+    {
+      "name": "admin_remove_team_member",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_membership_id uuid, p_reason text"
+    },
+    {
+      "name": "admin_review_application",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_application_id uuid, p_status text, p_internal_notes text, p_role_id uuid"
+    },
+    {
+      "name": "admin_review_moderation_report",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_report_id uuid, p_status text, p_internal_notes text, p_content_action text"
+    },
+    {
+      "name": "admin_set_account_status",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_target_user_id uuid, p_status text, p_reason text"
+    },
+    {
+      "name": "admin_update_department",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_department_id uuid, p_name text, p_slug text, p_description text, p_sort_order integer, p_status text"
+    },
+    {
+      "name": "admin_update_opportunity",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_opportunity_id uuid, p_department_id uuid, p_title text, p_description text, p_requirements text, p_openings integer, p_questions jsonb, p_opens_at timestamp with time zone, p_closes_at timestamp with time zone, p_status text"
+    },
+    {
+      "name": "admin_update_team_role",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_role_id uuid, p_name text, p_description text, p_badge_title text, p_badge_description text, p_status text, p_permission_codes text[]"
+    },
+    {
+      "name": "admin_validate_opportunity_questions",
+      "language": "plpgsql",
+      "arguments": "p_questions jsonb"
+    },
+    {
+      "name": "announce_published_literary_event",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "append_reading_list_item",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "beta_reading_action",
+      "language": "plpgsql",
+      "arguments": "p_actor uuid, p_action text, p_invite uuid, p_chapter uuid, p_reader text, p_excerpt text, p_body text"
+    },
+    {
+      "name": "cancel_own_application",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_application_id uuid"
+    },
+    {
+      "name": "change_own_chat_message",
+      "language": "plpgsql",
+      "arguments": "p_sender uuid, p_thread uuid, p_message uuid, p_version integer, p_cipher text, p_revoke boolean"
+    },
+    {
+      "name": "chat_action",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_action text"
+    },
+    {
+      "name": "chat_direct_send",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_id uuid, p_cipher text, p_reply uuid, p_media_path text, p_media_type text, p_sticker boolean"
+    },
+    {
+      "name": "chat_group_action",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_action text"
+    },
+    {
+      "name": "chat_group_capacity",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "chat_group_create",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_name text, p_members uuid[]"
+    },
+    {
+      "name": "chat_group_invite_members",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_members uuid[]"
+    },
+    {
+      "name": "chat_group_link_info",
+      "language": "sql",
+      "arguments": "p_token_hash text"
+    },
+    {
+      "name": "chat_group_link_join",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_token_hash text"
+    },
+    {
+      "name": "chat_group_link_manage",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_token_hash text, p_revoke boolean"
+    },
+    {
+      "name": "chat_group_send",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_id uuid, p_cipher text, p_reply uuid, p_media_path text, p_media_type text, p_sticker boolean"
+    },
+    {
+      "name": "chat_request",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_target uuid"
+    },
+    {
+      "name": "chat_safety_notice",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "chat_send",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_thread uuid, p_id uuid, p_cipher text, p_reply uuid, p_media_path text, p_media_type text"
+    },
+    {
+      "name": "complete_auth_recovery",
+      "language": "plpgsql",
+      "arguments": "p_account_id uuid, p_expected_recovery_key_hash text, p_new_password_hash text, p_consumed_recovery_key_hash text"
+    },
+    {
+      "name": "consume_auth_rate_limit",
+      "language": "plpgsql",
+      "arguments": "p_key_hash text, p_limit integer, p_window_seconds integer"
+    },
+    {
+      "name": "content_media_allowed",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_bucket text, p_urls text[]"
+    },
+    {
+      "name": "create_feed_media_post",
+      "language": "sql",
+      "arguments": "p_profile uuid, p_text text, p_story uuid, p_news text, p_media jsonb"
+    },
+    {
+      "name": "create_feed_media_post",
+      "language": "plpgsql",
+      "arguments": "p_profile uuid, p_text text, p_story uuid, p_news text, p_media jsonb, p_origin text"
+    },
+    {
+      "name": "discovery_fandom_catalog",
+      "language": "sql",
+      "arguments": ""
+    },
+    {
+      "name": "discovery_home",
+      "language": "sql",
+      "arguments": "p_account uuid"
+    },
+    {
+      "name": "discovery_key",
+      "language": "sql",
+      "arguments": "value text"
+    },
+    {
+      "name": "discovery_sitemap",
+      "language": "sql",
+      "arguments": ""
+    },
+    {
+      "name": "discovery_story_fandoms",
+      "language": "sql",
+      "arguments": "p_story uuid, p_fandom text"
+    },
+    {
+      "name": "feed_hashtags",
+      "language": "sql",
+      "arguments": "body text"
+    },
+    {
+      "name": "generate_tag_slug",
+      "language": "plpgsql",
+      "arguments": "input text"
+    },
+    {
+      "name": "get_story_tags",
+      "language": "sql",
+      "arguments": "target_story_id uuid"
+    },
+    {
+      "name": "handle_new_user",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "list_story_series",
+      "language": "sql",
+      "arguments": "p_story uuid, p_viewer uuid"
+    },
+    {
+      "name": "moderation_warn",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_source_type text, p_source_id uuid, p_reason text"
+    },
+    {
+      "name": "nook_repost_notification",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "nooklie_delete_chapter",
+      "language": "plpgsql",
+      "arguments": "p_story uuid, p_chapter uuid"
+    },
+    {
+      "name": "nooklie_reorder_chapters",
+      "language": "plpgsql",
+      "arguments": "p_story uuid, p_ids uuid[]"
+    },
+    {
+      "name": "notify_chapter_comment_reply",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "notify_feed_mentions",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "notify_literary_event",
+      "language": "plpgsql",
+      "arguments": "p_event uuid"
+    },
+    {
+      "name": "notify_mural_followers",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "notify_news_comment_reply",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "notify_released_chapter",
+      "language": "plpgsql",
+      "arguments": "p_chapter uuid"
+    },
+    {
+      "name": "pin_profile_story",
+      "language": "sql",
+      "arguments": "p_profile uuid, p_story uuid"
+    },
+    {
+      "name": "prevent_admin_audit_mutation",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "profile_content_allowed",
+      "language": "sql",
+      "arguments": "p_owner uuid, p_viewer uuid"
+    },
+    {
+      "name": "profile_control",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_target uuid, p_action text"
+    },
+    {
+      "name": "publish_scheduled_chapters",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "record_discovery_activity",
+      "language": "plpgsql",
+      "arguments": "p_account uuid, p_story uuid, p_chapter uuid, p_percent numeric, p_position integer, p_read boolean"
+    },
+    {
+      "name": "remove_reading_list_item",
+      "language": "plpgsql",
+      "arguments": "p_owner uuid, p_list uuid, p_story uuid"
+    },
+    {
+      "name": "reorder_reading_list",
+      "language": "plpgsql",
+      "arguments": "p_owner uuid, p_list uuid, p_stories uuid[]"
+    },
+    {
+      "name": "review_character_edit",
+      "language": "plpgsql",
+      "arguments": "p_edit uuid, p_decision text"
+    },
+    {
+      "name": "save_reading_list",
+      "language": "plpgsql",
+      "arguments": "p_owner uuid, p_list uuid, p_story uuid, p_name text, p_description text"
+    },
+    {
+      "name": "save_story_details",
+      "language": "plpgsql",
+      "arguments": "p_story uuid, p_author uuid, p_changes jsonb, p_tags uuid[]"
+    },
+    {
+      "name": "search_catalog_stories",
+      "language": "sql",
+      "arguments": "p_viewer uuid, p_query text, p_include_slugs text[], p_exclude_slugs text[], p_rating text, p_status text, p_sort text, p_limit integer, p_offset integer, p_kind text, p_format text"
+    },
+    {
+      "name": "search_public_stories",
+      "language": "sql",
+      "arguments": "p_query text, p_include_slugs text[], p_exclude_slugs text[], p_rating text, p_status text, p_sort text, p_limit integer, p_offset integer"
+    },
+    {
+      "name": "search_tags",
+      "language": "sql",
+      "arguments": "search_text text"
+    },
+    {
+      "name": "search_visible_stories",
+      "language": "sql",
+      "arguments": "p_viewer uuid, p_query text, p_include_slugs text[], p_exclude_slugs text[], p_rating text, p_status text, p_sort text, p_limit integer, p_offset integer"
+    },
+    {
+      "name": "set_chapter_publication",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_chapter uuid, p_status text, p_scheduled_for timestamp with time zone"
+    },
+    {
+      "name": "set_story_release",
+      "language": "plpgsql",
+      "arguments": "p_story uuid, p_author uuid, p_action text, p_schedule timestamp with time zone"
+    },
+    {
+      "name": "snapshot_chat_report",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "social_actor",
+      "language": "sql",
+      "arguments": "p_session text"
+    },
+    {
+      "name": "social_chapter_release",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "social_follow",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_target uuid, p_action text"
+    },
+    {
+      "name": "social_interaction_notification",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "social_notify",
+      "language": "sql",
+      "arguments": "p_target uuid, p_actor uuid, p_kind text, p_body text, p_href text, p_key text"
+    },
+    {
+      "name": "submit_character_edit",
+      "language": "plpgsql",
+      "arguments": "p_profile uuid, p_character uuid, p_name text, p_universe text, p_bio text, p_source text"
+    },
+    {
+      "name": "submit_moderation_report",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_content_type text, p_content_id uuid, p_reason text, p_details text"
+    },
+    {
+      "name": "submit_opportunity_application",
+      "language": "plpgsql",
+      "arguments": "p_session_token_hash text, p_opportunity_id uuid, p_answers jsonb"
+    },
+    {
+      "name": "support_review",
+      "language": "plpgsql",
+      "arguments": "p_session text, p_id uuid, p_status text, p_notes text, p_response text"
+    },
+    {
+      "name": "sync_official_account_follows",
+      "language": "plpgsql",
+      "arguments": ""
+    },
+    {
+      "name": "update_nook_comment_updated_at",
+      "language": "plpgsql",
+      "arguments": ""
+    }
+  ],
+  "orphan_sessions": 0
+}
