@@ -8,6 +8,7 @@ export interface D1Statement {
 }
 export interface NooklieD1 {
   prepare(sql: string): D1Statement;
+  batch(statements: D1Statement[]): Promise<Array<{ success: boolean; meta: { changes?: number } }>>;
 }
 
 export function getD1Database(): NooklieD1 | undefined {
