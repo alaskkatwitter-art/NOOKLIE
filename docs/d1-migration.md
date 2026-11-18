@@ -402,3 +402,36 @@ usando outro namespace de registros sintéticos. Preparação e limpeza foram
 agrupadas em batches para caber no limite de tempo da ferramenta, sem paralelizar
 operações dependentes. A limpeza confirmou zero contas, conversas, mensagens,
 membros, denúncias ou notificações de teste e a verificação de FKs passou.
+
+## Etapa 8: administração e moderação
+
+A migração 0008 acrescenta seis tabelas de origem (65 colunas): denúncias,
+advertências, suporte, auditoria, oportunidades e candidaturas. O D1 isolado
+agora tem 59 tabelas de aplicação, além das duas tabelas internas. Nenhum
+dado real foi importado e as rotas de produção continuam no Supabase.
+
+O repositório d1-moderation valida sessão ativa e permissões do departamento
+ativo. Moderadores somente de leitura não podem revisar denúncias. Controle
+de suspensão exige administrador principal, protege administradores e a própria
+conta e revoga sessões atomicamente. Reativação não restaura sessões antigas.
+Advertências derivam o destinatário da denúncia, sem confundir perfil e conta.
+Suporte separa respostas públicas de notas internas. Nomeações e remoções de
+equipe respeitam o departamento, impedem autopromoção e registram o ator.
+
+Mutações privilegiadas e auditoria compartilham a mesma transação. O histórico
+administrativo não pode ser reescrito nem apagado; a única atualização permitida
+é anonimizar a referência do ator ao excluir sua conta por FK. O importador
+deve inserir os registros originais, sem sobrescrever auditorias existentes.
+Leitura de evidência exige permissão de moderação e seleção explícita de
+denúncias: retorna apenas snapshots cifrados, registra o acesso atomicamente
+e não exporta conversas. Não foi lida nem alterada nenhuma chave de chat.
+
+Validação: 21 testes locais, TypeScript e diff-check passaram; 48 verificações
+remotas passaram num D1 descartável, com FKs consistentes. O banco descartável
+foi excluído após o teste. A estrutura foi aplicada ao D1 de migração, confirmado
+sem contas ou auditorias fictícias e sem violações de FK.
+
+Integração HTTP/painel, edição de departamentos e catálogo de cargos, fluxo
+completo de vagas/candidaturas, importação e troca de produção continuam
+pendentes. Oportunidades e candidaturas receberam estrutura nesta fase, não
+a implementação completa dos seus fluxos.
