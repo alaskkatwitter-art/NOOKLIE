@@ -1,4 +1,4 @@
-# Migração D1: contas, leitura e comunidade
+# Migração D1: contas, leitura, comunidade e chat
 
 Estado em 17/11/2026: banco `nooklie-migration` criado na conta Cloudflare do
 Nooklie, UUID `fcea4d88-3c18-4c21-a6c1-af13c72caa00`, região ENAM.
@@ -53,7 +53,7 @@ enquanto contas, perfis e autorização não tiverem sido migrados em conjunto.
 
 O inventário `d1/source-inventory.json` registra as 72 tabelas e 86 assinaturas
 de funções encontradas no banco de origem. As três tabelas de autenticação e as
-11 da segunda fase, 13 da terceira, sete da quarta e 13 da quinta estão estruturadas no D1. Isso ainda não significa que todos
+11 da segunda fase, 13 da terceira, sete da quarta, 13 da quinta e seis do chat estão estruturadas no D1. Isso ainda não significa que todos
 os fluxos que as usam tenham sido migrados. Não copiar SQL PostgreSQL diretamente
 para o D1 (SQLite).
 
@@ -328,3 +328,77 @@ cenários da fase anterior foram repetidos localmente com o novo esquema.
 A limpeza confirmou zero contas, posts, eventos, votos ou notificações de teste,
 com o modo de supressão restaurado a `'0'`, e a verificação de FKs não encontrou
 inconsistências. Nenhuma notificação foi enviada a usuários reais.
+
+## Etapa do chat: migração 0007
+
+`0007_chat.sql` adapta 42 colunas de `chat_threads`, `chat_messages`,
+`chat_group_members`, `chat_group_invite_links`, `chat_reports` e
+`chat_audit_access`. `chat_blocks` já estava na etapa de perfis. Agora são 53
+tabelas de origem e duas internas; o comando de criação de grupos é um view,
+sem linhas persistidas. Consultas na origem confirmaram zero respostas de outra
+conversa, zero grupos com mais de 15 pessoas e zero versões cifradas fora de 1/2.
+
+As expressões PostgreSQL de par único, validação de hash, avatar e caminho de
+anexo foram convertidas para SQLite. IDs são conservados e os arrays de IDs
+de relatórios de auditoria passam a JSON TEXT. Histórico de versões antigas é
+conservado, mas cada operação de mensagem/anexo seleciona a versão definida
+pelo servidor. Nunca selecionar a versão a partir de um parâmetro do navegador.
+
+`d1-chat.ts` só persiste ciphertext; não cria/chama chaves novas, não recebe
+texto simples como mensagem cifrada e não substitui `lib/chat/crypto.ts`.
+Encriptação/desencriptação continuam com o AES-256-GCM existente, incluindo AAD
+`thread:message:body` ou `thread:message:media`, prefixo de versão e caminho
+`v2/thread/message.enc`. A chave real deve permanecer no segredo do Worker.
+O teste de criptografia usa uma chave descartável exclusivamente no processo
+local, confere round-trip e rejeita outro contexto de mensagem.
+
+O view interno `d1_chat_access` resolve o ator pela sessão e pelas relações
+atuais. Administração principal não concede leitura geral de conversas. Em
+grupos, somente membros aceitos leem mensagens/anexos ou roster com fotos de
+perfil; convidados pendentes veem apenas metadados da própria solicitação.
+Participantes diretos mantêm a leitura de histórico não bloqueado conforme a
+regra anterior; envio exige solicitação aceita. Bloqueios são verificados nos
+dois sentidos, e no grupo são considerados os membros aceitos, como no app atual.
+
+Solicitação direta reutiliza o par de pessoas e não aceita auto solicitação.
+A criação de grupo valida, na mesma operação, proprietário, 2–15 pessoas
+distintas, contas ativas, ausência de bloqueios e limite de novas solicitações.
+Uma trigger de capacidade também protege convites/links contra ultrapassar 15,
+contando pendentes. Apenas o proprietário aceito convida mais pessoas ou emite
+links. Links guardam somente o hash, expiram em sete dias e são invalidados por
+rotação/revogação/saída do dono. A saída transfere propriedade quando possível e
+remove acesso do ex-membro; conversas vazias não são apagadas automaticamente.
+
+Envio resolve ator e permissões dentro do INSERT, verifica resposta da mesma
+conversa/versão não revogada e limita 30 mensagens por minuto por remetente.
+Anexos só retornam metadados ao participante autorizado, com versão e revogação
+conferidas. A edição/cancelamento exige autoria, participação aceita e menos de
+duas horas; mensagem revogada não pode ser reativada. Cancelar apaga as referências
+de anexo e resposta, conservando o registro da mensagem. A remoção física do R2
+precisa ser integrada usando o caminho derivado existente.
+
+Denúncias só podem referenciar conversa própria e mensagem da mesma conversa,
+na versão atual, ainda não revogada. O snapshot cifrado é produzido no próprio
+INSERT e não pode ser sobrescrito, mesmo depois de a mensagem original mudar.
+O limite é dez denúncias por hora. Não existe exportação de conversa para a
+administração; leitura de evidências, auditoria e revisão no painel ainda serão
+adaptadas na etapa de moderação, preservando a seleção explícita de mensagens.
+
+Avisos de solicitações, convites e mensagens usam o mecanismo transacional que
+respeita bloqueios, silenciamentos, preferências e a supressão da importação.
+O importador deve restaurar `chat_threads.updated_at` depois de copiar mensagens,
+pois o trigger normal de mensagem atualiza essa coluna; a flag de notificações
+não desativa todos os efeitos. Snapshots históricos devem ser importados sem
+reconstruir ou sobrescrever a evidência.
+
+Integração HTTP, upload/leitura/desencriptação do R2, confirmação de leitura,
+polling de edições, painel de denúncias/auditoria e limites adicionais de HTTP
+continuam pendentes antes da troca. As rotas antigas e as conversas reais não
+foram modificadas ou importadas nesta etapa.
+
+Resultado: 19 testes de integração locais e TypeScript passaram. As 48
+verificações de chat passaram no D1 remoto com os mesmos métodos e cenários,
+usando outro namespace de registros sintéticos. Preparação e limpeza foram
+agrupadas em batches para caber no limite de tempo da ferramenta, sem paralelizar
+operações dependentes. A limpeza confirmou zero contas, conversas, mensagens,
+membros, denúncias ou notificações de teste e a verificação de FKs passou.
