@@ -462,3 +462,39 @@ O SQLite lower() nativo só dobra caixa ASCII: revisão de equivalência de nome
 Unicode com a origem PostgreSQL e busca Unicode ficam pendentes para a etapa
 de importação/integração. O catálogo tem limite de 60 resultados e favoritos de
 1000 nesta base; paginação deve ser integrada conforme o volume real.
+
+## Etapa 10: comentários do Jornal Nooklie
+
+A migração 0010 preserva a tabela news_comments e suas oito colunas. O D1
+isolado soma 63 tabelas de aplicação e duas internas. O repositório recebe
+o catálogo server-side newsArticleSlugs; não aceita notícias arbitrárias.
+Comentários exigem perfil ativo, texto de 1 a 3000 caracteres e até 20 envios
+em 15 minutos por perfil, somando notícias e comentários removidos.
+
+Leitura e respostas respeitam perfil privado, seguidores, bloqueios, suspensão
+e ocultação por moderação. Respostas exigem comentário ainda disponível na
+mesma notícia. Avisos usam o mecanismo social existente, com silenciamento,
+preferências, autorresposta e supressão durante importação.
+
+Remoção exige autoria ou moderation.manage no departamento ativo de moderação
+(ou administrador principal). Grava ator real na auditoria e deleted_by como
+perfil em uma transação; conserva encadeamento e não expõe texto ou autoria
+do comentário removido. O corpo original permanece no banco, como na origem.
+A remoção física administrativa preserva a notícia das respostas e limpa
+apenas parent_id, emulando o SET NULL parcial do PostgreSQL por trigger.
+
+Passaram 23 testes locais, TypeScript e diff-check; os mesmos métodos passaram
+41 verificações no D1 remoto descartável, que foi excluído após teste e
+verificação de FKs. A estrutura foi aplicada ao D1 de migração, confirmado
+com 63 tabelas de origem, zero contas, comentários de notícias ou auditorias
+fictícias e nenhuma violação de FK. Nenhum dado de produção foi modificado.
+
+Integração das rotas, formato da resposta HTTP, CSRF, paginação da interface e
+limites de requisição HTTP continuam pendentes. O repositório oferece cursor
+por data/ID, com até 100 itens; validar custo da ordenação por julianday no
+volume importado antes da troca. Não houve publicação ou mudança de backend.
+
+Faltam estruturas de discovery_preferences, story_daily_engagement, fic_clubs,
+fic_club_members, official_signup_tokens, posts, post_likes, profile_themes e
+social_stories. Completar estruturas não substitui adaptar todos os fluxos,
+importar dados e testar a integração de ponta a ponta antes da produção.
