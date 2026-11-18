@@ -435,3 +435,30 @@ Integração HTTP/painel, edição de departamentos e catálogo de cargos, fluxo
 completo de vagas/candidaturas, importação e troca de produção continuam
 pendentes. Oportunidades e candidaturas receberam estrutura nesta fase, não
 a implementação completa dos seus fluxos.
+
+## Etapa 9: wiki de personagens
+
+A migração 0009 preserva as três tabelas da wiki e suas 16 colunas: personagens,
+favoritos e sugestões. O D1 isolado soma 62 tabelas de aplicação e duas internas.
+Criação de personagem, favorito inicial e primeira sugestão são atômicos.
+Contribuições adicionais exigem favorito próprio e atualizam a sugestão pendente
+sem alterar a biografia pública. Fontes exigem HTTPS sem credenciais.
+
+O catálogo expõe somente biografias aprovadas. Favoritos próprios podem incluir
+o nome de personagens ainda pendentes, sem revelar sua biografia. A revisão
+exige administrador principal ou moderation.manage no departamento ativo de
+moderação; outras equipes e permissões apenas de leitura não revisam a wiki.
+A decisão e a auditoria são atômicas, e uma decisão concluída não é reaberta.
+Rejeitar preserva a versão pública anterior. As novas rotas ainda não foram
+ligadas ao repositório D1; autenticação HTTP, CSRF e limites de requisição devem
+ser integrados antes da troca. As biografias continuam texto, não HTML confiável.
+
+Passaram 22 testes locais, TypeScript e diff-check; os mesmos métodos passaram
+34 verificações no D1 remoto descartável, depois excluído. A estrutura foi
+aplicada ao D1 de migração com FKs consistentes e zero contas, personagens ou
+auditorias fictícias. Nenhum dado de produção foi importado ou alterado.
+
+O SQLite lower() nativo só dobra caixa ASCII: revisão de equivalência de nomes
+Unicode com a origem PostgreSQL e busca Unicode ficam pendentes para a etapa
+de importação/integração. O catálogo tem limite de 60 resultados e favoritos de
+1000 nesta base; paginação deve ser integrada conforme o volume real.

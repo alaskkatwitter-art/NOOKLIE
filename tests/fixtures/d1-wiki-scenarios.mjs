@@ -1,0 +1,63 @@
+// Run in a disposable database: reviews create permanent administrative audits.
+export async function verifyD1Wiki(db,factory){
+ const wiki=factory(db),checks=[],names=['author','other','root','mod','viewer','outsider'];
+ const tokens=Object.fromEntries(names.map((n,i)=>[n,String(i+1).repeat(64)]));
+ const run=(s,...p)=>db.prepare(s).bind(...p).run(),one=(s,...p)=>db.prepare(s).bind(...p).first();
+ function check(ok,label){if(!ok)throw Error(label);checks.push(label);}
+ async function fails(fn,label){let error=false;try{await fn();}catch{error=true;}check(error,label);}
+ const seed=[];for(const n of names){seed.push(db.prepare('INSERT INTO auth_accounts(id,username,password_hash,recovery_key_hash) VALUES(?,?,?,?)').bind('w9u_'+n,'w9_'+n,'hash','recovery_'+n));seed.push(db.prepare('INSERT INTO profiles(id,user_id,username) VALUES(?,?,?)').bind('w9p_'+n,'w9u_'+n,'w9_'+n));seed.push(db.prepare('INSERT INTO auth_sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,?)').bind('w9s_'+n,'w9u_'+n,tokens[n],new Date(Date.now()+3600000).toISOString()));}await db.batch(seed);
+ await run("INSERT INTO platform_admins(user_id) VALUES('w9u_root')");
+ await run("INSERT INTO departments(id,name,slug) VALUES('w9dept','Moderacao','moderacao'),('w9news','Jornal','jornal')");
+ await run("INSERT INTO permissions(code,name,scope) VALUES('moderation.manage','Manage','department'),('moderation.view','View','department')");
+ await run("INSERT INTO team_roles(id,department_id,name) VALUES('w9role','w9dept','Manager'),('w9view','w9dept','Viewer'),('w9foreign','w9news','Foreign')");
+ await run("INSERT INTO team_role_permissions(role_id,permission_code) VALUES('w9role','moderation.manage'),('w9view','moderation.view'),('w9foreign','moderation.manage')");
+ await run("INSERT INTO team_memberships(id,user_id,department_id,role_id) VALUES('w9m','w9u_mod','w9dept','w9role'),('w9v','w9u_viewer','w9dept','w9view'),('w9o','w9u_outsider','w9news','w9foreign')");
+ const input={name:'Example Character',universe:'Example Universe',biography:'A complete biography awaiting review.',source:'https://example.com/source'};
+ await fails(()=>wiki.submit(tokens.author,'w9bad',{...input,source:'javascript:alert(1)'}),'non-HTTPS source rejected');
+ await fails(()=>wiki.submit(tokens.author,'w9bad',{...input,source:'https://user:pass@example.com'}),'credential-bearing source rejected');
+ await fails(()=>wiki.submit(tokens.author,'w9bad',{...input,biography:'short'}),'short biography rejected');
+ await fails(()=>wiki.submit('0'.repeat(64),'w9bad',input),'unknown session cannot create wiki record');
+ check(!(await one("SELECT id FROM wiki_characters WHERE id='w9bad'")),'failed submission leaves no character');
+ await wiki.submit(tokens.author,'w9char',input);
+ check((await wiki.list()).length===0,'pending character absent from public catalog');
+ check((await wiki.favorites(tokens.author))[0]?.id==='w9char','creator receives favorite using profile ID');
+ check((await wiki.favorites(tokens.other)).length===0,'other account cannot read creator favorites');
+ check((await wiki.pending(tokens.author)).length===0,'ordinary account cannot read pending biography');
+ check((await wiki.pending(tokens.viewer)).length===0,'read-only moderator cannot read wiki review queue');
+ check((await wiki.pending(tokens.outsider)).length===0,'another department cannot review wiki');
+ check((await wiki.pending(tokens.mod)).length===1,'moderator sees pending contribution');
+ await fails(()=>wiki.submit(tokens.other,'w9duplicate',{...input,name:'example character'}),'case-insensitive duplicate character rejected');
+ check(!(await one("SELECT id FROM wiki_character_edits WHERE id='w9duplicate'")),'duplicate submission is atomic');
+ await fails(()=>wiki.submit(tokens.other,'w9edit',{...input,characterId:'w9char'}),'non-favorite contribution rejected');
+ await wiki.favorite(tokens.other,'w9char',true);
+ check((await wiki.favorites(tokens.other)).length===0,'unapproved character cannot be favorited by another reader');
+ await wiki.submit(tokens.author,'w9replacement',{...input,characterId:'w9char',biography:'A revised biography awaiting approval.'});
+ check((await wiki.pending(tokens.mod)).length===1,'resubmission replaces same pending suggestion');
+ await fails(()=>wiki.review(tokens.viewer,'w9audit_bad','w9char','approved'),'read-only staff cannot approve');
+ await fails(()=>wiki.review(tokens.outsider,'w9audit_bad','w9char','approved'),'wrong department cannot approve');
+ await wiki.review(tokens.mod,'w9audit','w9char','approved');
+ check((await wiki.list())[0]?.biography==='A revised biography awaiting approval.','approved biography becomes public');
+ check((await one("SELECT actor_user_id FROM admin_audit_log WHERE id='w9audit'"))?.actor_user_id==='w9u_mod','review audit uses account ID');
+ await fails(()=>wiki.review(tokens.root,'w9again','w9char','rejected'),'reviewed suggestion cannot change decision');
+ await wiki.favorite(tokens.other,'w9char',true);await wiki.favorite(tokens.other,'w9char',true);
+ check((await wiki.favorites(tokens.other)).length===1,'favoriting is idempotent');
+ await wiki.submit(tokens.other,'w9second',{...input,characterId:'w9char',biography:'A second proposal that will be rejected.'});
+ await wiki.review(tokens.root,'w9reject','w9second','rejected');
+ check((await wiki.list())[0]?.biography==='A revised biography awaiting approval.','rejection preserves public biography');
+ await wiki.submit(tokens.author,'w9third',{...input,characterId:'w9char'});
+ await fails(()=>wiki.review(tokens.root,'w9audit','w9third','approved'),'audit collision aborts review');
+ check((await one("SELECT decision FROM wiki_character_edits WHERE id='w9third'"))?.decision===null,'failed audit leaves suggestion pending');
+ await run("UPDATE team_roles SET status='archived' WHERE id='w9role'");
+ await fails(()=>wiki.review(tokens.mod,'w9archived','w9third','approved'),'archived role cannot review');
+ await run("UPDATE auth_sessions SET expires_at='2000-01-01T00:00:00Z' WHERE id='w9s_root'");
+ await fails(()=>wiki.review(tokens.root,'w9expired','w9third','approved'),'expired administrator cannot review');
+ await wiki.favorite(tokens.author,'w9char',false);
+ check((await wiki.favorites(tokens.author)).length===0,'author can remove own favorite');
+ check((await wiki.favorites(tokens.other)).length===1,'removal preserves another readers favorite');
+ check((await wiki.list('%')).length===0,'search treats wildcard as literal');
+ check((await wiki.list('example'))[0]?.id==='w9char','case-insensitive substring search works');
+ await run("UPDATE auth_accounts SET account_status='suspended' WHERE id='w9u_other'");
+ await fails(()=>wiki.submit(tokens.other,'w9suspended',{...input,characterId:'w9char'}),'suspended account cannot contribute');
+ check((await wiki.favorites(tokens.other)).length===0,'suspended session loses private access');
+ return{passed:checks.length,checks};
+}
