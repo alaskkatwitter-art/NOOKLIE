@@ -498,3 +498,51 @@ Faltam estruturas de discovery_preferences, story_daily_engagement, fic_clubs,
 fic_club_members, official_signup_tokens, posts, post_likes, profile_themes e
 social_stories. Completar estruturas não substitui adaptar todos os fluxos,
 importar dados e testar a integração de ponta a ponta antes da produção.
+
+## Etapa 11: as nove tabelas finais
+
+A migração 0011 acrescenta discovery_preferences, story_daily_engagement,
+fic_clubs, fic_club_members, official_signup_tokens, posts, post_likes,
+profile_themes e social_stories. Os 44 campos e sua nulabilidade foram
+conferidos com o catálogo da origem, registrado em source-final-tables.json.
+O D1 isolado agora cobre as 72 tabelas do inventário, além de duas internas.
+Esta é cobertura de estrutura; não significa que todos os fluxos e rotas
+estão adaptados ou que a migração de dados está concluída.
+
+Preferências usam JSON TEXT em lugar de text[], com até 30 itens text/null
+e 3000 caracteres somando separadores e omitindo null, como array_to_string.
+Arrays multidimensionais não são aceitos nesta representação; o importador
+deve conferir o formato das preferências antes de copiar. Temas preservam
+até 12 rascunhos, objeto ativo ou SQL NULL, e revisão positiva. A validação
+completa dos objetos de tema existente na aplicação ainda deve ser integrada.
+
+Clubes e membros preservam unicidade e cascatas. Posts antigos e curtidas
+continuam separados do feed atual; excluir capítulo mantém a citação e
+limpa chapter_id. Notificações antigas de citação/curtida usam o mecanismo
+social compartilhado e respeitam a flag de supressão para importação. As
+novas chaves de curtida usam IDs explícitos em vez de MD5 da linha PostgreSQL;
+o importador deve preservar notificações históricas, suprimir triggers e
+planejar equivalência das chaves antes de liberar novas interações.
+
+Stories preservam tipos image/gif/video e validade padrão de 24 horas; a
+filtragem de expirados e limpeza de mídias pertencem à integração das rotas.
+Atividade diária preserva a chave história/perfil/dia, booleanos e datas.
+O padrão usa UTC-3, equivalente ao horário atual de São Paulo; importar datas
+originais explicitamente e calcular pelo fuso America/Sao_Paulo na aplicação
+para períodos históricos ou mudanças futuras de fuso. O token oficial é uma
+linha singleton de hash, sem expor nem ler o valor real; consumo condicional
+foi testado apenas com valor fictício. Sua integração privilegiada continua
+pendente, assim como demais regras de autorização e operações HTTP.
+
+Validação: 26 testes locais, TypeScript e diff-check passaram. As 42
+verificações compartilhadas passaram no D1 remoto descartável, com FKs
+consistentes, e o banco foi excluído. A estrutura foi aplicada ao D1 de
+migração; as 72 tabelas foram consultadas e estão vazias, sem violações de FK.
+A conferência de contagens foi dividida em batches de consultas individuais por causa do
+limite remoto de termos em UNION ALL. Não houve alteração de produção,
+importação de usuários ou troca do backend.
+
+Próximas etapas: completar repositórios e fluxos restantes, integrar HTTP e
+painéis ao D1 em prévia isolada, criar e validar o importador completo,
+conferir dados/permissões e então realizar a troca de produção. A estrutura
+completa, por si só, ainda não permite excluir o Supabase.

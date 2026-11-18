@@ -2,7 +2,7 @@
   "database_name": "nooklie-migration",
   "database_id": "fcea4d88-3c18-4c21-a6c1-af13c72caa00",
   "binding": "NOOKLIE_DB",
-  "stage": "isolated-auth-social-books-reader-community-chat-moderation-wiki-news",
+  "stage": "isolated-all-72-source-table-schemas",
   "applied_migrations": [
     "0001_auth_foundation.sql",
     "0002_profiles_social_permissions.sql",
@@ -13,7 +13,8 @@
     "0007_chat.sql",
     "0008_moderation.sql",
     "0009_character_wiki.sql",
-    "0010_news_comments.sql"
+    "0010_news_comments.sql",
+    "0011_remaining_tables.sql"
   ],
   "production_cutover": false,
   "user_data_imported": false

@@ -1,0 +1,418 @@
+{
+  "observed_at": "2026-11-17",
+  "project": "fwwgoyburkdybbqmvljk",
+  "tables": [
+    {
+      "name": "discovery_preferences",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "favorite_fandoms",
+          "type": "text[]",
+          "nullable": false,
+          "default": "'{}'::text[]"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "CHECK ((cardinality(favorite_fandoms) <= 30))",
+        "CHECK ((char_length(array_to_string(favorite_fandoms, ','::text)) <= 3000))",
+        "PRIMARY KEY (user_id)",
+        "FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX discovery_preferences_pkey ON public.discovery_preferences USING btree (user_id)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "fic_club_members",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "club_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY (club_id) REFERENCES fic_clubs(id) ON DELETE CASCADE",
+        "UNIQUE (club_id, user_id)",
+        "PRIMARY KEY (id)",
+        "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX fic_club_members_pkey ON public.fic_club_members USING btree (id)",
+        "CREATE UNIQUE INDEX fic_club_members_club_id_user_id_key ON public.fic_club_members USING btree (club_id, user_id)",
+        "CREATE INDEX fic_club_members_club_id_idx ON public.fic_club_members USING btree (club_id)",
+        "CREATE INDEX fic_club_members_user_id_idx ON public.fic_club_members USING btree (user_id)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "fic_clubs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "story_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "creator_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY (creator_id) REFERENCES profiles(id) ON DELETE CASCADE",
+        "PRIMARY KEY (id)",
+        "FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX fic_clubs_pkey ON public.fic_clubs USING btree (id)",
+        "CREATE INDEX fic_clubs_story_id_idx ON public.fic_clubs USING btree (story_id)",
+        "CREATE INDEX fic_clubs_creator_id_idx ON public.fic_clubs USING btree (creator_id)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "official_signup_tokens",
+      "columns": [
+        {
+          "name": "singleton",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true"
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY (singleton)",
+        "CHECK ((singleton IS TRUE))"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX official_signup_tokens_pkey ON public.official_signup_tokens USING btree (singleton)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "post_likes",
+      "columns": [
+        {
+          "name": "post_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY (post_id, user_id)",
+        "FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE",
+        "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX post_likes_pkey ON public.post_likes USING btree (post_id, user_id)",
+        "CREATE INDEX post_likes_user_id_idx ON public.post_likes USING btree (user_id)"
+      ],
+      "triggers": [
+        "CREATE TRIGGER social_notify_insert AFTER INSERT ON public.post_likes FOR EACH ROW EXECUTE FUNCTION social_interaction_notification()"
+      ]
+    },
+    {
+      "name": "posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "quote_text",
+          "type": "text",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "chapter_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "start_offset",
+          "type": "integer",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "end_offset",
+          "type": "integer",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": "now()"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL",
+        "PRIMARY KEY (id)",
+        "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)",
+        "CREATE INDEX posts_user_id_idx ON public.posts USING btree (user_id)",
+        "CREATE INDEX posts_created_at_idx ON public.posts USING btree (created_at DESC)",
+        "CREATE INDEX posts_chapter_id_idx ON public.posts USING btree (chapter_id)"
+      ],
+      "triggers": [
+        "CREATE TRIGGER social_notify_insert AFTER INSERT ON public.posts FOR EACH ROW EXECUTE FUNCTION social_interaction_notification()"
+      ]
+    },
+    {
+      "name": "profile_themes",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "drafts",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "active",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false,
+          "default": null
+        }
+      ],
+      "constraints": [
+        "CHECK (((active IS NULL) OR (jsonb_typeof(active) = 'object'::text)))",
+        "CHECK (\nCASE\n    WHEN (jsonb_typeof(drafts) = 'array'::text) THEN (jsonb_array_length(drafts) <= 12)\n    ELSE false\nEND)",
+        "PRIMARY KEY (user_id)",
+        "CHECK ((revision > 0))",
+        "FOREIGN KEY (user_id) REFERENCES auth_accounts(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX profile_themes_pkey ON public.profile_themes USING btree (user_id)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "social_stories",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "media_url",
+          "type": "text",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "media_type",
+          "type": "text",
+          "nullable": false,
+          "default": "'image'::text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "(now() + '24:00:00'::interval)"
+        },
+        {
+          "name": "thought",
+          "type": "text",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "constraints": [
+        "CHECK ((media_type = ANY (ARRAY['image'::text, 'gif'::text, 'video'::text])))",
+        "PRIMARY KEY (id)",
+        "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX social_stories_pkey ON public.social_stories USING btree (id)",
+        "CREATE INDEX social_stories_user_id_idx ON public.social_stories USING btree (user_id)",
+        "CREATE INDEX social_stories_expires_at_idx ON public.social_stories USING btree (expires_at)",
+        "CREATE INDEX social_stories_created_at_idx ON public.social_stories USING btree (created_at DESC)",
+        "CREATE INDEX social_stories_media_url_idx ON public.social_stories USING btree (media_url)"
+      ],
+      "triggers": null
+    },
+    {
+      "name": "story_daily_engagement",
+      "columns": [
+        {
+          "name": "story_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "reader_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null
+        },
+        {
+          "name": "activity_day",
+          "type": "date",
+          "nullable": false,
+          "default": "((now() AT TIME ZONE 'America/Sao_Paulo'::text))::date"
+        },
+        {
+          "name": "viewed",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        },
+        {
+          "name": "read",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY (story_id, reader_id, activity_day)",
+        "FOREIGN KEY (reader_id) REFERENCES profiles(id) ON DELETE CASCADE",
+        "FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE"
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX story_daily_engagement_pkey ON public.story_daily_engagement USING btree (story_id, reader_id, activity_day)",
+        "CREATE INDEX story_daily_reader_idx ON public.story_daily_engagement USING btree (reader_id)",
+        "CREATE INDEX story_daily_day_idx ON public.story_daily_engagement USING btree (activity_day, story_id)"
+      ],
+      "triggers": null
+    }
+  ]
+}
