@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1Feed } from '@/lib/database/d1-feed';
+import { getMediaBucket } from '@/lib/media/r2-binding';
+import { uuid } from '@/lib/chat/server';
 import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { NextRequest, NextResponse } from 'next/server';
@@ -127,22 +132,15 @@ function getExtension(
 export async function POST(
   request: NextRequest
 ) {
-  const userId =
-    await getCurrentUserId(
-      request
-    );
-
-  if (!userId) {
-    return NextResponse.json(
-      {
-        error:
-          'Você precisa estar autenticado.',
-      },
-      { status: 401 }
-    );
-  }
-
   try {
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    const userId = db ? actor?.id : await getCurrentUserId(request);
+
+    if (!userId) {
+      return NextResponse.json({error:'Você precisa estar autenticado.'},{status:401});
+    }
+
     const formData =
       await request.formData();
 
@@ -200,6 +198,53 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    if (db && actor) {
+      const id = postId.toLowerCase();
+      const post = uuid.test(id) ? await d1Feed(db).post(actor.hash,id) : null;
+      if (!post) return NextResponse.json({error:'Post não encontrado.'},{status:404});
+      if (post.user_id !== userId) {
+        return NextResponse.json({error:'Você não pode adicionar mídia a este post.'},{status:403});
+      }
+      const limit = () => NextResponse.json({error:'Cada post pode ter no máximo 4 imagens ou GIFs.'},{status:400});
+      const count = await db.prepare('SELECT count(*) AS total FROM nook_post_media WHERE post_id=?')
+        .bind(id).first<{total:number}>();
+      if ((count?.total ?? 0) >= MAX_MEDIA) return limit();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (!imageMatchesType(bytes,file.type)) {
+        return NextResponse.json({error:'O conteúdo do arquivo não corresponde ao formato da imagem.'},{status:415});
+      }
+      const mediaId = crypto.randomUUID();
+      const path = `d1-feed/${userId}/${mediaId}.${getExtension(file)}`;
+      const key = 'nook-media/' + path;
+      const url = '/api/content-media?' + new URLSearchParams({bucket:'nook-media',path});
+      const bucket = getMediaBucket();
+      if (!await bucket?.put(key,bytes,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:file.type}})) {
+        throw Error('Unable to store post media');
+      }
+      let saved = false;
+      try {
+        const media = await db.prepare(`INSERT INTO nook_post_media(id,post_id,media_url,media_type,position)
+          SELECT ?3,p.id,?4,?5,coalesce((SELECT max(position)+1 FROM nook_post_media WHERE post_id=p.id),0)
+          FROM nook_posts p JOIN d1_social_actors a ON a.profile_id=p.user_id
+          WHERE p.id=?2 AND p.moderation_hidden_at IS NULL AND a.token_hash=?1
+            AND (SELECT count(*) FROM nook_post_media WHERE post_id=p.id) < ?6
+          RETURNING id,post_id,media_url,media_type,created_at`)
+          .bind(actor.hash,id,mediaId,url,file.type==='image/gif'?'gif':'image',MAX_MEDIA).first();
+        if (!media) {
+          return await d1Feed(db).post(actor.hash,id) ? limit()
+            : NextResponse.json({error:'Post não encontrado.'},{status:404});
+        }
+        saved = true;
+        return NextResponse.json({success:true,media},{status:201});
+      } finally {
+        if (!saved) {
+          const existing = await db.prepare('SELECT id FROM nook_post_media WHERE id=?').bind(mediaId).first()
+            .catch(() => undefined);
+          if (existing === null) await bucket?.delete([key]).catch(() => undefined);
+        }
+      }
     }
 
     /*

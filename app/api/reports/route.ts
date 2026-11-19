@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Moderation } from '@/lib/database/d1-moderation';
+import { uuid } from '@/lib/chat/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUserContext } from '@/lib/auth/session';
@@ -20,6 +23,19 @@ export async function POST(request: NextRequest) {
         (body.details != null && typeof body.details !== 'string') ||
         (body.details || '').trim().length > 3000) {
       return NextResponse.json({ error: 'Confira o conteúdo e o motivo da denúncia.' }, { status: 400 });
+    }
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      if (!uuid.test(body.content_id)) return NextResponse.json({ error: 'Confira os dados da denúncia.' }, { status: 400 });
+      const id = body.content_id.toLowerCase();
+      const target = await db.prepare('SELECT user_id FROM d1_mod_content WHERE kind=? AND id=?')
+        .bind(body.content_type, id).first<{ user_id: string }>();
+      if (!target) return NextResponse.json({ error: 'O conteúdo não está disponível.' }, { status: 404 });
+      if (target.user_id === user.userId) return NextResponse.json({ error: 'Não é possível denunciar o próprio conteúdo.' }, { status: 400 });
+      const report = await d1Moderation(db).report(user.sessionTokenHash, crypto.randomUUID(),
+        body.content_type, id, body.reason, (body.details || '').trim());
+      if (!report) return NextResponse.json({ error: 'Já existe uma denúncia aberta ou você atingiu o limite de denúncias.' }, { status: 409 });
+      return NextResponse.json({ report_id: report.id, message: 'Denúncia enviada para a equipe de moderação.' }, { status: 201 });
     }
     const { data, error } = await supabase.rpc('submit_moderation_report', {
       p_session_token_hash: user.sessionTokenHash,

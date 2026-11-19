@@ -1,3 +1,7 @@
+import { getMediaBucket } from '@/lib/media/r2-binding';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Books } from '@/lib/database/d1-books';
 import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
@@ -171,6 +175,14 @@ export async function GET(
           headers: noCacheHeaders(),
         }
       );
+    }
+
+    const d1 = getD1PreviewDatabase('auth');
+    if (d1) {
+      const result = await d1Books(d1, safeChapterHtml).chapterForReader(await getSessionTokenHash(), id);
+      return result
+        ? NextResponse.json(result, { headers: noCacheHeaders() })
+        : NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers: noCacheHeaders() });
     }
 
     const { data: chapter, error: chapterError } =
@@ -389,7 +401,11 @@ export async function PUT(
       );
     }
 
-    const userId = await getAuthenticatedUser(request);
+    const d1 = getD1PreviewDatabase('auth');
+    const hash = d1 ? await getSessionTokenHash() : null;
+    const actor = d1 && hash ? await d1.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash=?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const userId = d1 ? actor?.profile_id : await getAuthenticatedUser(request);
 
     if (!userId) {
       return NextResponse.json(
@@ -413,7 +429,12 @@ export async function PUT(
     const {
       data: chapter,
       error: chapterError,
-    } = await supabase
+    } = d1 ? { data: await d1.prepare('SELECT * FROM chapters WHERE id=?').bind(id).first<{
+        id: string; story_id: string; title: string; body: string; author_notes: string | null;
+        published: number | null; publication_status: string; spotify_link: string | null;
+        original_published_at: string | null; republished_at: string | null;
+      }>().then(row => row && { ...row, published: row.published === null ? null : Boolean(row.published) }), error: null }
+      : await supabase
       .from('chapters')
       .select(`
         id,
@@ -472,7 +493,8 @@ export async function PUT(
     const {
       data: story,
       error: storyError,
-    } = await supabase
+    } = d1 ? { data: await d1.prepare('SELECT author_id FROM stories WHERE id=? AND moderation_hidden_at IS NULL').bind(chapter.story_id).first<{ author_id: string }>(), error: null }
+      : await supabase
       .from('stories')
       .select('id, author_id')
       .eq('id', chapter.story_id)
@@ -515,7 +537,7 @@ export async function PUT(
     const formData =
       await request.formData();
 
-    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, chapter.spotify_link);
+    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, d1 && typeof chapter.spotify_link === 'string' ? JSON.parse(chapter.spotify_link) : chapter.spotify_link);
     if (music instanceof NextResponse) return music;
 
     const entryKind = formData.get('entry_kind');
@@ -703,6 +725,86 @@ export async function PUT(
         new Date(
           scheduledForValue
         );
+    }
+
+    if (d1 && hash) {
+      const headers = noCacheHeaders();
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403, headers });
+      const captured = await d1.prepare('SELECT * FROM chapter_media WHERE chapter_id=? ORDER BY position,id').bind(id).all<{ id: string }>();
+      if (!captured.success) throw Error('Unable to load chapter media');
+      const retained = formData.getAll('existing_media_ids');
+      const files = formData.getAll('media').filter((item): item is File => item instanceof File && item.size > 0);
+      const replaceMedia = formData.get('replace_media') === '1' || retained.length > 0 || files.length > 0;
+      const ids = replaceMedia ? retained : captured.results.map(item => item.id);
+      if (new Set(ids).size !== ids.length || ids.some(item => typeof item !== 'string' || !captured.results.some(media => media.id === item)) ||
+          ids.length + files.length > MAX_MEDIA_PER_CHAPTER) {
+        return NextResponse.json({ error: 'Seleção de mídias inválida.' }, { status: 400, headers });
+      }
+      const uploads: { id: string; key: string; url: string; type: string; mime: string; bytes: ArrayBuffer }[] = [];
+      for (const file of files) {
+        const type = ALLOWED_MEDIA_TYPES[file.type];
+        if (!type || file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Imagem inválida ou acima de 5 MB.' }, { status: 400, headers });
+        const bytes = await file.arrayBuffer();
+        if (!imageMatchesType(new Uint8Array(bytes), file.type)) return NextResponse.json({ error: 'Formato da imagem inválido.' }, { status: 400, headers });
+        const mediaId = crypto.randomUUID();
+        const key = `d1-chapters/${mediaId}.${extensionFromMime(file.type)}`;
+        const url = '/api/content-media?' + new URLSearchParams({ bucket: 'chapter-media', path: key });
+        uploads.push({ id: mediaId, key, url, type, mime: file.type, bytes });
+      }
+      const schedule = scheduledDate?.toISOString() ?? null;
+      const musicJson = music.spotify_link === undefined ? null : JSON.stringify(music.spotify_link);
+      const update = d1.prepare(`UPDATE chapters SET title=?3,body=?4,author_notes=?5,
+        entry_kind=coalesce(?6,entry_kind), spotify_link=CASE WHEN ?7 IS NULL THEN spotify_link ELSE nullif(?7,'null') END,
+        published=?8='published', publication_status=?8,
+        original_published_at=CASE WHEN ?8='published' THEN coalesce(original_published_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ELSE original_published_at END,
+        republished_at=CASE WHEN ?8='published' AND coalesce(published,0)=0 AND original_published_at IS NOT NULL
+          THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') ELSE republished_at END,
+        updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE id=?2 AND EXISTS(SELECT 1 FROM stories s JOIN d1_social_actors a ON a.profile_id=s.author_id
+          WHERE a.token_hash=?1 AND s.id=chapters.story_id AND s.moderation_hidden_at IS NULL)`)
+        .bind(hash,id,title,body,authorNotes || null,typeof entryKind === 'string' ? entryKind : null,musicJson,publicationStatus);
+      const setSchedule = d1.prepare(`INSERT INTO scheduled_chapters(id,chapter_id,scheduled_for)
+        SELECT id,id,?2 FROM chapters WHERE id=?1 AND publication_status='scheduled' AND ?2 IS NOT NULL AND changes()=1
+        ON CONFLICT(chapter_id) DO UPDATE SET scheduled_for=excluded.scheduled_for,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`)
+        .bind(id,schedule);
+      const statements = [update, setSchedule];
+      const owner = `EXISTS(SELECT 1 FROM chapters c JOIN stories s ON s.id=c.story_id
+        JOIN d1_social_actors a ON a.profile_id=s.author_id
+        WHERE c.id=?1 AND a.token_hash=?2 AND s.moderation_hidden_at IS NULL)`;
+      if (replaceMedia) {
+        statements.push(d1.prepare(`DELETE FROM chapter_media WHERE chapter_id=?1 AND ${owner}
+          AND id NOT IN (SELECT value FROM json_each(?3))`).bind(id,hash,JSON.stringify(ids)));
+        ids.forEach((mediaId,position) => statements.push(d1.prepare(`UPDATE chapter_media SET position=?4
+          WHERE chapter_id=?1 AND id=?3 AND ${owner}`).bind(id,hash,String(mediaId),position)));
+        uploads.forEach((item,index) => statements.push(d1.prepare(`INSERT INTO chapter_media(id,chapter_id,media_url,media_type,position)
+          SELECT ?3,?1,?4,?5,?6 WHERE ${owner}`).bind(id,hash,item.id,item.url,item.type,ids.length+index)));
+      }
+      const bucket = uploads.length ? getMediaBucket() : undefined;
+      if (uploads.length && !bucket) throw Error('Preview media bucket unavailable');
+      const stored: string[] = [];
+      let committed = false;
+      try {
+        for (const item of uploads) {
+          const key = 'chapter-media/' + item.key;
+          const written = await bucket!.put(key,item.bytes,{ onlyIf:{ etagDoesNotMatch:'*' },httpMetadata:{contentType:item.mime} });
+          if (!written) throw Error('Unable to store chapter media');
+          stored.push(key);
+        }
+        const result = await d1.batch(statements);
+        if (result.some(row => !row.success)) throw Error('Unable to edit chapter');
+        if (!result[0].meta.changes) return NextResponse.json({ error: 'Capítulo indisponível.' }, { status: 409, headers });
+        committed = true;
+      } finally {
+        if (!committed && stored.length) await bucket?.delete(stored).catch(() => undefined);
+      }
+      const edited = await d1Books(d1,safeChapterHtml).chapterForReader(hash,id);
+      return NextResponse.json({
+        success: true, chapter: edited?.chapter, media: edited?.media ?? captured.results,
+        scheduled: publicationStatus === 'scheduled', scheduled_for: schedule,
+        publication_status: publicationStatus, published: publicationStatus === 'published',
+        status_was_provided: statusWasProvided, scheduled_for_was_provided: scheduledForWasProvided,
+      }, { headers });
     }
 
     /*
@@ -1305,9 +1407,9 @@ export async function PUT(
      * ========================================================
      */
 
-    const actor=await chatActor();
-    if(!actor)return NextResponse.json({error:'Sua sessão expirou.'},{status:401,headers:noCacheHeaders()});
-    const publication=await supabase.rpc('set_chapter_publication',{p_session:actor.sessionTokenHash,p_chapter:id,p_status:publicationStatus,p_scheduled_for:scheduledDate?.toISOString()||null});
+    const publicationActor=await chatActor();
+    if(!publicationActor)return NextResponse.json({error:'Sua sessão expirou.'},{status:401,headers:noCacheHeaders()});
+    const publication=await supabase.rpc('set_chapter_publication',{p_session:publicationActor.sessionTokenHash,p_chapter:id,p_status:publicationStatus,p_scheduled_for:scheduledDate?.toISOString()||null});
     if(publication.error)throw publication.error;
     return NextResponse.json(
       {

@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor, d1FollowState } from '@/lib/database/d1-follow-http';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { d1Feed } from '@/lib/database/d1-feed';
+import { readD1Feed } from '@/lib/database/d1-feed-read';
 import { NextResponse } from "next/server";
 import {
   chatActor,
@@ -14,7 +19,9 @@ import { visiblePosts, visibleReposts } from "@/lib/social/posts";
 import { rateLimitKey } from "@/lib/security/rate-key";
 export async function GET(request: Request) {
   try {
-    const actor = await chatActor();
+    const db = getD1PreviewDatabase('auth');
+    const d1Actor = db ? await d1FollowActor(db) : null;
+    const actor = db ? null : await chatActor();
     const params = new URL(request.url).searchParams;
     const post = params.get("post_id") || undefined,
       profile = params.get("profile_id") || undefined;
@@ -24,6 +31,22 @@ export async function GET(request: Request) {
       (!post && !profile)
     )
       return new NextResponse(null, { status: 400 });
+    if (db) {
+      const hash = d1Actor?.hash ?? null;
+      if ((post && !await d1Feed(db).post(hash, post.toLowerCase())) ||
+          (profile && !(await d1FollowState(db, hash, profile.toLowerCase()))?.allowed)) {
+        return new NextResponse(null, { status: 404 });
+      }
+      const { posts } = await readD1Feed(db, hash, false, '', null, 100, {
+        post: post?.toLowerCase() ?? null, profile: profile?.toLowerCase() ?? null,
+      });
+      if (profile) return NextResponse.json({ posts }, { headers: privateHeaders });
+      const entries = posts.map(item => item.repost);
+      return NextResponse.json({
+        reposts: entries.map(({ id, author, comment }) => ({ id, author, comment })),
+        nookled: entries.some(item => item.user_id === d1Actor?.id),
+      }, { headers: privateHeaders });
+    }
     if (
       (post && !(await isPublicPostVisible(chatDb, post))) ||
       (profile &&
@@ -70,8 +93,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const actor = await chatActor();
-    if (!actor) return new NextResponse(null, { status: 401 });
+    const db = getD1PreviewDatabase('auth');
+    const d1Actor = db ? await d1FollowActor(db) : null;
+    const actor = db ? null : await chatActor();
+    if (!actor && !d1Actor) return new NextResponse(null, { status: 401 });
     const raw = await request.text();
     if (raw.length > 12000) return new NextResponse(null, { status: 413 });
     const body = JSON.parse(raw);
@@ -86,6 +111,21 @@ export async function POST(request: Request) {
         { error: "Escreva até 5000 caracteres." },
         { status: 400 },
       );
+    if (db && d1Actor) {
+      const feed = d1Feed(db);
+      const target = id.toLowerCase();
+      if (!await feed.post(d1Actor.hash, target)) return new NextResponse(null, { status: 404 });
+      try {
+        if (!await d1Auth(db).consumeRateLimit(rateLimitKey('repost', d1Actor.id), 60, 3600)) {
+          return new NextResponse(null, { status: 429 });
+        }
+      } catch {
+        return new NextResponse(null, { status: 429 });
+      }
+      await feed.repost(d1Actor.hash, crypto.randomUUID(), target, comment);
+      return NextResponse.json({ saved: true }, { headers: privateHeaders });
+    }
+    if (!actor) return new NextResponse(null, { status: 401 });
     if (!(await isPublicPostVisible(chatDb, id)))
       return new NextResponse(null, { status: 404 });
     const rate = await chatDb.rpc("consume_auth_rate_limit", {
@@ -113,11 +153,18 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const actor = await chatActor();
-    if (!actor) return new NextResponse(null, { status: 401 });
+    const db = getD1PreviewDatabase('auth');
+    const d1Actor = db ? await d1FollowActor(db) : null;
+    const actor = db ? null : await chatActor();
+    if (!actor && !d1Actor) return new NextResponse(null, { status: 401 });
     const body = await request.json();
     if (!uuid.test(body.post_id || ""))
       return new NextResponse(null, { status: 400 });
+    if (db && d1Actor) {
+      await d1Feed(db).unrepost(d1Actor.hash, body.post_id.toLowerCase());
+      return NextResponse.json({ removed: true }, { headers: privateHeaders });
+    }
+    if (!actor) return new NextResponse(null, { status: 401 });
     const { error } = await chatDb
       .from("nook_reposts")
       .delete()

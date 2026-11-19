@@ -1,3 +1,8 @@
+import { getMediaBucket } from '@/lib/media/r2-binding';
+import { d1Chat } from '@/lib/database/d1-chat';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { readD1Chat } from '@/lib/database/d1-chat-read';
 import { mediaStorage } from '@/lib/media/storage';
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
@@ -17,6 +22,8 @@ import { detectedMedia } from "@/lib/chat/safety";
 
 export async function GET(request: Request) {
   try {
+    const d1 = getD1PreviewDatabase('auth');
+    if (d1) return await readD1Chat(d1, await getSessionTokenHash(), request);
     const actor = await chatActor();
     if (!actor)
       return NextResponse.json(
@@ -203,10 +210,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   let uploaded = "";
+  let cleanup: (() => Promise<unknown>) | undefined;
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const actor = await chatActor();
-    if (!actor)
+    const d1 = getD1PreviewDatabase('auth');
+    const chat = d1 ? d1Chat(d1, chatCipherVersion()) : null;
+    const hash = d1 ? await getSessionTokenHash() : null;
+    const actor = d1 ? null : await chatActor();
+    const active = d1 && hash ? await d1.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash = ?').bind(hash).first() : null;
+    const sessionTokenHash = actor?.sessionTokenHash ?? (active ? hash : null);
+    if (!sessionTokenHash)
       return new NextResponse(null, { status: 401, headers: privateHeaders });
     const length = Number(request.headers.get("content-length") || 0);
     if (length > 4 * 1024 * 1024)
@@ -222,8 +235,10 @@ export async function POST(request: Request) {
       const body = JSON.parse(raw);
       if (typeof body.target !== "string" || !uuid.test(body.target))
         return new NextResponse(null, { status: 400 });
-      const { data, error } = await chatDb.rpc("chat_request", {
-        p_session: actor.sessionTokenHash,
+      const { data, error } = chat
+        ? await chat.request(sessionTokenHash, randomUUID(), body.target).then(row => ({ data: row?.id, error: !row }))
+        : await chatDb.rpc("chat_request", {
+        p_session: sessionTokenHash,
         p_target: body.target,
       });
       if (error)
@@ -258,14 +273,21 @@ export async function POST(request: Request) {
         },
         { status: 400, headers: privateHeaders },
       );
-    const thread = await allowedThread(actor.profileId, threadId);
+    const d1Thread = chat ? await chat.thread(sessionTokenHash, threadId) : null;
+    const thread = d1Thread ? { ...d1Thread, status: d1Thread.member_status }
+      : actor ? await allowedThread(actor.profileId, threadId) : null;
     if (!thread || thread.blocked || thread.status !== "accepted")
       return NextResponse.json(
         { error: "A conversa precisa ser aceita e estar desbloqueada." },
         { status: 403, headers: privateHeaders },
       );
     if (reply) {
-      const original = await chatDb.from("chat_messages").select("id")
+      const original = d1
+        ? { data: await d1.prepare(`SELECT m.id FROM chat_messages m JOIN d1_chat_access t ON t.id = m.thread_id
+            WHERE t.token_hash = ? AND t.id = ? AND t.member_status = 'accepted' AND t.blocked = 0
+              AND m.id = ? AND m.revoked_at IS NULL AND m.cipher_version = ?`)
+            .bind(sessionTokenHash, threadId, String(reply), chatCipherVersion()).first(), error: null }
+        : await chatDb.from("chat_messages").select("id")
         .eq("id", String(reply))
         .is("revoked_at", null)
         .eq("thread_id", threadId)
@@ -298,19 +320,34 @@ export async function POST(request: Request) {
           },
           { status: 400, headers: privateHeaders },
         );
-      uploaded = chatMediaPath(threadId, id);
-      const upload = await mediaStorage(chatDb, chatMediaBucket)
-        .upload(uploaded, encryptChat(bytes, `${threadId}:${id}:media`), {
-          contentType: "application/octet-stream",
-          upsert: false,
+      const path = chatMediaPath(threadId, id);
+      const encrypted = encryptChat(bytes, `${threadId}:${id}:media`);
+      if (d1) {
+        const bucket = getMediaBucket();
+        if (!bucket) throw Error('Isolated R2 bucket unavailable');
+        const key = `${chatMediaBucket}/${path}`;
+        const stored = await bucket.put(key, encrypted, {
+          onlyIf: { etagDoesNotMatch: '*' }, httpMetadata: { contentType: 'application/octet-stream' },
         });
-      if (upload.error) throw upload.error;
+        if (!stored) throw Error('Unable to store encrypted attachment');
+        cleanup = () => bucket.delete([key]);
+      } else {
+        const storage = mediaStorage(chatDb, chatMediaBucket);
+        const upload = await storage.upload(path, encrypted, {
+          contentType: 'application/octet-stream', upsert: false,
+        });
+        if (upload.error) throw upload.error;
+        cleanup = () => storage.remove([path]);
+      }
+      uploaded = path;
     }
     const cipher = encodeChatBody(encryptChat(Buffer.from(text), `${threadId}:${id}:body`));
-    const result = await chatDb.rpc(
+    const result = chat
+      ? { data: await chat.send(sessionTokenHash, id, threadId, cipher, reply ? String(reply) : null, mediaType, sticker), error: null }
+      : await chatDb.rpc(
       thread.kind === "group" ? "chat_group_send" : "chat_direct_send",
       {
-        p_session: actor.sessionTokenHash,
+        p_session: sessionTokenHash,
         p_thread: threadId,
         p_id: id,
         p_cipher: cipher,
@@ -321,8 +358,7 @@ export async function POST(request: Request) {
       },
     );
     if (result.error || !result.data) {
-      if (uploaded)
-        await mediaStorage(chatDb, chatMediaBucket).remove([uploaded]);
+      await cleanup?.().catch(() => undefined);
       return NextResponse.json(
         {
           error:
@@ -336,7 +372,7 @@ export async function POST(request: Request) {
       { status: 201, headers: privateHeaders },
     );
   } catch {
-    if (uploaded) await mediaStorage(chatDb, chatMediaBucket).remove([uploaded]);
+    await cleanup?.().catch(() => undefined);
     return NextResponse.json(
       { error: "Não foi possível enviar. Tente novamente." },
       { status: 503, headers: privateHeaders },
@@ -347,8 +383,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const actor = await chatActor();
-    if (!actor)
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const session = db && hash ? await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash = ?').bind(hash).first() : null;
+    const actor = db ? null : await chatActor();
+    if (!actor && !session)
       return new NextResponse(null, { status: 401, headers: privateHeaders });
     const raw = await request.text();
     if (raw.length > 500) return new NextResponse(null, { status: 400 });
@@ -358,6 +397,23 @@ export async function PATCH(request: Request) {
       !["accept", "deny", "block", "unblock", "leave"].includes(body.action)
     )
       return new NextResponse(null, { status: 400 });
+    if (db && hash && session) {
+      const chat = d1Chat(db, chatCipherVersion());
+      const thread = await chat.thread(hash, body.thread_id);
+      if (!thread) return new NextResponse(null, { status: 404 });
+      const action = body.action;
+      let updated: unknown;
+      if (thread.kind === 'group') {
+        if (action === 'accept') updated = await chat.acceptGroup(hash, body.thread_id);
+        if (action === 'leave' || action === 'deny') updated = await chat.leaveGroup(hash, body.thread_id);
+      } else {
+        if (action === 'accept' || action === 'deny') updated = await chat.acceptDirect(hash, body.thread_id, action === 'accept');
+        if (action === 'block' || action === 'unblock') updated = await chat.changeDirectBlock(hash, body.thread_id, action === 'block');
+      }
+      return updated ? NextResponse.json({ updated: true }, { headers: privateHeaders })
+        : new NextResponse(null, { status: 403, headers: privateHeaders });
+    }
+    if (!actor) return new NextResponse(null, { status: 401, headers: privateHeaders });
     const thread = await allowedThread(actor.profileId, body.thread_id);
     if (!thread) return new NextResponse(null, { status: 404 });
     const { data, error } = await chatDb.rpc(

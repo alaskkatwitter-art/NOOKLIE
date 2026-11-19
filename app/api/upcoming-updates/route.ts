@@ -1,3 +1,5 @@
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -58,6 +60,32 @@ async function getCurrentUserId() {
 
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const headers = {'Cache-Control':'no-store, private',Vary:'Cookie'};
+      const hash = await getSessionTokenHash();
+      const actor = hash && await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash=?')
+        .bind(hash).first<{profile_id:string}>();
+      if (!actor) return NextResponse.json({error:'Não autenticado.'},{status:401,headers});
+      const result = await db.prepare(`SELECT sc.id,sc.chapter_id,s.id AS story_id,c.chapter_number,c.title AS chapter_title,
+        s.title AS story_title,s.cover_url AS story_cover_url,sc.scheduled_for,
+        json_object('id',p.id,'username',p.username,'display_name',p.display_name,'avatar_url',p.avatar_url,
+          'verified',json(CASE WHEN p.verified THEN 'true' ELSE 'false' END),
+          'is_official',json(CASE WHEN p.is_official THEN 'true' ELSE 'false' END)) AS author
+        FROM d1_social_actors v JOIN follows f ON f.follower_id=v.profile_id
+        JOIN profiles p ON p.id=f.following_id AND p.moderation_hidden_at IS NULL
+        JOIN auth_accounts a ON a.id=p.user_id AND a.account_status='active'
+        JOIN released_stories s ON s.author_id=p.id
+        JOIN chapters c ON c.story_id=s.id AND coalesce(c.published,0)=0
+        JOIN scheduled_chapters sc ON sc.chapter_id=c.id
+        WHERE v.token_hash=? AND julianday(sc.scheduled_for)>julianday('now')
+          AND NOT EXISTS(SELECT 1 FROM chat_blocks b WHERE
+            (b.blocker_id=v.profile_id AND b.blocked_id=p.id) OR (b.blocker_id=p.id AND b.blocked_id=v.profile_id))
+        ORDER BY sc.scheduled_for,sc.id`).bind(hash).all<{author:string}>();
+      if (!result.success) throw Error('Unable to load scheduled chapters');
+      return NextResponse.json({updates:result.results.map(row=>({...row,author:JSON.parse(row.author)}))},{headers});
+    }
+
     // ======================================================
     // USUÁRIO LOGADO
     // ======================================================

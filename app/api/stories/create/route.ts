@@ -1,8 +1,11 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { getMediaBucket } from '@/lib/media/r2-binding';
 import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { ensureCatalogTag } from '@/lib/stories/tags';
-import { parseStoryMetadata } from '@/lib/stories/metadata';
+import { emptyStoryMetadata, parseStoryMetadata } from '@/lib/stories/metadata';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -26,57 +29,67 @@ export async function POST(request: Request) {
   let uploadedCoverPath = '';
 
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    let userId: string;
+    if (db) {
+      if (!actor) return NextResponse.json({error:'Você precisa estar logado.'},{status:401});
+      userId = actor.id;
+    } else {
+      const cookieHeader = request.headers.get('cookie') || '';
 
-    const sessionCookie = cookieHeader
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .find((cookie) =>
-        cookie.startsWith('toriland_session=')
+      const sessionCookie = cookieHeader
+        .split(';')
+        .map((cookie) => cookie.trim())
+        .find((cookie) =>
+          cookie.startsWith('toriland_session=')
+        );
+
+      if (!sessionCookie) {
+        return NextResponse.json(
+          { error: 'Você precisa estar logado.' },
+          { status: 401 }
+        );
+      }
+
+      const sessionToken = decodeURIComponent(
+        sessionCookie.substring('toriland_session='.length)
       );
 
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
-      );
-    }
+      if (!sessionToken) {
+        return NextResponse.json(
+          { error: 'Sessão inválida.' },
+          { status: 401 }
+        );
+      }
 
-    const sessionToken = decodeURIComponent(
-      sessionCookie.substring('toriland_session='.length)
-    );
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(sessionToken)
+        .digest('hex');
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Sessão inválida.' },
-        { status: 401 }
-      );
-    }
+      const { data: session, error: sessionError } =
+        await supabase
+          .from('auth_sessions')
+          .select('user_id, expires_at')
+          .eq('token_hash', tokenHash)
+          .maybeSingle();
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(sessionToken)
-      .digest('hex');
+      if (
+        sessionError ||
+        !session ||
+        new Date(session.expires_at).getTime() <= Date.now()
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Sua sessão expirou. Entre novamente.',
+          },
+          { status: 401 }
+        );
+      }
 
-    const { data: session, error: sessionError } =
-      await supabase
-        .from('auth_sessions')
-        .select('user_id, expires_at')
-        .eq('token_hash', tokenHash)
-        .maybeSingle();
-
-    if (
-      sessionError ||
-      !session ||
-      new Date(session.expires_at).getTime() <= Date.now()
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Sua sessão expirou. Entre novamente.',
-        },
-        { status: 401 }
-      );
+      userId = session.user_id;
     }
 
     const formData = await request.formData();
@@ -184,6 +197,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const tagNames = tagsText
+      .split(',')
+      .map(tag => tag.trim().replace(/^#+/, '').trim())
+      .filter(Boolean);
+
+    const uniqueTagNames = Array.from(
+      new Map(
+        tagNames.map((tag) => [
+          createSlug(tag),
+          tag,
+        ])
+      ).values()
+    );
+
+    if (genre) {
+      const genreSlug = createSlug(genre);
+
+      const alreadyExists = uniqueTagNames.some(
+        (tag) => createSlug(tag) === genreSlug
+      );
+
+      if (!alreadyExists) {
+        uniqueTagNames.push(genre);
+      }
+    }
+
+    const limitedTags =
+      uniqueTagNames.slice(0, 30);
+
+    const storyId = crypto.randomUUID();
+    const bucket = db ? getMediaBucket() : undefined;
+    let d1CoverKey: string | undefined;
     let coverUrl: string | null = null;
 
     if (
@@ -223,9 +268,6 @@ export async function POST(request: Request) {
           ? 'png'
           : 'webp';
 
-      uploadedCoverPath =
-        `${session.user_id}/story-${Date.now()}.${extension}`;
-
       const arrayBuffer =
         await coverValue.arrayBuffer();
 
@@ -235,32 +277,82 @@ export async function POST(request: Request) {
       }
 
 
-      const { error: uploadError } =
-        await mediaStorage(supabase, 'story-covers')
-          .upload(
-            uploadedCoverPath,
-            fileBuffer,
+      if (db && actor) {
+        const path = `d1-stories/${actor.id}/${storyId}/cover.${extension}`;
+        const key = 'story-covers/' + path;
+        if (!await bucket?.put(key,fileBuffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:coverValue.type}})) {
+          throw Error('Unable to store story cover');
+        }
+        d1CoverKey = key;
+        coverUrl = '/api/content-media?' + new URLSearchParams({bucket:'story-covers',path});
+      } else {
+        uploadedCoverPath = `${userId}/story-${Date.now()}.${extension}`;
+        const { error: uploadError } =
+          await mediaStorage(supabase, 'story-covers')
+            .upload(
+              uploadedCoverPath,
+              fileBuffer,
+              {
+                contentType: coverValue.type,
+                upsert: false,
+              }
+            );
+
+        if (uploadError) {
+          return NextResponse.json(
             {
-              contentType: coverValue.type,
-              upsert: false,
-            }
+              error:
+                'Não foi possível enviar a capa da história.',
+            },
+            { status: 500 }
           );
+        }
 
-      if (uploadError) {
-        return NextResponse.json(
-          {
-            error:
-              'Não foi possível enviar a capa da história.',
-          },
-          { status: 500 }
-        );
+        const { data: publicUrlData } =
+          mediaStorage(supabase, 'story-covers')
+            .getPublicUrl(uploadedCoverPath);
+
+        coverUrl = publicUrlData.publicUrl;
       }
+    }
 
-      const { data: publicUrlData } =
-        mediaStorage(supabase, 'story-covers')
-          .getPublicUrl(uploadedCoverPath);
-
-      coverUrl = publicUrlData.publicUrl;
+    if (db && actor) {
+      const data = {
+        ...emptyStoryMetadata,...storyMetadata,title,description:description || null,status,rating:rating || null,
+        cover_url:coverUrl,spotify_link:music.spotify_link ? JSON.stringify(music.spotify_link) : null,
+      };
+      const columns = Object.keys(data);
+      const values = Object.values(data).map(value=>typeof value==='boolean'?Number(value):value);
+      const insert = db.prepare(`INSERT INTO stories(id,author_id,${columns.join(',')},release_at)
+        SELECT ?,profile_id,${columns.map(()=>'?').join(',')},'infinity'
+        FROM d1_social_actors WHERE token_hash=?`).bind(storyId,...values,actor.hash);
+      const statements = [insert];
+      for (const name of limitedTags) {
+        const slug = createSlug(name);
+        if (!slug) continue;
+        statements.push(db.prepare(`INSERT INTO tags(id,name,slug,category_id,created_by)
+          SELECT ?2,?3,?4,(SELECT id FROM tag_categories WHERE slug=?5),author_id FROM stories WHERE id=?1
+          AND NOT EXISTS(SELECT 1 FROM tags WHERE slug=?4 OR lower(name)=lower(?3))
+          ON CONFLICT DO NOTHING`).bind(storyId,crypto.randomUUID(),name,slug,genre && slug===createSlug(genre)?'genre':'freeform'));
+        statements.push(db.prepare(`INSERT INTO story_tags(story_id,tag_id)
+          SELECT s.id,t.id FROM stories s JOIN tags t ON t.slug=?3 OR lower(t.name)=lower(?2) WHERE s.id=?1
+          ORDER BY lower(t.name)=lower(?2) DESC,t.id LIMIT 1 ON CONFLICT DO NOTHING`).bind(storyId,name,slug));
+      }
+      try {
+        const result = await db.batch(statements);
+        if (result.some(row=>!row.success) || !result[0].meta.changes) throw Error('Unable to create story');
+      } catch (error) {
+        const row = await db.prepare('SELECT id FROM stories WHERE id=?').bind(storyId).first().catch(()=>undefined);
+        if (row === null && d1CoverKey) await bucket?.delete([d1CoverKey]).catch(()=>undefined);
+        if (row === null && error instanceof Error && error.message.includes('stories_series_volume_key')) {
+          return NextResponse.json({error:'Já existe um livro com esse número nesta série.'},{status:500});
+        }
+        if (!row) throw error;
+      }
+      const story = await db.prepare(`SELECT id,author_id,title,description,cover_url,status,rating,created_at,updated_at
+        FROM stories WHERE id=?`).bind(storyId).first();
+      if (!story) throw Error('Story unavailable');
+      return NextResponse.json({message:'História criada com sucesso.',story},{status:201});
     }
 
     const { data: story, error: storyError } =
@@ -269,7 +361,7 @@ export async function POST(request: Request) {
         .insert({
           ...storyMetadata,
           ...music,
-          author_id: session.user_id,
+          author_id: userId,
           title,
           description: description || null,
           cover_url: coverUrl,
@@ -295,35 +387,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
-    const tagNames = tagsText
-      .split(',')
-      .map(tag => tag.trim().replace(/^#+/, '').trim())
-      .filter(Boolean);
-
-    const uniqueTagNames = Array.from(
-      new Map(
-        tagNames.map((tag) => [
-          createSlug(tag),
-          tag,
-        ])
-      ).values()
-    );
-
-    if (genre) {
-      const genreSlug = createSlug(genre);
-
-      const alreadyExists = uniqueTagNames.some(
-        (tag) => createSlug(tag) === genreSlug
-      );
-
-      if (!alreadyExists) {
-        uniqueTagNames.push(genre);
-      }
-    }
-
-    const limitedTags =
-      uniqueTagNames.slice(0, 30);
 
     if (limitedTags.length > 0) {
       const { data: genreCategory } =
@@ -357,7 +420,7 @@ export async function POST(request: Request) {
           ? genreCategory?.id || null
           : freeformCategory?.id || null;
 
-        const tag = await ensureCatalogTag(supabase, tagName, categoryId, session.user_id);
+        const tag = await ensureCatalogTag(supabase, tagName, categoryId, userId);
         if (tag) tagIds.push(tag.id);
       }
 

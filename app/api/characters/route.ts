@@ -1,3 +1,5 @@
+import {getD1PreviewDatabase} from '@/lib/database/preview';
+import {d1WikiHttp} from '@/lib/database/d1-wiki-http';
 import { chatActor, chatDb, privateHeaders, uuid } from '@/lib/chat/server';
 import { getStaffContext, hasStaffPermission } from '@/lib/admin/authorization';
 
@@ -10,6 +12,7 @@ async function canReview() {
 
 export async function GET(request: Request) {
   try {
+    const d1=getD1PreviewDatabase('wiki');if(d1)return d1WikiHttp(request,'GET',d1);
     const actor = await chatActor();
     const params = new URL(request.url).searchParams;
     const id = params.get('id');
@@ -45,6 +48,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const d1=getD1PreviewDatabase('wiki');if(d1)return d1WikiHttp(request,'POST',d1);
     const actor = await chatActor();
     if (!actor) return respond({ error: 'Entre para participar da wiki.' }, 401);
     const body = await request.json().catch(() => null);

@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Permissions } from '@/lib/database/d1-permissions';
+import { d1AdminMutation, d1AdminResource } from '@/lib/database/d1-admin-manage';
+import type { NooklieD1 } from '@/lib/database/d1';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -39,16 +44,37 @@ function cleanText(value: unknown, maxLength: number, required = false): string 
 }
 
 async function getStaffOrResponse() {
+  const db = getD1PreviewDatabase('auth');
+  if (db) {
+    const hash = await getSessionTokenHash();
+    const actor = hash ? await db.prepare('SELECT user_id,is_root FROM d1_mod_actor WHERE token_hash=?')
+      .bind(hash).first<{user_id:string;is_root:number}>() : null;
+    if (!actor || !hash) return {db,staff:null,response:staffPermissionErrorResponse(401)};
+    return {db,staff:{userId:actor.user_id,sessionTokenHash:hash,isPlatformAdmin:Boolean(actor.is_root),memberships:[]},response:null};
+  }
   const staff = await getStaffContext();
-  if (!staff) return { staff: null, response: staffPermissionErrorResponse(401) };
-  return { staff, response: null };
+  if (!staff) return { db, staff: null, response: staffPermissionErrorResponse(401) };
+  return { db, staff, response: null };
+}
+
+function can(db:NooklieD1|undefined, staff:NonNullable<Awaited<ReturnType<typeof getStaffContext>>>,
+  permission:string, department?:string) {
+  return db ? d1Permissions(db).hasPermission(staff.sessionTokenHash,permission,department ?? null)
+    : hasStaffPermission(staff,permission,department);
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { staff, response } = await getStaffOrResponse();
+    const { db, staff, response } = await getStaffOrResponse();
     if (!staff) return response || staffPermissionErrorResponse(401);
-    const resource = request.nextUrl.searchParams.get('resource');
+    const query = new URL(request.url).searchParams;
+    const resource = query.get('resource');
+    if (db) {
+      const result = await d1AdminResource(db,staff.sessionTokenHash,resource,query);
+      if (result===null) return staffPermissionErrorResponse(403);
+      if (result===undefined) return NextResponse.json({error:'Área administrativa desconhecida.'},{status:400,headers:noStore});
+      return NextResponse.json(result,{headers:noStore});
+    }
 
     if (resource === 'departments') {
       if (!(await canAny(staff, ['departments.manage', 'members.view', 'opportunities.view', 'opportunities.manage', 'applications.view', 'applications.review']))) return staffPermissionErrorResponse(403);
@@ -229,19 +255,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { staff, response } = await getStaffOrResponse();
+    const { db, staff, response } = await getStaffOrResponse();
     if (!staff) return response || staffPermissionErrorResponse(401);
+    const mutate = (operation:string,args:Record<string,unknown>) =>
+      db ? d1AdminMutation(db,operation,args) : supabase.rpc(operation,args);
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400, headers: noStore });
 
     if (body.resource === 'user_status') {
-      if (!(await hasStaffPermission(staff, 'users.manage'))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'users.manage'))) return staffPermissionErrorResponse(403);
       if (typeof body.user_id !== 'string' || !['active', 'suspended'].includes(body.status) ||
           body.confirm !== true) {
         return NextResponse.json({ error: 'Confirme a ação e informe um status válido.' }, { status: 400, headers: noStore });
       }
       const reason = cleanText(body.reason, 1000) || '';
-      const { data, error } = await supabase.rpc('admin_set_account_status', {
+      const { data, error } = await mutate('admin_set_account_status', {
         p_session_token_hash: staff.sessionTokenHash,
         p_target_user_id: body.user_id,
         p_status: body.status,
@@ -252,13 +280,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.resource === 'department') {
-      if (!(await hasStaffPermission(staff, 'departments.manage'))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'departments.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
       const slug = cleanText(body.slug, 80, true);
       const description = cleanText(body.description, 1000) || '';
       const sortOrder = Number.isInteger(body.sort_order) ? body.sort_order : 0;
       if (!name || !slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return NextResponse.json({ error: 'Nome ou identificador do departamento inválido.' }, { status: 400, headers: noStore });
-      const { data, error } = await supabase.rpc('admin_create_department', {
+      const { data, error } = await mutate('admin_create_department', {
         p_session_token_hash: staff.sessionTokenHash,
         p_name: name,
         p_slug: slug,
@@ -270,7 +298,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.resource === 'role') {
-      if (!(await hasStaffPermission(staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
       const description = cleanText(body.description, 1000) || '';
       const badgeTitle = cleanText(body.badge_title, 80) || '';
@@ -279,7 +307,7 @@ export async function POST(request: NextRequest) {
         ? Array.from(new Set(body.permission_codes as string[]))
         : null;
       if (!name || !permissionCodes || typeof body.department_id !== 'string') return NextResponse.json({ error: 'Dados do cargo inválidos.' }, { status: 400, headers: noStore });
-      const { data, error } = await supabase.rpc('admin_create_team_role', {
+      const { data, error } = await mutate('admin_create_team_role', {
         p_session_token_hash: staff.sessionTokenHash,
         p_department_id: body.department_id,
         p_name: name,
@@ -293,7 +321,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.resource === 'opportunity') {
-      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
       const title = cleanText(body.title, 120, true);
       const description = cleanText(body.description, 12000) || '';
       const requirements = cleanText(body.requirements, 8000) || '';
@@ -305,7 +333,7 @@ export async function POST(request: NextRequest) {
           !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
         return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
       }
-      const { data, error } = await supabase.rpc('admin_create_opportunity', {
+      const { data, error } = await mutate('admin_create_opportunity', {
         p_session_token_hash: staff.sessionTokenHash,
         p_department_id: body.department_id,
         p_title: title,
@@ -322,9 +350,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.resource === 'member') {
-      if (!(staff.isPlatformAdmin || await canAny(staff, ['members.manage']))) return staffPermissionErrorResponse(403);
+      if (!(staff.isPlatformAdmin || await can(db, staff, 'members.manage'))) return staffPermissionErrorResponse(403);
       if (typeof body.user_id !== 'string' || typeof body.role_id !== 'string') return NextResponse.json({ error: 'Escolha uma pessoa e um cargo.' }, { status: 400, headers: noStore });
-      const { data, error } = await supabase.rpc('admin_assign_team_member', {
+      const { data, error } = await mutate('admin_assign_team_member', {
         p_session_token_hash: staff.sessionTokenHash,
         p_target_user_id: body.user_id,
         p_role_id: body.role_id,
@@ -342,20 +370,22 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { staff, response } = await getStaffOrResponse();
+    const { db, staff, response } = await getStaffOrResponse();
     if (!staff) return response || staffPermissionErrorResponse(401);
+    const mutate = (operation:string,args:Record<string,unknown>) =>
+      db ? d1AdminMutation(db,operation,args) : supabase.rpc(operation,args);
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400, headers: noStore });
 
     if (body.resource === 'department') {
-      if (!(await hasStaffPermission(staff, 'departments.manage'))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'departments.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
       const slug = cleanText(body.slug, 80, true);
       const description = cleanText(body.description, 1000) || '';
       const status = body.status === 'archived' ? 'archived' : body.status === 'active' ? 'active' : null;
       const sortOrder = Number.isInteger(body.sort_order) ? body.sort_order : 0;
       if (!name || !slug || !status || typeof body.id !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return NextResponse.json({ error: 'Dados do departamento inválidos.' }, { status: 400, headers: noStore });
-      const { data, error } = await supabase.rpc('admin_update_department', {
+      const { data, error } = await mutate('admin_update_department', {
         p_session_token_hash: staff.sessionTokenHash,
         p_department_id: body.id,
         p_name: name,
@@ -369,7 +399,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.resource === 'role') {
-      if (!(await hasStaffPermission(staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'roles.manage'))) return staffPermissionErrorResponse(403);
       const name = cleanText(body.name, 80, true);
       const description = cleanText(body.description, 1000) || '';
       const badgeTitle = cleanText(body.badge_title, 80) || '';
@@ -379,7 +409,7 @@ export async function PATCH(request: NextRequest) {
         ? Array.from(new Set(body.permission_codes as string[]))
         : null;
       if (!name || !status || !permissionCodes || typeof body.id !== 'string') return NextResponse.json({ error: 'Dados do cargo inválidos.' }, { status: 400, headers: noStore });
-      const { data, error } = await supabase.rpc('admin_update_team_role', {
+      const { data, error } = await mutate('admin_update_team_role', {
         p_session_token_hash: staff.sessionTokenHash,
         p_role_id: body.id,
         p_name: name,
@@ -394,7 +424,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.resource === 'opportunity') {
-      if (!(await hasStaffPermission(staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
+      if (!(await can(db, staff, 'opportunities.manage', body.department_id))) return staffPermissionErrorResponse(403);
       const id = cleanText(body.id, 80, true);
       const title = cleanText(body.title, 120, true);
       const description = cleanText(body.description, 12000) || '';
@@ -407,7 +437,7 @@ export async function PATCH(request: NextRequest) {
           !Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) {
         return NextResponse.json({ error: 'Confira os campos e as datas da vaga.' }, { status: 400, headers: noStore });
       }
-      const { data, error } = await supabase.rpc('admin_update_opportunity', {
+      const { data, error } = await mutate('admin_update_opportunity', {
         p_session_token_hash: staff.sessionTokenHash,
         p_opportunity_id: id,
         p_department_id: body.department_id,
@@ -433,14 +463,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { staff, response } = await getStaffOrResponse();
+    const { db, staff, response } = await getStaffOrResponse();
     if (!staff) return response || staffPermissionErrorResponse(401);
+    const mutate = (operation:string,args:Record<string,unknown>) =>
+      db ? d1AdminMutation(db,operation,args) : supabase.rpc(operation,args);
     const body = await request.json();
     if (!body || body.resource !== 'member' || typeof body.id !== 'string') return NextResponse.json({ error: 'Vínculo inválido.' }, { status: 400, headers: noStore });
     if (body.confirm !== true) return NextResponse.json({ error: 'Confirme a remoção do integrante.' }, { status: 400, headers: noStore });
-    if (!(staff.isPlatformAdmin || await canAny(staff, ['members.manage']))) return staffPermissionErrorResponse(403);
+    if (!(staff.isPlatformAdmin || await can(db, staff, 'members.manage'))) return staffPermissionErrorResponse(403);
     const reason = cleanText(body.reason, 500) || '';
-    const { data, error } = await supabase.rpc('admin_remove_team_member', {
+    const { data, error } = await mutate('admin_remove_team_member', {
       p_session_token_hash: staff.sessionTokenHash,
       p_membership_id: body.id,
       p_reason: reason,

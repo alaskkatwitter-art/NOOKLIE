@@ -1,5 +1,11 @@
+import { randomUUID } from 'node:crypto';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1Reader } from '@/lib/database/d1-reader';
+import { isReaderPreferences } from '@/lib/reader/preferences';
 import { NextResponse } from 'next/server';
-import { chatActor, uuid, privateHeaders } from '@/lib/chat/server';
+import { chatActor, sameOrigin, uuid, privateHeaders } from '@/lib/chat/server';
 import { createClient } from '@supabase/supabase-js';
 import { isPublicStoryVisible } from '@/lib/moderation/content-visibility';
 
@@ -7,6 +13,12 @@ const supabase = createClient(
 process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_SECRET_KEY!
 );
+
+function readerComment(row: Record<string,unknown>) {
+  const { username,display_name,avatar_url,verified,is_official,sticker_url,end_offset,...rest } = row;
+  return { ...rest,profiles:{username,display_name,avatar_url,verified:Boolean(verified),is_official:Boolean(is_official)},
+    user_stickers:row.sticker_id && sticker_url ? {id:row.sticker_id,image_url:sticker_url} : null };
+}
 
 export async function GET(request: Request) {
 try {
@@ -21,6 +33,22 @@ if (typeof chapterId !== 'string' || !uuid.test(chapterId)) {
     },
     { status: 400 }
   );
+}
+
+const db = getD1PreviewDatabase('auth');
+if (db) {
+  const hash = await getSessionTokenHash();
+  const reader = d1Reader(db,isReaderPreferences);
+  const comments = [];
+  let cursor: {createdAt:string;id:string}|null = null;
+  while (comments.length < 1000) {
+    const page = await reader.comments(hash,chapterId,200,cursor);
+    comments.push(...page.map(readerComment));
+    if (page.length < 200) break;
+    const last = page[page.length-1];
+    cursor = {createdAt:String(last.created_at),id:String(last.id)};
+  }
+  return NextResponse.json({comments},{headers:privateHeaders});
 }
 
 const { data: chapterVisibility } = await supabase
@@ -84,7 +112,9 @@ error: 'Não foi possível carregar os comentários.',
 
 export async function POST(request: Request) {
 try {
-const userId = (await chatActor())?.profileId;
+const db = getD1PreviewDatabase('auth');
+const actor = db ? await d1FollowActor(db) : null;
+const userId = db ? actor?.id : (await chatActor())?.profileId;
 
 if (!userId) {
   return NextResponse.json(
@@ -131,6 +161,29 @@ if (
     },
     { status: 400 }
   );
+}
+
+if (db && actor) {
+  const reply = (data:object,status:number) => NextResponse.json(data,{status,headers:privateHeaders});
+  if (!sameOrigin(request)) return reply({error:'Acesso restrito.'},403);
+  if (parentId!==null && (typeof parentId!=='string'||!uuid.test(parentId))) return reply({error:'Comentário de origem inválido.'},400);
+  if ((selectedText!==null&&(typeof selectedText!=='string'||selectedText.length>10000))||
+      (startOffset!==null&&(!Number.isSafeInteger(startOffset)||startOffset<0))) {
+    return reply({error:'Trecho selecionado inválido.'},400);
+  }
+  if (stickerId&&!await db.prepare('SELECT id FROM user_stickers WHERE id=? AND user_id=?').bind(stickerId,actor.id).first()) {
+    return reply({error:'Figurinha não encontrada.'},400);
+  }
+  const reader = d1Reader(db,isReaderPreferences);
+  const saved = await reader.postComment(actor.hash,{
+    id:randomUUID(),chapterId,body:commentBody,parentId,stickerId,selectedText,startOffset,
+  });
+  if (!saved) return reply({error:'Capítulo ou comentário de origem indisponível.'},404);
+  if (stickerId) await db.prepare(`UPDATE user_stickers SET last_used_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE id=? AND user_id=?`).bind(stickerId,actor.id).run();
+  const comment = await reader.commentById(actor.hash,saved.id);
+  if (!comment) return reply({error:'Comentário indisponível.'},404);
+  return reply({comment:readerComment(comment)},201);
 }
 
 const { data: chapter } = await supabase

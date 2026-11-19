@@ -1,3 +1,5 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -22,6 +24,23 @@ export async function GET(
       );
     }
 
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const actor = await d1FollowActor(db);
+      const headers = {'Cache-Control':'no-store, private',Vary:'Cookie'};
+      if (!actor) return NextResponse.json({error:'Não autenticado.'},{status:401,headers});
+      const stories = await db.prepare(`SELECT s.id,s.author_id,s.title,s.description,s.cover_url,s.status,s.rating,s.created_at,s.updated_at
+        FROM released_stories s JOIN profiles p ON p.id=s.author_id AND p.moderation_hidden_at IS NULL
+        JOIN auth_accounts a ON a.id=p.user_id AND a.account_status='active'
+        JOIN d1_social_actors v ON v.token_hash=?1
+        WHERE s.author_id=?2 AND (p.is_private=0 OR p.id=v.profile_id OR EXISTS(
+          SELECT 1 FROM follows WHERE follower_id=v.profile_id AND following_id=p.id))
+        AND NOT EXISTS(SELECT 1 FROM chat_blocks b WHERE
+          (b.blocker_id=v.profile_id AND b.blocked_id=p.id) OR (b.blocker_id=p.id AND b.blocked_id=v.profile_id))
+        ORDER BY s.updated_at DESC,s.id`).bind(actor.hash,id).all<Record<string,unknown>>();
+      if (!stories.success) throw Error('Unable to load author stories');
+      return NextResponse.json({stories:stories.results},{headers});
+    }
     const cookieStore = await cookies();
     const token = cookieStore.get('toriland_session')?.value;
 

@@ -1,3 +1,7 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Moderation } from '@/lib/database/d1-moderation';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1Auth } from '@/lib/database/d1-auth';
 import { NextResponse } from "next/server";
 import {
   chatActor,
@@ -8,6 +12,12 @@ import {
 import { rateLimitKey } from "@/lib/security/rate-key";
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const actor = await d1FollowActor(db);
+      if (!actor) return new NextResponse(null, { status: 401 });
+      return NextResponse.json({ tickets: await d1Moderation(db).myTickets(actor.hash) }, { headers: privateHeaders });
+    }
     const actor = await chatActor();
     if (!actor) return new NextResponse(null, { status: 401 });
     const r = await chatDb
@@ -27,8 +37,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const actor = await chatActor();
-    if (!actor) return new NextResponse(null, { status: 401 });
+    const db = getD1PreviewDatabase('auth');
+    const d1Actor = db ? await d1FollowActor(db) : null;
+    const actor = db ? null : await chatActor();
+    if (!d1Actor && !actor) return new NextResponse(null, { status: 401 });
     const raw = await request.text();
     if (raw.length > 7000) return new NextResponse(null, { status: 400 });
     const b = JSON.parse(raw);
@@ -46,6 +58,23 @@ export async function POST(request: Request) {
         { error: "Confira o assunto, o relato e o username informado." },
         { status: 400 },
       );
+    if (db && d1Actor) {
+      const account = await db.prepare('SELECT user_id FROM d1_social_actors WHERE token_hash=?')
+        .bind(d1Actor.hash).first<{ user_id: string }>();
+      if (!account) return new NextResponse(null, { status: 401 });
+      if (!await d1Auth(db).consumeRateLimit(rateLimitKey('support', account.user_id), 10, 3600)) {
+        return new NextResponse(null, { status: 429 });
+      }
+      if (b.target_username && !await db.prepare('SELECT user_id FROM profiles WHERE username=?')
+        .bind(b.target_username).first()) {
+        return NextResponse.json({ error: 'Esse username não foi encontrado.' }, { status: 400 });
+      }
+      const ticket = await d1Moderation(db).submitTicket(d1Actor.hash, crypto.randomUUID(),
+        b.category, b.subject, b.details, b.target_username || null);
+      if (!ticket) throw new Error('Support ticket unavailable');
+      return NextResponse.json(ticket, { status: 201, headers: privateHeaders });
+    }
+    if (!actor) return new NextResponse(null, { status: 401 });
     const rate = await chatDb.rpc("consume_auth_rate_limit", {
       p_key_hash: rateLimitKey("support", actor.userId),
       p_limit: 10,

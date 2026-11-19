@@ -1,3 +1,5 @@
+import {getD1PreviewDatabase} from '@/lib/database/preview';
+import {d1NewsHttp} from '@/lib/database/d1-news-http';
 import { NextResponse } from 'next/server';
 import { chatActor, chatDb as db, privateHeaders, sameOrigin, uuid } from '@/lib/chat/server';
 import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
@@ -12,6 +14,7 @@ function publishedComment(row: {id:string;body:string;parent_id:string|null;crea
 }
 export async function GET(request: Request) {
   try {
+    const d1=getD1PreviewDatabase('news');if(d1)return d1NewsHttp(request,'GET',d1);
     const params = new URL(request.url).searchParams;
     const article = params.get('article');
     if (!isNewsArticle(article)) return failure('Notícia não encontrada.',404);
@@ -44,6 +47,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   try {
+    const d1=getD1PreviewDatabase('news');if(d1)return d1NewsHttp(request,'POST',d1);
     if (!sameOrigin(request)) return failure('Origem não permitida.',403);
     const actor = await chatActor();
     if (!actor) return failure('Entre na sua conta para comentar.',401);
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
 }
 export async function DELETE(request: Request) {
   try {
+    const d1=getD1PreviewDatabase('news');if(d1)return d1NewsHttp(request,'DELETE',d1);
     if (!sameOrigin(request)) return failure('Origem não permitida.',403);
     const actor=await chatActor();
     if (!actor) return failure('Entre na sua conta.',401);

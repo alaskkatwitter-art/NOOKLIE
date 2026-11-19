@@ -546,3 +546,35 @@ Próximas etapas: completar repositórios e fluxos restantes, integrar HTTP e
 painéis ao D1 em prévia isolada, criar e validar o importador completo,
 conferir dados/permissões e então realizar a troca de produção. A estrutura
 completa, por si só, ainda não permite excluir o Supabase.
+
+## Cópia preliminar e autenticação na prévia
+
+Em 18/11/2026, a cópia isolada chegou a 14.316 registros. As contagens das
+72 tabelas coincidiram com o Supabase de produção no momento da comparação.
+Foram restauradas e conferidas as seis histórias fixadas nos perfis.
+`PRAGMA foreign_key_check` retornou zero violações e `PRAGMA quick_check`
+retornou `ok`. A cópia foi feita em lotes com a origem ativa. Contagens
+iguais não verificam todas as alterações de conteúdo, e a execução permanece
+em fase de cópia até a reconciliação final.
+
+A opção de prévia `auth` liga o login, logout, consulta de sessão e perfil,
+recuperação de senha e preferências de leitura ao D1. A prévia continua
+isolada e depende de um binding configurado explicitamente. O teste HTTP
+local usa credenciais fictícias e confirma que login e logout criam e revogam
+a mesma sessão D1. TypeScript, os 39 testes D1 e a compilação da prévia
+passaram.
+
+Cadastro, leitor completo, editor, feed, chat, permissões de mídia e rotas
+administrativas ainda precisam de integração ou validação HTTP de ponta
+a ponta. A transferência final deve reconciliar inserções, edições e
+exclusões da origem em uma janela com gravações controladas. O Worker de
+produção continua ligado ao Supabase.
+
+Também foram integrados na prévia o cadastro de contas e a rota de
+reordenação e exclusão de capítulos. A criação de conta e perfil e o
+consumo do código oficial ocorrem na mesma transação D1. O cadastro
+continua retornando a chave de recuperação e usa o fluxo de login já
+existente para abrir uma sessão. A exclusão na prévia atua sobre o banco
+isolado e preserva objetos de mídia que podem estar referenciados em
+produção. Passaram TypeScript, a compilação da prévia e 41 testes D1,
+incluindo cadastro e gerenciamento de capítulos pelas rotas HTTP locais.

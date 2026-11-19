@@ -1,3 +1,5 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -60,6 +62,30 @@ async function getCurrentUserId() {
   return session.user_id as string;
 }
 
+async function writeD1Comment(request: Request, id: string, remove: boolean) {
+  const db = getD1PreviewDatabase('auth');
+  if (!db) return null;
+  const headers = { 'Cache-Control': 'no-store, private' };
+  const respond = (body: object, status = 200) => NextResponse.json(body, { status, headers });
+  const origin = request.headers.get('origin');
+  if (origin && origin !== new URL(request.url).origin) return respond({ error: 'Origem não permitida.' }, 403);
+  const hash = await getSessionTokenHash();
+  const actor = hash && await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash=?').bind(hash).first();
+  if (!hash || !actor) return respond({ error: 'Não autenticado.' }, 401);
+  const owner = 'id=?1 AND author_id=(SELECT profile_id FROM d1_social_actors WHERE token_hash=?2)';
+  if (remove) {
+    const row = await db.prepare(`DELETE FROM nook_comments WHERE ${owner} RETURNING id`).bind(id,hash).first();
+    return row ? respond({ success: true, message: 'Comentário excluído com sucesso.', commentId: id })
+      : respond({ error: 'Comentário indisponível.' }, 404);
+  }
+  const body = await request.json().catch(() => null);
+  const content = typeof body?.content === 'string' ? body.content.trim() : '';
+  if (!content || content.length > 2000) return respond({ error: 'Escreva um comentário de até 2.000 caracteres.' }, 400);
+  const row = await db.prepare(`UPDATE nook_comments SET content=?3,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE ${owner} RETURNING id,post_id,author_id,content,parent_id,image_url,created_at,updated_at`).bind(id,hash,content).first();
+  return row ? respond({ comment: row }) : respond({ error: 'Comentário indisponível.' }, 404);
+}
+
 /*
  * PATCH
  *
@@ -74,6 +100,8 @@ export async function PATCH(
   }
 ) {
   try {
+    const d1 = await writeD1Comment(request,(await context.params).id,false);
+    if (d1) return d1;
     const userId =
       await getCurrentUserId();
 
@@ -264,6 +292,8 @@ export async function DELETE(
   }
 ) {
   try {
+    const d1 = await writeD1Comment(request,(await context.params).id,true);
+    if (d1) return d1;
     const userId =
       await getCurrentUserId();
 

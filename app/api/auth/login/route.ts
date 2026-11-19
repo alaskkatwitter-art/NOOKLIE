@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 import { clientIpForAuth } from '@/lib/security/rate-key';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -25,6 +27,8 @@ function hashRateLimitKey(value: string) {
 
 export async function POST(request: Request) {
   try {
+    const db = getD1PreviewDatabase('auth');
+    const auth = db ? d1Auth(db) : null;
     const payload = await request.json();
     const username = typeof payload.username === 'string' ? payload.username.trim().toLowerCase() : '';
     const password = typeof payload.password === 'string' ? payload.password : '';
@@ -42,7 +46,9 @@ export async function POST(request: Request) {
       { value: `login:ip:${clientIp}`, limit: 60 },
     ];
     for (const entry of limiterKeys) {
-      const { data: allowed, error } = await supabase.rpc('consume_auth_rate_limit', {
+      const { data: allowed, error } = auth
+        ? { data: await auth.consumeRateLimit(hashRateLimitKey(entry.value), entry.limit, RATE_WINDOW_SECONDS), error: null }
+        : await supabase.rpc('consume_auth_rate_limit', {
         p_key_hash: hashRateLimitKey(entry.value),
         p_limit: entry.limit,
         p_window_seconds: RATE_WINDOW_SECONDS,
@@ -56,7 +62,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: account, error: accountError } = await supabase
+    const { data: account, error: accountError } = auth
+      ? { data: await auth.accountForLogin(username), error: null }
+      : await supabase
       .from('auth_accounts')
       .select('id, username, password_hash, account_status')
       .eq('username', username)
@@ -80,7 +88,8 @@ export async function POST(request: Request) {
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
     const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
-    const { error: sessionError } = await supabase.from('auth_sessions').insert({
+    if (auth) await auth.createSession(crypto.randomUUID(), account.id, tokenHash, expiresAt);
+    const { error: sessionError } = auth ? { error: null } : await supabase.from('auth_sessions').insert({
       id: crypto.randomUUID(),
       user_id: account.id,
       token_hash: tokenHash,

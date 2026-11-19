@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Explore } from '@/lib/database/d1-explore';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
@@ -108,6 +111,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Ordenação inválida.' }, { status: 400 });
     }
 
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      return NextResponse.json(await d1Explore(db,await getSessionTokenHash(),{
+        query,include:includedTagSlugs,exclude:excludedTagSlugs,rating,status:storyStatus,kind,format,sort,page:requestedPage,
+      }));
+    }
     const currentProfileId = await getCurrentProfileId();
 
     /*

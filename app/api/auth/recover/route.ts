@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 import { clientIpForAuth } from '@/lib/security/rate-key';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -23,6 +25,8 @@ function noStoreHeaders() {
 
 export async function POST(request: Request) {
   try {
+    const db = getD1PreviewDatabase('auth');
+    const auth = db ? d1Auth(db) : null;
     const payload = await request.json();
     const username = typeof payload.username === 'string' ? payload.username.trim().toLowerCase() : '';
     const recoveryKey = typeof payload.recoveryKey === 'string' ? payload.recoveryKey : '';
@@ -48,7 +52,9 @@ export async function POST(request: Request) {
       { value: `recovery:ip:${clientIp}`, limit: 60 },
     ];
     for (const entry of limiterKeys) {
-      const { data: allowed, error: limitError } = await supabase.rpc('consume_auth_rate_limit', {
+      const { data: allowed, error: limitError } = auth
+        ? { data: await auth.consumeRateLimit(hashRateLimitKey(entry.value), entry.limit, RATE_WINDOW_SECONDS), error: null }
+        : await supabase.rpc('consume_auth_rate_limit', {
         p_key_hash: hashRateLimitKey(entry.value),
         p_limit: entry.limit,
         p_window_seconds: RATE_WINDOW_SECONDS,
@@ -62,7 +68,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: account, error } = await supabase
+    const { data: account, error } = auth
+      ? { data: await auth.accountForLogin(username), error: null }
+      : await supabase
       .from('auth_accounts')
       .select('id, recovery_key_hash')
       .eq('username', username)
@@ -80,7 +88,9 @@ export async function POST(request: Request) {
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
     const newRecoveryKey = crypto.randomBytes(16).toString('hex');
     const newRecoveryKeyHash = await bcrypt.hash(newRecoveryKey, 12);
-    const { data: recovered, error: recoveryError } = await supabase.rpc('complete_auth_recovery', {
+    const { data: recovered, error: recoveryError } = auth
+      ? { data: await auth.completeRecovery(account.id, account.recovery_key_hash, newPasswordHash, newRecoveryKeyHash), error: null }
+      : await supabase.rpc('complete_auth_recovery', {
       p_account_id: account.id,
       p_expected_recovery_key_hash: account.recovery_key_hash,
       p_new_password_hash: newPasswordHash,

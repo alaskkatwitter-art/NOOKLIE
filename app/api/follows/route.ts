@@ -1,14 +1,47 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { d1Social } from '@/lib/database/d1-social';
+import { d1FollowActor, d1FollowState } from '@/lib/database/d1-follow-http';
 import {NextResponse}from'next/server';
 import{rateLimitKey}from'@/lib/security/rate-key';
 import{chatActor,chatDb,uuid,privateHeaders,sameOrigin}from'@/lib/chat/server';
 import{currentViewerProfileId,isPublicProfileVisible}from'@/lib/moderation/content-visibility';
 export async function GET(request:Request){try{
-const target=new URL(request.url).searchParams.get('user_id')||'';if(!uuid.test(target))return new NextResponse(null,{status:400});const viewer=await currentViewerProfileId(chatDb);
+const target=new URL(request.url).searchParams.get('user_id')||'';if(!uuid.test(target))return new NextResponse(null,{status:400});const db=getD1PreviewDatabase('auth');
+if(db){
+  const row=await d1FollowState(db,await getSessionTokenHash(),target);
+  if(!row)return new NextResponse(null,{status:404,headers:privateHeaders});
+  return NextResponse.json({
+    followers_count:row.allowed?row.followers_count:0,following_count:row.allowed?row.following_count:0,
+    is_self:Boolean(row.own),is_following:Boolean(row.following),requested:Boolean(row.requested),restricted:!row.allowed,
+  },{headers:privateHeaders});
+}
+const viewer=await currentViewerProfileId(chatDb);
 const profile=await chatDb.from('profiles').select('id,is_private').eq('id',target).maybeSingle();if(profile.error||!profile.data)return new NextResponse(null,{status:404});
 const own=viewer===target;const follow=viewer?await chatDb.from('follows').select('follower_id').eq('follower_id',viewer).eq('following_id',target).maybeSingle():{data:null,error:null};if(follow.error)throw follow.error;
 const requested=viewer?await chatDb.from('follow_requests').select('requester_id').eq('requester_id',viewer).eq('target_id',target).maybeSingle():{data:null,error:null};if(requested.error)throw requested.error;
 const allowed=await isPublicProfileVisible(chatDb,target,viewer);let followers=0,following=0;if(allowed){const[a,b]=await Promise.all([chatDb.from('follows').select('*',{count:'exact',head:true}).eq('following_id',target),chatDb.from('follows').select('*',{count:'exact',head:true}).eq('follower_id',target)]);if(a.error||b.error)throw a.error||b.error;followers=a.count||0;following=b.count||0;}
 return NextResponse.json({followers_count:followers,following_count:following,is_self:own,is_following:Boolean(follow.data),requested:Boolean(requested.data),restricted:!allowed},{headers:privateHeaders});
 }catch{return new NextResponse(null,{status:503,headers:privateHeaders});}}
-async function change(request:Request,action:string){try{if(!sameOrigin(request))return new NextResponse(null,{status:403});const actor=await chatActor();if(!actor)return new NextResponse(null,{status:401});const raw=await request.text();const body=raw.length<=500?JSON.parse(raw):null;if(!body||!uuid.test(body.following_id||''))return new NextResponse(null,{status:400});if(action==='follow'){const rate=await chatDb.rpc('consume_auth_rate_limit',{p_key_hash:rateLimitKey('follow',actor.profileId),p_limit:60,p_window_seconds:3600});if(rate.error||!rate.data)return new NextResponse(null,{status:429,headers:privateHeaders});}const{data,error}=await chatDb.rpc('social_follow',{p_session:actor.sessionTokenHash,p_target:body.following_id,p_action:action});if(error)throw error;return NextResponse.json({following:data==='following',requested:data==='requested'},{headers:privateHeaders});}catch{return NextResponse.json({error:'Não foi possível atualizar esta solicitação.'},{status:409,headers:privateHeaders});}}
+async function change(request:Request,action:string){try{if(!sameOrigin(request))return new NextResponse(null,{status:403});const db=getD1PreviewDatabase('auth');
+if(db){
+  const actor=await d1FollowActor(db);
+  if(!actor)return new NextResponse(null,{status:401,headers:privateHeaders});
+  const raw=await request.text();
+  const body=raw.length<=500?JSON.parse(raw):null;
+  const target=body?.following_id;
+  if(typeof target!=='string'||!uuid.test(target))return new NextResponse(null,{status:400});
+  const social=d1Social(db);
+  if(action==='follow'){
+    if(!await d1Auth(db).consumeRateLimit(rateLimitKey('follow',actor.id),60,3600))return new NextResponse(null,{status:429,headers:privateHeaders});
+    await social.follow(actor.hash,target);
+    const state=await d1FollowState(db,actor.hash,target);
+    if(!state||(!state.following&&!state.requested))return NextResponse.json({error:'Não foi possível atualizar esta solicitação.'},{status:409,headers:privateHeaders});
+    return NextResponse.json({following:Boolean(state.following),requested:Boolean(state.requested)},{headers:privateHeaders});
+  }
+  await social.unfollow(actor.hash,target);
+  return NextResponse.json({following:false,requested:false},{headers:privateHeaders});
+}
+const actor=await chatActor();if(!actor)return new NextResponse(null,{status:401});const raw=await request.text();const body=raw.length<=500?JSON.parse(raw):null;if(!body||!uuid.test(body.following_id||''))return new NextResponse(null,{status:400});if(action==='follow'){const rate=await chatDb.rpc('consume_auth_rate_limit',{p_key_hash:rateLimitKey('follow',actor.profileId),p_limit:60,p_window_seconds:3600});if(rate.error||!rate.data)return new NextResponse(null,{status:429,headers:privateHeaders});}const{data,error}=await chatDb.rpc('social_follow',{p_session:actor.sessionTokenHash,p_target:body.following_id,p_action:action});if(error)throw error;return NextResponse.json({following:data==='following',requested:data==='requested'},{headers:privateHeaders});}catch{return NextResponse.json({error:'Não foi possível atualizar esta solicitação.'},{status:409,headers:privateHeaders});}}
 export async function POST(r:Request){return change(r,'follow');}export async function DELETE(r:Request){return change(r,'unfollow');}

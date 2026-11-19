@@ -8,7 +8,8 @@ export function contentMediaUrl(
   try {
     const url = new URL(value);
     const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (configured && url.origin !== new URL(configured).origin) return value;
+    if (configured && url.origin !== new URL(configured).origin &&
+        url.origin !== 'https://fwwgoyburkdybbqmvljk.supabase.co') return value;
     const match = url.pathname.match(/^\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
     if (!match || !buckets.has(match[1])) return value;
     const path = '/api/content-media?bucket=' + encodeURIComponent(match[1]) +

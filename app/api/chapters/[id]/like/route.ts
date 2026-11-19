@@ -1,3 +1,7 @@
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Books } from '@/lib/database/d1-books';
+import { safeChapterHtml } from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
@@ -63,6 +67,12 @@ export async function GET(
         },
         { status: 400 }
       );
+    }
+
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const result = await d1Books(db, safeChapterHtml).chapterLike(await getSessionTokenHash(), id, false);
+      return NextResponse.json(result ?? { likes: 0, liked: false }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     const { count, error: countError } =
@@ -141,6 +151,19 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const headers = { 'Cache-Control': 'no-store, private' };
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403, headers });
+      const hash = await getSessionTokenHash();
+      const actor = hash && await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash = ?').bind(hash).first();
+      if (!hash || !actor) return NextResponse.json({ error: 'Você precisa estar logado para curtir capítulos.' }, { status: 401, headers });
+      const result = await d1Books(db, safeChapterHtml).chapterLike(hash, id, true);
+      return result ? NextResponse.json(result, { headers })
+        : NextResponse.json({ error: 'Capítulo não encontrado.' }, { status: 404, headers });
     }
 
     const userId = await getUserId(request);

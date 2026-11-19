@@ -1,3 +1,10 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash, getAuthenticatedUserContext } from '@/lib/auth/session';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { d1StoryDetails, decodeD1Story, saveD1StoryDetails } from '@/lib/database/d1-story-details';
+import { getMediaBucket } from '@/lib/media/r2-binding';
+import type { D1Value } from '@/lib/database/d1';
 import { mediaStorage } from '@/lib/media/storage';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { imageMatchesType } from '@/lib/security/uploads';
@@ -107,6 +114,12 @@ export async function GET(
       );
     }
 
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const details = await d1StoryDetails(db,await getSessionTokenHash(),id,new URL(request.url).searchParams.get('summary')==='1');
+      return details ? NextResponse.json(details,{headers:privateHeaders})
+        : NextResponse.json({error:'História não encontrada.'},{status:404,headers:privateHeaders});
+    }
     const currentUserId =
       await getSessionUserId();
 
@@ -620,8 +633,9 @@ export async function PUT(
      * ==================================================
      */
 
-    const userId =
-      await getSessionUserId();
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    const userId = db ? actor?.id : await getSessionUserId();
 
     if (!userId) {
       return NextResponse.json(
@@ -641,10 +655,12 @@ export async function PUT(
      * ==================================================
      */
 
-    const {
-      data: existingStory,
-      error: existingError,
-    } = await supabase
+    const {data:existingStory,error:existingError} = db ? {
+      data:await db.prepare('SELECT * FROM stories WHERE id=?').bind(id).first<{
+        author_id:string;title:string;description:string|null;spotify_link:string|null;cover_url:string|null;status:string|null;rating:string|null;
+      }>(),
+      error:null,
+    } : await supabase
       .from('stories')
       .select(`
         id,
@@ -717,7 +733,7 @@ export async function PUT(
     let storyMetadata;
     try { storyMetadata = parseStoryMetadata(formData); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Dados inválidos.' }, { status: 400 }); }
 
-    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, existingStory.spotify_link, true);
+    const music = await spotifyUpdate(formData.get('spotify_url') ?? undefined, db && existingStory.spotify_link ? JSON.parse(existingStory.spotify_link) : existingStory.spotify_link, true);
     if (music instanceof NextResponse) return music;
 
     const title = String(formData.get('title') ?? existingStory.title ?? '').trim();
@@ -827,6 +843,8 @@ export async function PUT(
      * ==================================================
      */
 
+    const bucket = db ? getMediaBucket() : undefined;
+    let d1CoverKey: string | undefined;
     let coverUrl =
       existingStory.cover_url ||
       null;
@@ -877,7 +895,8 @@ export async function PUT(
       }
 
 
-      if (!imageMatchesType(new Uint8Array(await cover.arrayBuffer()), cover.type)) {
+      const bytes = new Uint8Array(await cover.arrayBuffer());
+      if (!imageMatchesType(bytes, cover.type)) {
         return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
       }
       let extension =
@@ -910,50 +929,62 @@ export async function PUT(
         '.' +
         extension;
 
-      const {
-        error: uploadError,
-      } =
-        await mediaStorage(supabase, 'story-covers')
-          .upload(
-            uploadedFilePath,
-            cover,
-            {
-              contentType:
-                cover.type,
+      if (db && actor) {
+        const path = `d1-stories/${actor.id}/${id}/${crypto.randomUUID()}.${extension}`;
+        const key = 'story-covers/' + path;
+        if (!await bucket?.put(key,bytes,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:cover.type}})) {
+          uploadedFilePath = null;
+          throw Error('Unable to store story cover');
+        }
+        d1CoverKey = key;
+        coverUrl = '/api/content-media?' + new URLSearchParams({bucket:'story-covers',path});
+        uploadedFilePath = null;
+      } else {
+        const {
+          error: uploadError,
+        } =
+          await mediaStorage(supabase, 'story-covers')
+            .upload(
+              uploadedFilePath,
+              cover,
+              {
+                contentType:
+                  cover.type,
 
-              upsert:
-                false,
+                upsert:
+                  false,
+              }
+            );
+
+        if (uploadError) {
+          console.error(
+            'Erro ao enviar nova capa:',
+            uploadError
+          );
+
+          return NextResponse.json(
+            {
+              error:
+                'Não foi possível enviar a capa.',
+            },
+            {
+              status: 500,
             }
           );
+        }
 
-      if (uploadError) {
-        console.error(
-          'Erro ao enviar nova capa:',
-          uploadError
-        );
+        const {
+          data:
+            publicUrlData,
+        } =
+          mediaStorage(supabase, 'story-covers')
+            .getPublicUrl(
+              uploadedFilePath
+            );
 
-        return NextResponse.json(
-          {
-            error:
-              'Não foi possível enviar a capa.',
-          },
-          {
-            status: 500,
-          }
-        );
+        coverUrl =
+          publicUrlData.publicUrl;
       }
-
-      const {
-        data:
-          publicUrlData,
-      } =
-        mediaStorage(supabase, 'story-covers')
-          .getPublicUrl(
-            uploadedFilePath
-          );
-
-      coverUrl =
-        publicUrlData.publicUrl;
     }
 
     /*
@@ -961,6 +992,42 @@ export async function PUT(
      * ATUALIZA HISTÓRIA
      * ==================================================
      */
+
+    if (db && actor) {
+      const fields = {
+        ...storyMetadata,
+        ...('spotify_link' in music && {spotify_link:music.spotify_link ? JSON.stringify(music.spotify_link) : null}),
+        ...(formData.has('title') && {title}),
+        ...(formData.has('description') && {description:description || null}),
+        ...(formData.has('status') && {status:status || null}),
+        ...(formData.has('rating') && {rating:rating || null}),
+        ...(d1CoverKey && {cover_url:coverUrl}),
+      };
+      const values:Record<string,D1Value> = Object.fromEntries(Object.entries(fields)
+        .map(([name,value])=>[name,typeof value==='boolean' ? Number(value) : value]));
+      const requested = genre ? [genre,...tagNames.filter(tag=>tag.toLowerCase()!==genre.toLowerCase())] : tagNames;
+      const tags = formData.has('tags') || formData.has('genre')
+        ? requested.map(name=>({name,category:name===genre ? 'genre' : 'freeform'})) : null;
+      try {
+        if (!await saveD1StoryDetails(db,actor.hash,id,values,tags)) throw Error('Obra indisponível.');
+      } catch (error) {
+        if (d1CoverKey) {
+          const current = await db.prepare('SELECT cover_url FROM stories WHERE id=?').bind(id)
+            .first<{cover_url:string|null}>().catch(()=>undefined);
+          if (current!==undefined && current?.cover_url!==coverUrl) await bucket?.delete([d1CoverKey]).catch(()=>undefined);
+        }
+        throw error;
+      }
+      const [row, updatedTags] = await Promise.all([
+        db.prepare(`SELECT s.* FROM stories s JOIN d1_social_actors a ON a.profile_id=s.author_id
+          WHERE s.id=? AND a.token_hash=?`).bind(id,actor.hash).first<Record<string,unknown>>(),
+        db.prepare(`SELECT t.id,t.name,t.slug FROM story_tags st JOIN tags t ON t.id=st.tag_id
+          WHERE st.story_id=? ORDER BY t.name,t.id`).bind(id).all(),
+      ]);
+      if (!row || !updatedTags.success) throw Error('Story unavailable');
+      return NextResponse.json({success:true,story:{...decodeD1Story(row),tags:updatedTags.results},
+        message:'História atualizada com sucesso.'});
+    }
 
     let tagIds: string[] | null = null;
     if (formData.has('tags') || formData.has('genre')) {
@@ -1027,7 +1094,8 @@ export async function PUT(
     return NextResponse.json(
       {
         error:
-          (error as { code?: string } | null)?.code === '23505'
+          ((error as { code?: string } | null)?.code === '23505' ||
+            (error instanceof Error && error.message.includes('stories_series_volume_key')))
             ? 'Já existe um livro com esse número nesta série.'
             : 'Não foi possível salvar as alterações da obra.' ,
       },
@@ -1041,10 +1109,32 @@ export async function PUT(
 export async function DELETE(request:Request,{params}:RouteContext){
   try{
     if(!sameOrigin(request))return new NextResponse(null,{status:403});
-    const actor=await chatActor();if(!actor)return NextResponse.json({error:'Entre na sua conta.'},{status:401,headers:privateHeaders});
+    const db=getD1PreviewDatabase('auth');
+    const auth=db ? await getAuthenticatedUserContext() : null;
+    const preview=db ? await d1FollowActor(db) : null;
+    const actor=db ? null : await chatActor();
+    if(!(db ? auth && preview : actor))return NextResponse.json({error:'Entre na sua conta.'},{status:401,headers:privateHeaders});
     const {id}=await params;if(!uuid.test(id))return new NextResponse(null,{status:400});
     const raw=await request.text();if(raw.length>1000)return new NextResponse(null,{status:400});const body=JSON.parse(raw);
     if(typeof body.password!=='string'||!body.password||body.password.length>200)return NextResponse.json({error:'Digite sua senha.'},{status:400,headers:privateHeaders});
+    if(db && auth && preview){
+      if(!await d1Auth(db).consumeRateLimit(rateLimitKey('delete-story',auth.userId),5,900)){
+        return NextResponse.json({error:'Aguarde alguns minutos antes de tentar novamente.'},{status:429,headers:privateHeaders});
+      }
+      const target=await db.prepare(`SELECT a.password_hash FROM stories s
+        JOIN d1_social_actors v ON v.profile_id=s.author_id JOIN auth_accounts a ON a.id=v.user_id
+        WHERE s.id=? AND v.token_hash=?`).bind(id,preview.hash).first<{password_hash:string}>();
+      if(!target)return NextResponse.json({error:'História não encontrada.'},{status:404,headers:privateHeaders});
+      if(!await bcrypt.compare(body.password,target.password_hash)){
+        return NextResponse.json({error:'Senha incorreta. A história foi mantida.'},{status:403,headers:privateHeaders});
+      }
+      const deleted=await db.prepare(`DELETE FROM stories WHERE id=?2 AND author_id=(
+        SELECT v.profile_id FROM d1_social_actors v JOIN auth_accounts a ON a.id=v.user_id
+        WHERE v.token_hash=?1 AND a.password_hash=?3) RETURNING id`).bind(preview.hash,id,target.password_hash).first();
+      return deleted ? NextResponse.json({deleted:true},{headers:privateHeaders})
+        : NextResponse.json({error:'História não encontrada.'},{status:404,headers:privateHeaders});
+    }
+    if(!actor)return NextResponse.json({error:'Entre na sua conta.'},{status:401,headers:privateHeaders});
     const limit=await supabase.rpc('consume_auth_rate_limit',{p_key_hash:rateLimitKey('delete-story',actor.userId),p_limit:5,p_window_seconds:900});if(limit.error||!limit.data)return NextResponse.json({error:'Aguarde alguns minutos antes de tentar novamente.'},{status:429,headers:privateHeaders});
     const [story,account]=await Promise.all([supabase.from('stories').select('id,author_id').eq('id',id).maybeSingle(),supabase.from('auth_accounts').select('password_hash').eq('id',actor.userId).single()]);
     if(story.error||account.error)throw story.error||account.error;

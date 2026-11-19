@@ -8,3 +8,7 @@ export function getMediaBucket(): MediaBucket | undefined {
     return undefined;
   }
 }
+
+export function getHistoricalMediaBucket(): Pick<MediaBucket, 'get'> | undefined {
+  return (env as { NOOKLIE_HISTORICAL_MEDIA?: Pick<MediaBucket, 'get'> }).NOOKLIE_HISTORICAL_MEDIA;
+}

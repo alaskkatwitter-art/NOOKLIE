@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Discovery } from '@/lib/database/d1-discovery';
 import { NextResponse } from 'next/server';
 import { discoveryDb, getDiscoveryReader, privateHeaders } from '@/lib/discovery/server';
 import type { DiscoveryHome, DiscoveryStory } from '@/lib/discovery/types';
@@ -6,6 +9,13 @@ const shelves = ['for_you', 'weekly', 'most_viewed', 'most_read', 'new_fandom', 
 
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const hash = await getSessionTokenHash();
+      const home = hash ? await d1Discovery(db,hash) : null;
+      return home ? NextResponse.json(home,{headers:privateHeaders})
+        : NextResponse.json({error:'Entre para acessar seu início.'},{status:401,headers:privateHeaders});
+    }
     const reader = await getDiscoveryReader();
     if (!reader) return NextResponse.json({ error: 'Entre para acessar seu início.' }, { status: 401, headers: privateHeaders });
     const { data, error } = await discoveryDb.rpc('discovery_home', { p_account: reader.accountId });

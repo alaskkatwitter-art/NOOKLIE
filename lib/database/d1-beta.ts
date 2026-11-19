@@ -4,7 +4,7 @@ export function d1Beta(db: NooklieD1, sanitizeBeta: (html: string) => string) {
   if(typeof sanitizeBeta!=='function')throw new Error('Private preview sanitizer required');
   function session(hash: string) {if(!/^[0-9a-f]{64}$/.test(hash))throw new Error('Invalid session hash');}
   const context=`WITH actor AS (SELECT profile_id FROM d1_social_actors WHERE token_hash=?1), eligible AS (
-    SELECT i.id,i.chapter_id,i.reader_id,i.accepted_at,c.title,c.body,c.published,s.title AS story_title,s.author_id,s.story_kind,
+    SELECT i.id,i.chapter_id,i.reader_id,i.accepted_at,i.created_at,author.username AS author_name,reader.username AS reader_name,c.title,c.body,c.published,s.title AS story_title,s.author_id,s.story_kind,
       CASE WHEN s.author_id=(SELECT profile_id FROM actor) THEN 1 ELSE 0 END AS owner
     FROM beta_reading_invites i JOIN chapters c ON c.id=i.chapter_id JOIN stories s ON s.id=c.story_id
     JOIN profiles author ON author.id=s.author_id JOIN auth_accounts aa ON aa.id=author.user_id
@@ -25,14 +25,15 @@ export function d1Beta(db: NooklieD1, sanitizeBeta: (html: string) => string) {
           AND s.moderation_hidden_at IS NULL AND r.moderation_hidden_at IS NULL AND ra.account_status='active'
           AND r.id<>a.profile_id AND NOT EXISTS(SELECT 1 FROM chat_blocks b WHERE
             (b.blocker_id=r.id AND b.blocked_id=a.profile_id) OR (b.blocked_id=r.id AND b.blocker_id=a.profile_id))
-        ON CONFLICT(chapter_id,reader_id) DO NOTHING RETURNING id`)
+        ON CONFLICT(chapter_id,reader_id) DO UPDATE SET reader_id=excluded.reader_id RETURNING id`)
         .bind(hash,id,chapterId,username.trim().replace(/^@/,'')).first<{id:string}>();
     },
     async invites(hash: string) {
       session(hash);
-      const result=await db.prepare(context+` SELECT id,chapter_id,reader_id,accepted_at,title,story_title,owner
-        FROM eligible WHERE ${active} ORDER BY id LIMIT 100`).bind(hash).all<Record<string,unknown>>();
-      if(!result.success)throw new Error('Invites unavailable');return result.results;
+      const result=await db.prepare(context+` SELECT id,accepted_at,title,story_title,owner,author_name,reader_name
+        FROM eligible WHERE ${active} ORDER BY created_at DESC,id LIMIT 100`).bind(hash).all<Record<string,unknown>>();
+      if(!result.success)throw new Error('Invites unavailable');
+      return result.results.map(row => ({ ...row, owner: Boolean(row.owner) }));
     },
     async accept(hash: string, id: string) {
       session(hash);
@@ -51,7 +52,8 @@ export function d1Beta(db: NooklieD1, sanitizeBeta: (html: string) => string) {
           AND (owner=1 OR accepted_at IS NOT NULL) ORDER BY n.created_at DESC,n.id LIMIT 100`)
         .bind(hash,id).all<{id:string;excerpt:string;body:string;created_at:string}>();
       if(!notes.success)throw new Error('Beta notes unavailable');
-      return {...draft,body:sanitizeBeta(draft.body),notes:notes.results};
+      return {title:draft.title,story_title:draft.story_title,owner:Boolean(draft.owner),
+        accepted:draft.accepted_at!==null,body:sanitizeBeta(draft.body || ''),notes:notes.results};
     },
     async note(hash: string, id: string, inviteId: string, excerpt: string, body: string) {
       session(hash);

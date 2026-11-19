@@ -21,3 +21,7 @@ export interface MediaBucket {
 export function getMediaBucket(): MediaBucket | undefined {
   return undefined;
 }
+
+export function getHistoricalMediaBucket(): Pick<MediaBucket, 'get'> | undefined {
+  return undefined;
+}

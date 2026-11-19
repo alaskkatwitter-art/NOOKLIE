@@ -1,3 +1,8 @@
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1Books } from '@/lib/database/d1-books';
+import { safeChapterHtml } from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
@@ -57,6 +62,11 @@ export async function GET(
       );
     }
 
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const result = await d1Books(db,safeChapterHtml).storyLike(await getSessionTokenHash(),id,false);
+      return NextResponse.json(result ?? {likes:0,liked:false},{headers:{'Cache-Control':'no-store, private'}});
+    }
     const userId = await getUserId(request);
 
     const { count, error: countError } =
@@ -109,6 +119,17 @@ export async function POST(
   try {
     const { id } = await context.params;
 
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const headers = {'Cache-Control':'no-store, private'};
+      const origin = request.headers.get('origin');
+      if (origin && origin!==new URL(request.url).origin) return NextResponse.json({error:'Acesso restrito.'},{status:403,headers});
+      const actor = await d1FollowActor(db);
+      if (!actor) return NextResponse.json({error:'Você precisa estar logado para curtir.'},{status:401,headers});
+      const result = await d1Books(db,safeChapterHtml).storyLike(actor.hash,id,true);
+      return result ? NextResponse.json(result,{headers})
+        : NextResponse.json({error:'História não encontrada.'},{status:404,headers});
+    }
     const userId = await getUserId(request);
 
     if (!userId) {

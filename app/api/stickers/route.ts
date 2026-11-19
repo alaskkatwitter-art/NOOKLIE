@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { getMediaBucket } from '@/lib/media/r2-binding';
 import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { NextResponse } from 'next/server';
@@ -45,7 +48,9 @@ return session.user_id;
 
 export async function GET(request: Request) {
 try {
-const userId = await getUserId(request);
+const db = getD1PreviewDatabase('auth');
+const actor = db ? await d1FollowActor(db) : null;
+const userId = db ? actor?.id : await getUserId(request);
 
 if (!userId) {
   return NextResponse.json(
@@ -54,6 +59,14 @@ if (!userId) {
     },
     { status: 401 }
   );
+}
+
+if (db && actor) {
+  const result = await db.prepare(`SELECT id,image_url,created_at,last_used_at FROM user_stickers
+    WHERE user_id=(SELECT profile_id FROM d1_social_actors WHERE token_hash=?)
+    ORDER BY last_used_at DESC NULLS LAST,created_at DESC,id`).bind(actor.hash).all();
+  if (!result.success) throw Error('Stickers unavailable');
+  return NextResponse.json({stickers:result.results});
 }
 
 const { data: stickers, error } = await supabase
@@ -98,7 +111,9 @@ error: 'Não foi possível carregar suas figurinhas.',
 
 export async function POST(request: Request) {
 try {
-const userId = await getUserId(request);
+const db = getD1PreviewDatabase('auth');
+const actor = db ? await d1FollowActor(db) : null;
+const userId = db ? actor?.id : await getUserId(request);
 
 if (!userId) {
   return NextResponse.json(
@@ -167,6 +182,31 @@ const arrayBuffer = await file.arrayBuffer();
       return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
     }
 
+
+if (db && actor) {
+  const bucket = getMediaBucket();
+  const path = 'stickers/' + filePath;
+  if (!await bucket?.put(path,arrayBuffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:file.type}})) {
+    throw Error('Sticker upload failed');
+  }
+  const id = crypto.randomUUID();
+  const url = '/api/public-media/' + path;
+  let saved = false;
+  try {
+    const sticker = await db.prepare(`INSERT INTO user_stickers(id,user_id,image_url)
+      SELECT ?2,profile_id,?3 FROM d1_social_actors WHERE token_hash=?1
+      RETURNING id,image_url,created_at,last_used_at`).bind(actor.hash,id,url).first();
+    if (!sticker) throw Error('Sticker could not be saved');
+    saved = true;
+    return NextResponse.json({sticker},{status:201});
+  } finally {
+    if (!saved) {
+      const record = await db.prepare('SELECT id FROM user_stickers WHERE id=?').bind(id).first()
+        .catch(() => undefined);
+      if (record === null) await bucket?.delete([path]).catch(() => undefined);
+    }
+  }
+}
 
 const { error: uploadError } = await mediaStorage(supabase, 'stickers')
   .upload(filePath, arrayBuffer, {

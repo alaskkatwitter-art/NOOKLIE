@@ -1,3 +1,5 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { GET as readD1Replies, POST as createD1Reply } from '@/app/api/nook-comments/route';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -66,6 +68,7 @@ async function getCurrentUserId() {
  */
 export async function GET(request: Request) {
   try {
+    if (getD1PreviewDatabase('auth')) return await readD1Replies(request);
     const { searchParams } =
       new URL(request.url);
 
@@ -213,6 +216,7 @@ export async function POST(
   request: Request
 ) {
   try {
+    if (getD1PreviewDatabase('auth')) return await createD1Reply(request);
     /*
      * Descobre o usuário diretamente
      * pela sessão, sem fazer fetch interno

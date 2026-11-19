@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 import { clientIpForAuth, rateLimitKey } from '@/lib/security/rate-key';
 
 const supabase = createClient(
@@ -46,9 +48,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const d1 = getD1PreviewDatabase('auth');
+    const auth = d1 ? d1Auth(d1) : null;
     const windowSeconds = 15 * 60;
     const clientIp = clientIpForAuth(request);
-    const { data: allowed, error: limitError } = await supabase.rpc('consume_auth_rate_limit', {
+    const { data: allowed, error: limitError } = auth
+      ? { data: await auth.consumeRateLimit(rateLimitKey('signup:ip', clientIp), 20, windowSeconds), error: null }
+      : await supabase.rpc('consume_auth_rate_limit', {
       p_key_hash: rateLimitKey('signup:ip', clientIp),
       p_limit: 20,
       p_window_seconds: windowSeconds,
@@ -63,7 +69,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: existingAccount, error: searchError } = await supabase
+    const { data: existingAccount, error: searchError } = auth
+      ? { data: await auth.accountForLogin(cleanUsername), error: null }
+      : await supabase
       .from('auth_accounts')
       .select('id')
       .eq('username', cleanUsername)
@@ -85,6 +93,7 @@ export async function POST(request: Request) {
 
     const isOfficialAccount = cleanUsername === 'nooklie';
 
+    let officialHash: string | null = null;
     if (isOfficialAccount) {
       if (typeof officialSignupCode !== 'string' || !officialSignupCode.trim()) {
         return NextResponse.json(
@@ -93,7 +102,9 @@ export async function POST(request: Request) {
         );
       }
 
-      const { data: claim, error: claimError } = await supabase
+      const { data: claim, error: claimError } = d1
+        ? { data: await d1.prepare('SELECT token_hash FROM official_signup_tokens WHERE singleton = 1 AND used_at IS NULL').first<{ token_hash: string }>(), error: null }
+        : await supabase
         .from('official_signup_tokens')
         .select('token_hash')
         .eq('singleton', true)
@@ -104,6 +115,7 @@ export async function POST(request: Request) {
         .createHash('sha256')
         .update(officialSignupCode.trim())
         .digest();
+      officialHash = suppliedHash.toString('hex');
 
       const expectedHash = claim?.token_hash
         ? Buffer.from(claim.token_hash, 'hex')
@@ -128,6 +140,19 @@ export async function POST(request: Request) {
     const recoveryKeyHash = await bcrypt.hash(recoveryKey, 12);
 
     const userId = crypto.randomUUID();
+
+    if (auth) {
+      const created = await auth.register(userId, cleanUsername, passwordHash, recoveryKeyHash, officialHash);
+      if (!created) {
+        const error = isOfficialAccount
+          ? 'O código oficial já foi usado. Solicite um novo código.'
+          : 'Esse username já está sendo usado.';
+        return NextResponse.json({ error }, { status: 409 });
+      }
+      return NextResponse.json({ message: 'Conta criada com sucesso.', recoveryKey }, {
+        status: 201, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
     const { error: accountError } = await supabase
       .from('auth_accounts')

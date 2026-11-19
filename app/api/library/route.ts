@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Books } from '@/lib/database/d1-books';
+import { safeChapterHtml } from '@/lib/security/html';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
@@ -67,8 +72,44 @@ async function getCurrentProfileId() {
  *
  * Carrega as histórias salvas na Biblioteca.
  */
+async function d1Library(request?:Request) {
+  const db = getD1PreviewDatabase('auth');
+  if (!db) return null;
+  const headers = { 'Cache-Control':'no-store, private', Vary:'Cookie' };
+  const respond = (data:object,status=200) => NextResponse.json(data,{status,headers});
+  const hash = await getSessionTokenHash();
+  if (!hash || !await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash=?').bind(hash).first()) {
+    return respond({error:'Você precisa estar logado.'},401);
+  }
+  const books = d1Books(db,safeChapterHtml);
+  if (!request) return respond({items:await books.libraryCards(hash),reading_details_available:true});
+  if (!sameOrigin(request)) return respond({error:'Acesso restrito.'},403);
+  const body = await request.json().catch(()=>null);
+  const storyId = body?.story_id;
+  if (typeof storyId!=='string'||!uuid.test(storyId)) return respond({error:'História inválida.'},400);
+  if (request.method==='POST') {
+    const list = await books.library(hash,randomUUID());
+    if (!list) return respond({error:'Biblioteca indisponível.'},404);
+    const added = await books.addToList(hash,list.id,storyId,randomUUID());
+    return added || await books.libraryItem(hash,storyId) ? respond({saved:true,story_id:storyId})
+      : respond({error:'História não encontrada.'},404);
+  }
+  const list = await db.prepare(`SELECT l.id FROM reading_lists l JOIN d1_social_actors a ON a.profile_id=l.user_id
+    WHERE a.token_hash=? AND l.name='Biblioteca'`).bind(hash).first<{id:string}>();
+  if (request.method==='DELETE') {
+    if (list) await books.removeFromList(hash,list.id,storyId);
+    return respond({saved:false,story_id:storyId});
+  }
+  const status = body?.reading_status;
+  if (status!==null&&!isReadingStatus(status)) return respond({error:'História ou status inválido.'},400);
+  const updated = list && await books.setReadingStatus(hash,list.id,storyId,status);
+  return updated ? respond({reading_status:status}) : respond({error:'História fora da biblioteca.'},404);
+}
+
 export async function GET() {
   try {
+    const d1 = await d1Library();
+    if (d1) return d1;
     const profileId =
       await getCurrentProfileId();
 
@@ -375,6 +416,8 @@ export async function POST(
   request: Request
 ) {
   try {
+    const d1 = await d1Library(request);
+    if (d1) return d1;
     const profileId =
       await getCurrentProfileId();
 
@@ -478,6 +521,8 @@ export async function DELETE(
   request: Request
 ) {
   try {
+    const d1 = await d1Library(request);
+    if (d1) return d1;
     if (!sameOrigin(request)) return NextResponse.json({ error: 'Acesso restrito.' }, { status: 403 });
     const profileId =
       await getCurrentProfileId();
@@ -584,6 +629,8 @@ export async function DELETE(
 
 export async function PATCH(request: Request) {
   try {
+    const d1 = await d1Library(request);
+    if (d1) return d1;
     const profileId = await getCurrentProfileId();
     if (!profileId) return NextResponse.json({ error: 'Você precisa estar logado.' }, { status: 401 });
 

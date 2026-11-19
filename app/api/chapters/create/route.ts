@@ -1,3 +1,6 @@
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Books } from '@/lib/database/d1-books';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import {safeChapterHtml} from '@/lib/security/html';
 import { NextResponse } from 'next/server';
@@ -99,7 +102,11 @@ function normalizePublicationStatus(
 
 export async function POST(request: Request) {
   try {
-    const userId = await getAuthenticatedUser(request);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const actor = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash = ?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const userId = db ? actor?.profile_id : await getAuthenticatedUser(request);
 
     if (!userId) {
       return NextResponse.json(
@@ -268,6 +275,31 @@ export async function POST(request: Request) {
           }
         );
       }
+    }
+
+    if (db && hash) {
+      const headers = noCacheHeaders();
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403, headers });
+      const status = normalizePublicationStatus(data.publication_status, scheduledDate);
+      if (status === 'scheduled' && !scheduledDate) return NextResponse.json({ error: 'Escolha uma data para agendar.' }, { status: 400, headers });
+      const story = await db.prepare('SELECT author_id FROM stories WHERE id = ? AND moderation_hidden_at IS NULL')
+        .bind(storyId).first<{ author_id: string }>();
+      if (!story) return NextResponse.json({ error: 'História não encontrada.' }, { status: 404, headers });
+      if (story.author_id !== userId) return NextResponse.json({ error: 'Você não pode adicionar capítulos a esta história.' }, { status: 403, headers });
+      const music = await spotifyUpdate(data.spotify_url);
+      if (music instanceof NextResponse) return music;
+      const schedule = scheduledDate?.toISOString() ?? null;
+      const chapter = await d1Books(db, safeChapterHtml).createEditorChapter(hash, {
+        id: crypto.randomUUID(), storyId, title, body: chapterBody, notes: authorNotes || null,
+        status, schedule, music: music.spotify_link ? JSON.stringify(music.spotify_link) : null,
+      });
+      if (!chapter) return NextResponse.json({ error: 'Não foi possível criar o capítulo.' }, { status: 409, headers });
+      return NextResponse.json({
+        success: true, chapter, scheduled: status === 'scheduled', published: chapter.published,
+        publication_status: status, scheduled_for: schedule,
+        original_published_at: chapter.original_published_at, republished_at: null,
+      }, { status: 201, headers });
     }
 
     /*

@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1Permissions } from '@/lib/database/d1-permissions';
+import { d1Moderation } from '@/lib/database/d1-moderation';
+import { uuid } from '@/lib/chat/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getStaffContext, hasStaffPermission, staffPermissionErrorResponse } from '@/lib/admin/authorization';
@@ -22,6 +27,18 @@ async function moderationDepartments(staff: NonNullable<Awaited<ReturnType<typeo
 
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const hash = await getSessionTokenHash();
+      if (!hash || !await db.prepare('SELECT user_id FROM d1_mod_actor WHERE token_hash=?').bind(hash).first()) {
+        return staffPermissionErrorResponse(401);
+      }
+      const permissions = d1Permissions(db);
+      if (!await permissions.hasPermission(hash,'moderation.view') &&
+          !await permissions.hasPermission(hash,'moderation.manage')) return staffPermissionErrorResponse(403);
+      const reports = await d1Moderation(db).reportCards(hash);
+      return NextResponse.json({ reports }, { headers: noStore });
+    }
     const staff = await getStaffContext();
     if (!staff) return staffPermissionErrorResponse(401);
     if (!staff.isPlatformAdmin && !(await hasStaffPermission(staff, 'moderation.view')) &&
@@ -73,8 +90,12 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const staff = await getStaffContext();
-    if (!staff) return staffPermissionErrorResponse(401);
+    const db = getD1PreviewDatabase('auth');
+    const staff = db ? null : await getStaffContext();
+    const hash = db ? await getSessionTokenHash() : staff?.sessionTokenHash;
+    if (!hash || (db && !await db.prepare('SELECT user_id FROM d1_mod_actor WHERE token_hash=?').bind(hash).first())) {
+      return staffPermissionErrorResponse(401);
+    }
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
         typeof body.id !== 'string' || !['in_review', 'resolved', 'dismissed'].includes(body.status) ||
@@ -85,6 +106,28 @@ export async function PATCH(request: NextRequest) {
     if (body.status !== 'in_review' && body.confirm !== true) {
       return NextResponse.json({ error: 'Confirme a decisão final.' }, { status: 400, headers: noStore });
     }
+    if (db) {
+      const id = body.id.toLowerCase();
+      const report = uuid.test(id) ? await db.prepare('SELECT department_id FROM moderation_reports WHERE id=?')
+        .bind(id).first<{ department_id: string }>() : null;
+      if (!report) return NextResponse.json({ error: 'Denúncia não encontrada.' }, { status: 404, headers: noStore });
+      const permissions = d1Permissions(db);
+      if (!await permissions.hasPermission(hash,'moderation.manage',report.department_id)) return staffPermissionErrorResponse(403);
+      const notes = typeof body.internal_notes === 'string' ? body.internal_notes.trim() : '';
+      if (notes.length > 8000) return NextResponse.json({ error: 'As observações podem ter até 8.000 caracteres.' }, { status: 400, headers: noStore });
+      try {
+        await d1Moderation(db).reviewReport(hash, crypto.randomUUID(), id, body.status, notes, body.content_action || 'none');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('permission required')) return staffPermissionErrorResponse(403);
+        if (message.includes('Invalid or closed report') || message.includes('Reported content unavailable')) {
+          return NextResponse.json({ error: 'Denúncia já finalizada ou indisponível.' }, { status: 409, headers: noStore });
+        }
+        throw error;
+      }
+      return NextResponse.json({ ok: true }, { headers: noStore });
+    }
+    if (!staff) return staffPermissionErrorResponse(401);
     const { data: report, error: reportError } = await supabase.from('moderation_reports')
       .select('id, department_id').eq('id', body.id).maybeSingle();
     if (reportError) throw reportError;

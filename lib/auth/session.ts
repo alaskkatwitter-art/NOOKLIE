@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +23,11 @@ export async function getSessionTokenHash(): Promise<string | null> {
 export async function getAuthenticatedUserContext(): Promise<AuthenticatedUserContext | null> {
   const sessionTokenHash = await getSessionTokenHash();
   if (!sessionTokenHash) return null;
+  const db = getD1PreviewDatabase('auth');
+  if (db) {
+    const session = await d1Auth(db).session(sessionTokenHash);
+    return session ? { userId: session.user_id, sessionTokenHash } : null;
+  }
   const { data: session, error } = await supabase
     .from('auth_sessions')
     .select('user_id, expires_at')

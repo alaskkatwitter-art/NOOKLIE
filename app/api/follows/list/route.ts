@@ -1,8 +1,33 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor, d1FollowState } from '@/lib/database/d1-follow-http';
 import { NextResponse } from "next/server";
 import { chatActor, chatDb, uuid, privateHeaders } from "@/lib/chat/server";
 import { isPublicProfileVisible } from "@/lib/moderation/content-visibility";
 export async function GET(request: Request) {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const actor=await d1FollowActor(db);
+      if (!actor) return new NextResponse(null,{status:401});
+      const params=new URL(request.url).searchParams;
+      const target=params.get('user_id') ?? '';
+      const kind=params.get('kind');
+      if (!uuid.test(target)||(kind!=='followers'&&kind!=='following')) return new NextResponse(null,{status:400});
+      if (!(await d1FollowState(db,actor.hash,target))?.allowed) return new NextResponse(null,{status:404});
+      const offset=Math.trunc(Math.max(0,Math.min(100000,Number(params.get('offset'))||0)));
+      const result=await db.prepare(`WITH page AS (
+        SELECT CASE WHEN ?1=1 THEN follower_id ELSE following_id END AS id FROM follows
+        WHERE CASE WHEN ?1=1 THEN following_id ELSE follower_id END=?2 ORDER BY id LIMIT 50 OFFSET ?3
+      ) SELECT page.id,p.username,p.display_name,p.avatar_url,p.verified,p.is_official,
+        p.moderation_hidden_at IS NULL AND a.account_status='active' AND NOT EXISTS(SELECT 1 FROM chat_blocks b WHERE
+          (b.blocker_id=?4 AND b.blocked_id=p.id) OR (b.blocker_id=p.id AND b.blocked_id=?4)) AS visible
+        FROM page JOIN profiles p ON p.id=page.id JOIN auth_accounts a ON a.id=p.user_id ORDER BY page.id`)
+        .bind(Number(kind==='followers'),target,offset,actor.id).all<{visible:number;verified:number;is_official:number}>();
+      if (!result.success) throw Error('Unable to list follows');
+      return NextResponse.json({people:result.results.filter(person=>person.visible).map(({visible,verified,is_official,...person})=>({
+        ...person,verified:Boolean(verified),is_official:Boolean(is_official),
+      })),next:result.results.length===50?offset+50:null},{headers:privateHeaders});
+    }
     const actor = await chatActor();
     if (!actor) return new NextResponse(null, { status: 401 });
     const params = new URL(request.url).searchParams,

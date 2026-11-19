@@ -1,3 +1,5 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getAuthenticatedUserContext } from '@/lib/auth/session';
 import { storyPublication } from '@/lib/stories/publication';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -11,6 +13,24 @@ const supabase = createClient(
 
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const user = await getAuthenticatedUserContext();
+      const headers = {'Cache-Control':'no-store, private',Vary:'Cookie'};
+      if (!user) return NextResponse.json({error:'Não autenticado.'},{status:401,headers});
+      const result = await db.prepare(`SELECT s.id,s.author_id,s.title,s.description,s.cover_url,s.created_at,
+        s.updated_at,s.rating,s.fandom,s.release_at,s.status AS editorial_status,
+        EXISTS(SELECT 1 FROM chapters c WHERE c.story_id=s.id AND c.published=1) AS published,
+        (SELECT count(*) FROM chapters c WHERE c.story_id=s.id) AS chapters_count,
+        (SELECT count(*) FROM story_likes l WHERE l.story_id=s.id) AS likes_count
+        FROM stories s JOIN d1_social_actors a ON a.profile_id=s.author_id
+        WHERE a.token_hash=? ORDER BY s.updated_at DESC,s.id`).bind(user.sessionTokenHash)
+        .all<{release_at:string|null;published:number}>();
+      if (!result.success) throw Error('Unable to load stories');
+      return NextResponse.json({stories:result.results.map(({release_at,published,...row})=>({
+        ...row,status:storyPublication(release_at,Boolean(published)),views_count:0,genre:null,
+      }))},{headers});
+    }
     /* =====================================================
        SESSÃO
     ===================================================== */

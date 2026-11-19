@@ -1,3 +1,6 @@
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { readD1Feed } from '@/lib/database/d1-feed-read';
 import { normalizeHashtag } from '@/lib/social/feed-links';
 import { visiblePosts, visibleReposts } from '@/lib/social/posts';
 import { hiddenFeedProfiles } from '@/lib/moderation/feed-controls';
@@ -10,15 +13,16 @@ const headers = { 'Cache-Control': 'private, no-store' };
 
 export async function GET(request: Request) {
   try {
-    const viewer = await currentViewerProfileId(chatDb);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const actor = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash = ?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const viewer = db ? actor?.profile_id : await currentViewerProfileId(chatDb);
     if (!viewer) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401, headers });
 
     const params = new URL(request.url).searchParams;
     const scope = params.get('scope');
     if (scope && scope !== 'following') return NextResponse.json({ error: 'Filtro inválido.' }, { status: 400, headers });
-    const follows = scope === 'following' ? await chatDb.from('follows').select('following_id').eq('follower_id', viewer) : null;
-    if (follows?.error) throw follows.error;
-    const followed = new Set((follows?.data || []).map(row => row.following_id));
     const rawTag = params.get('tag');
     const tag = rawTag ? normalizeHashtag(rawTag) : '';
     if (rawTag && !tag) return NextResponse.json({ error: 'Hashtag inválida.' }, { status: 400, headers });
@@ -28,6 +32,15 @@ export async function GET(request: Request) {
     if (rawCursor && !cursor) return NextResponse.json({ error: 'Página do feed inválida.' }, { status: 400, headers });
     const beforeTime = cursor ? Number(cursor[1]) : Infinity;
     const beforeKey = cursor ? cursor[2] + ':' + cursor[3] : '';
+
+    if (db && hash) {
+      const feed = await readD1Feed(db, hash, scope === 'following', tag,
+        cursor ? { time: beforeTime, key: beforeKey } : null, PAGE_SIZE);
+      return NextResponse.json(feed, { headers });
+    }
+    const follows = scope === 'following' ? await chatDb.from('follows').select('following_id').eq('follower_id', viewer) : null;
+    if (follows?.error) throw follows.error;
+    const followed = new Set((follows?.data || []).map(row => row.following_id));
 
     let query = chatDb.from('nook_posts')
       .select('id,user_id,created_at')

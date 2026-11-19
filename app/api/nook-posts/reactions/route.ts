@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Feed } from '@/lib/database/d1-feed';
 import { NextResponse } from 'next/server';
 import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
@@ -33,7 +37,11 @@ const ALLOWED_EMOJIS = [
  */
 export async function POST(request: Request) {
   try {
-    const userId = await currentViewerProfileId(supabase);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const actor = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash = ?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const userId = db ? actor?.profile_id : await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -72,6 +80,14 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    if (db && hash) {
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403 });
+      const result = await d1Feed(db).togglePostReaction(hash, postId, emoji, randomUUID());
+      if (!result) return NextResponse.json({ error: 'Post não encontrado.' }, { status: 404 });
+      return NextResponse.json(result, { status: result.reacted ? 201 : 200 });
     }
 
     /*
@@ -217,6 +233,17 @@ export async function POST(request: Request) {
 
 export async function GET(request:Request){
  try{
+ const db = getD1PreviewDatabase('auth');
+ if (db) {
+   const hash = await getSessionTokenHash();
+   const actor = hash && await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash = ?').bind(hash).first();
+   if (!hash || !actor) return NextResponse.json({ error: 'Entre na sua conta.' }, { status: 401 });
+   const id = new URL(request.url).searchParams.get('post_id');
+   const summary = id && await d1Feed(db).reactionSummary(hash, id);
+   return summary
+     ? NextResponse.json({ summary }, { headers: { 'Cache-Control': 'no-store, private' } })
+     : NextResponse.json({ error: 'Publicação indisponível.' }, { status: 404 });
+ }
  const userId=await currentViewerProfileId(supabase);if(!userId)return NextResponse.json({error:'Entre na sua conta.'},{status:401});
  const id=new URL(request.url).searchParams.get('post_id');if(!id||!await isPublicPostVisible(supabase,id))return NextResponse.json({error:'Publicação indisponível.'},{status:404});
  const [reactions,comments]=await Promise.all([supabase.from('nook_post_reactions').select('emoji,user_id').eq('post_id',id),supabase.from('nook_comments').select('id',{count:'exact',head:true}).eq('post_id',id)]);

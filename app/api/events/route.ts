@@ -1,3 +1,7 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getMediaBucket, getHistoricalMediaBucket } from '@/lib/media/r2-binding';
+import type { NooklieD1 } from '@/lib/database/d1';
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { sameOrigin } from '@/lib/chat/server';
@@ -13,7 +17,23 @@ import {
 
 const fields = 'id,title,description,starts_at,ends_at,active,details,revision';
 const maxFormBytes = eventMaxImages * eventImageBytes + eventDataBytes + 32_768;
-const storage = mediaStorage(discoveryDb, 'chapter-media');
+const storage = () => mediaStorage(discoveryDb, 'chapter-media');
+const publicEvent = "active=1 AND julianday(ends_at)>julianday('now')";
+type EventRow = Omit<LiteraryEvent, 'active' | 'details'> & { active: number; details: string | null };
+function eventFromRow(row: EventRow): LiteraryEvent {
+  return { ...row, active: Boolean(row.active), details: row.details ? JSON.parse(row.details) : null };
+}
+async function d1EventActor(db: NooklieD1) {
+  const hash = await getSessionTokenHash();
+  if (!hash) return null;
+  return db.prepare(`SELECT a.user_id AS accountId,a.profile_id AS profileId,
+    a.token_hash AS hash,EXISTS(SELECT 1 FROM platform_admins p WHERE p.user_id=a.user_id) AS admin
+    FROM d1_social_actors a WHERE a.token_hash=?`).bind(hash)
+    .first<{ accountId: string; profileId: string; hash: string; admin: number }>();
+}
+
+const adminCheck = `EXISTS(SELECT 1 FROM d1_social_actors a JOIN platform_admins p ON p.user_id=a.user_id
+  WHERE a.token_hash=?1)`;
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: privateHeaders });
@@ -37,6 +57,37 @@ function imagePath(eventId: string, image: EventImage) {
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      if (params.get('destaque') === '1') {
+        const event = await db.prepare(`SELECT id,title FROM story_events WHERE ${publicEvent}
+          ORDER BY julianday(starts_at),id LIMIT 1`).first<{ id: string; title: string }>();
+        return json({ event });
+      }
+      const actor = await d1EventActor(db);
+      const canManage = Boolean(actor?.admin);
+      const imageId = params.get('image');
+      const eventId = params.get(imageId === null ? 'evento' : 'event') || null;
+      if (imageId !== null && (!eventId || !uuid.test(eventId) || !uuid.test(imageId))) {
+        return problem('Imagem não encontrada.',404);
+      }
+      if (eventId && !uuid.test(eventId)) return problem('Evento inválido.',400);
+      const result = await db.prepare(`SELECT ${fields} FROM story_events
+        WHERE (?1=1 OR (${publicEvent})) AND (?2 IS NULL OR id=?2)
+        ORDER BY julianday(starts_at) DESC,id LIMIT 50`)
+        .bind(Number(canManage),eventId?.toLowerCase() ?? null).all<EventRow>();
+      if (!result.success) throw Error('Events unavailable');
+      const events = result.results.map(eventFromRow);
+      if (imageId === null) return json({ events, can_manage: canManage });
+      const image = events[0]?.details?.images.find(item => item.id === imageId.toLowerCase());
+      if (!image) return problem('Imagem não encontrada.',404);
+      const key = 'chapter-media/' + imagePath(events[0].id,image);
+      const object = await getMediaBucket()?.get(key) ?? await getHistoricalMediaBucket()?.get(key);
+      if (!object) return problem('Não foi possível carregar a imagem.',503);
+      return new Response(object.body,{
+        headers: { ...privateHeaders, 'Content-Type': image.type, 'X-Content-Type-Options': 'nosniff' },
+      });
+    }
     if (params.get('destaque') === '1') {
       const { data, error } = await discoveryDb.from('story_events').select('id,title')
         .eq('active', true).gt('ends_at', new Date().toISOString()).order('starts_at').limit(1).maybeSingle();
@@ -54,7 +105,7 @@ export async function GET(request: Request) {
       const event = row.data as LiteraryEvent | null;
       const image = event?.details?.images.find(item => item.id === imageId);
       if (!image) return problem('Imagem não encontrada.', 404);
-      const result = await storage.download(imagePath(eventId, image));
+      const result = await storage().download(imagePath(eventId, image));
       if (result.error) return problem('Não foi possível carregar a imagem.', 503);
       return new Response(result.data, {
         headers: { ...privateHeaders, 'Content-Type': image.type, 'X-Content-Type-Options': 'nosniff' },
@@ -95,14 +146,15 @@ function validOption(value: unknown, choices: string[]): value is string {
 
 async function removeImages(paths: string[]) {
   if (paths.length) {
-    const result = await storage.remove(paths);
+    const result = await storage().remove(paths);
     if (result.error) console.error('Não foi possível limpar imagens de evento.', result.error);
   }
 }
 
-async function saveEvent(request: Request, accountId: string, editing: boolean) {
-  const staff = await getStaffContext();
-  if (!staff?.isPlatformAdmin) return problem('Apenas a administração pode gerenciar eventos.', 403);
+async function saveEvent(request: Request, accountId: string, editing: boolean,
+  db?: NooklieD1, actor?: NonNullable<Awaited<ReturnType<typeof d1EventActor>>>) {
+  const canManage = db ? Boolean(actor?.admin) : Boolean((await getStaffContext())?.isPlatformAdmin);
+  if (!canManage) return problem('Apenas a administração pode gerenciar eventos.', 403);
   if (Number(request.headers.get('content-length')) > maxFormBytes) {
     return problem('As imagens excedem o tamanho permitido.', 413);
   }
@@ -121,7 +173,7 @@ async function saveEvent(request: Request, accountId: string, editing: boolean) 
       typeof body.starts_at !== 'string' || typeof body.ends_at !== 'string') {
     return problem('Confira o título, a descrição e o período do evento.');
   }
-  const eventId = body.id;
+  const eventId = body.id.toLowerCase();
   const starts = Date.parse(body.starts_at);
   const ends = Date.parse(body.ends_at);
   if (!Number.isFinite(starts) || !Number.isFinite(ends) || ends <= starts) {
@@ -145,8 +197,16 @@ async function saveEvent(request: Request, accountId: string, editing: boolean) 
     topics.push({ title: topic.title.trim(), text: topic.text.trim() });
   }
 
-  const stored = await discoveryDb.from('story_events').select('created_by,details,revision').eq('id', eventId).maybeSingle();
-  if (stored.error) throw stored.error;
+  let stored: { data: { created_by: string | null; details: EventDetails | null; revision: string } | null };
+  if (db) {
+    const row = await db.prepare('SELECT created_by,details,revision FROM story_events WHERE id=?').bind(eventId)
+      .first<{created_by: string | null; details: string | null; revision: string}>();
+    stored = { data: row ? { ...row, details: row.details ? JSON.parse(row.details) : null } : null };
+  } else {
+    const result = await discoveryDb.from('story_events').select('created_by,details,revision').eq('id', eventId).maybeSingle();
+    if (result.error) throw result.error;
+    stored = result;
+  }
   if (editing && !stored.data) return problem('Evento não encontrado.', 404);
   if (editing && body.revision !== stored.data?.revision) {
     return problem('O evento mudou em outra aba. Abra a edição novamente para carregar a versão atual.', 409);
@@ -198,10 +258,52 @@ async function saveEvent(request: Request, accountId: string, editing: boolean) 
       images,
     },
   };
+  if (db && actor) {
+    const bucket = getMediaBucket();
+    if (newFiles.length && !bucket) return problem('Não foi possível enviar as imagens. Tente novamente.',503);
+    const uploaded: string[] = [];
+    let committed = false;
+    try {
+      for (const { image, bytes } of newFiles) {
+        const key = 'chapter-media/' + imagePath(eventId,image);
+        const written = await bucket!.put(key,bytes,{ onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:image.type} });
+        if (!written) throw Error('Event upload failed');
+        uploaded.push(key);
+      }
+      const payload = [values.title,values.description,values.starts_at,values.ends_at,revision,JSON.stringify(values.details)];
+      const statement = editing
+        ? db.prepare(`UPDATE story_events SET title=?3,description=?4,starts_at=?5,ends_at=?6,revision=?7,details=?8
+            WHERE id=?2 AND revision=?9 AND ${adminCheck} RETURNING id`)
+            .bind(actor.hash,eventId,...payload,stored.data?.revision ?? '')
+        : db.prepare(`INSERT INTO story_events(id,title,description,starts_at,ends_at,revision,details,created_by)
+            SELECT ?2,?3,?4,?5,?6,?7,?8,a.user_id FROM d1_social_actors a
+            WHERE a.token_hash=?1 AND ${adminCheck} ON CONFLICT(id) DO NOTHING RETURNING id`)
+            .bind(actor.hash,eventId,...payload);
+      const row = await statement.first<{ id: string }>();
+      if (!row) return problem('O evento mudou em outra aba. Abra a edição novamente.',409);
+      committed = true;
+    } catch (error) {
+      const current = await db.prepare('SELECT revision FROM story_events WHERE id=?').bind(eventId)
+        .first<{ revision: string }>().catch(() => undefined);
+      if (current === undefined) {
+        uploaded.length = 0;
+        throw error;
+      }
+      if (current?.revision !== revision) throw error;
+      committed = true;
+    } finally {
+      if (!committed && uploaded.length) await bucket?.delete(uploaded).catch(() => undefined);
+    }
+    const obsolete = previous.filter(image => !images.some(next => next.id === image.id))
+      .map(image => 'chapter-media/' + imagePath(eventId,image));
+    if (obsolete.length) await bucket?.delete(obsolete).catch(() => undefined);
+    return json({ saved: true }, editing ? 200 : 201);
+  }
+
   const uploaded: string[] = [];
   for (const { image, bytes } of newFiles) {
     const path = imagePath(eventId, image);
-    const upload = await storage.upload(path, bytes, { contentType: image.type, upsert: false });
+    const upload = await storage().upload(path, bytes, { contentType: image.type, upsert: false });
     if (upload.error) {
       await removeImages(uploaded);
       return problem('Não foi possível enviar as imagens. Tente novamente.', 503);
@@ -236,15 +338,29 @@ async function saveEvent(request: Request, accountId: string, editing: boolean) 
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return problem('Acesso restrito.', 403);
-    const reader = await getDiscoveryReader();
-    if (!reader) return problem('Entre na sua conta.', 401);
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1EventActor(db) : null;
+    const reader = db ? null : await getDiscoveryReader();
+    const accountId = actor?.accountId ?? reader?.accountId;
+    if (!accountId) return problem('Entre na sua conta.', 401);
     if (request.headers.get('content-type')?.startsWith('multipart/form-data')) {
-      return await saveEvent(request, reader.accountId, false);
+      return await saveEvent(request, accountId, false, db, actor ?? undefined);
     }
     const body = parseJson(await request.text(), 5000);
     if (!body) return problem('Dados inválidos.');
     if (body.action === 'enter') {
       if(typeof body.event_id!=='string'||!uuid.test(body.event_id)||typeof body.story_id!=='string'||!uuid.test(body.story_id))return NextResponse.json({error:'Selecione o evento e uma obra sua.'},{status:400,headers:privateHeaders});
+      if (db && actor) {
+        const result = await db.prepare(`INSERT INTO story_event_entries(event_id,story_id)
+          SELECT e.id,s.id FROM story_events e JOIN released_stories s ON s.id=?3
+          JOIN d1_social_actors a ON a.profile_id=s.author_id AND a.token_hash=?1
+          WHERE e.id=?2 AND e.active=1 AND julianday(e.starts_at)<=julianday('now')
+          AND julianday(e.ends_at)>julianday('now')
+          ON CONFLICT(event_id,story_id) DO UPDATE SET story_id=excluded.story_id RETURNING story_id`)
+          .bind(actor.hash,body.event_id.toLowerCase(),body.story_id.toLowerCase()).first();
+        return result ? json({saved:true}) : problem('Evento indisponível ou obra não pertence a esta conta.',403);
+      }
+      if (!reader) return problem('Entre na sua conta.',401);
       const now=new Date().toISOString();
       const [event,story]=await Promise.all([
         discoveryDb.from('story_events').select('id').eq('id',body.event_id).eq('active',true).lte('starts_at',now).gt('ends_at',now).maybeSingle(),
@@ -259,8 +375,7 @@ export async function POST(request: Request) {
       return NextResponse.json({saved:true},{headers:privateHeaders});
     }
     if (body.action !== 'create') return problem('Ação inválida.');
-    const staff = await getStaffContext();
-    if (!staff?.isPlatformAdmin) return problem('Apenas a administração pode criar eventos.', 403);
+    if (!(db ? actor?.admin : (await getStaffContext())?.isPlatformAdmin)) return problem('Apenas a administração pode criar eventos.', 403);
     if (!validText(body.title, 120) || !body.title.trim() || !validText(body.description, 2000) ||
         typeof body.starts_at !== 'string' || typeof body.ends_at !== 'string') {
       return problem('Confira o título, a descrição e o período do evento.');
@@ -270,8 +385,15 @@ export async function POST(request: Request) {
     if (!Number.isFinite(starts) || !Number.isFinite(ends) || ends <= starts) {
       return problem('O encerramento deve ser posterior ao início.');
     }
+    if (db && actor) {
+      const created = await db.prepare(`INSERT INTO story_events(id,title,description,created_by,starts_at,ends_at,revision)
+        SELECT ?2,?3,?4,a.user_id,?5,?6,?7 FROM d1_social_actors a WHERE a.token_hash=?1 AND ${adminCheck}
+        RETURNING id`).bind(actor.hash,randomUUID(),body.title.trim(),body.description.trim(),
+          new Date(starts).toISOString(),new Date(ends).toISOString(),randomUUID()).first();
+      return created ? json({saved:true},201) : problem('Apenas a administração pode criar eventos.',403);
+    }
     const { error } = await discoveryDb.from('story_events').insert({
-      title: body.title.trim(), description: body.description.trim(), created_by: reader.accountId,
+      title: body.title.trim(), description: body.description.trim(), created_by: accountId,
       starts_at: new Date(starts).toISOString(), ends_at: new Date(ends).toISOString(),
     });
     if (error) throw error;
@@ -284,16 +406,24 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     if (!sameOrigin(request)) return problem('Acesso restrito.', 403);
-    const reader = await getDiscoveryReader();
-    if (!reader) return problem('Entre na sua conta.', 401);
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1EventActor(db) : null;
+    const reader = db ? null : await getDiscoveryReader();
+    const accountId = actor?.accountId ?? reader?.accountId;
+    if (!accountId) return problem('Entre na sua conta.', 401);
     if (request.headers.get('content-type')?.startsWith('multipart/form-data')) {
-      return await saveEvent(request, reader.accountId, true);
+      return await saveEvent(request, accountId, true, db, actor ?? undefined);
     }
-    const staff = await getStaffContext();
-    if (!staff?.isPlatformAdmin) return problem('Acesso restrito.', 403);
+    if (!(db ? actor?.admin : (await getStaffContext())?.isPlatformAdmin)) return problem('Acesso restrito.', 403);
     const body = parseJson(await request.text(), 500);
     if (!body || typeof body.id !== 'string' || !uuid.test(body.id) || typeof body.active !== 'boolean') {
       return problem('Evento inválido.');
+    }
+    if (db && actor) {
+      const updated = await db.prepare(`UPDATE story_events SET active=?3,revision=?4
+        WHERE id=?2 AND ${adminCheck} RETURNING id`)
+        .bind(actor.hash,body.id.toLowerCase(),Number(body.active),randomUUID()).first();
+      return updated ? json({saved:true}) : problem('Evento não encontrado.',404);
     }
     const { data, error } = await discoveryDb.from('story_events').update({ active: body.active })
       .eq('id', body.id).select('id').maybeSingle();

@@ -1863,6 +1863,7 @@ export default function EditarHistoriaPage() {
 
       if(finalStatus==='scheduled')formData.set('scheduled_for',new Date(scheduledFor).toISOString());
 
+      formData.set('replace_media', '1');
       finalMediaIds.forEach(
         (mediaId) => {
           formData.append(

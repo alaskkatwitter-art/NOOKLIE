@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { d1Auth } from '@/lib/database/d1-auth';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,7 +30,9 @@ export async function POST(request: Request) {
         .update(sessionToken)
         .digest('hex');
 
-      await supabase
+      const db = getD1PreviewDatabase('auth');
+      if (db) await d1Auth(db).revokeSession(tokenHash);
+      else await supabase
         .from('auth_sessions')
         .delete()
         .eq('token_hash', tokenHash);

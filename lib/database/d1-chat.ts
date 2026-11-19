@@ -25,10 +25,45 @@ export function d1Chat(db:NooklieD1,version:1|2=2) {
    return db.prepare(`UPDATE chat_threads SET status=?3,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?2 AND kind='direct'
     AND recipient_id=(SELECT profile_id FROM d1_social_actors WHERE token_hash=?1)
     AND EXISTS(SELECT 1 FROM d1_chat_access WHERE token_hash=?1 AND id=?2 AND blocked=0) RETURNING id`).bind(hash,threadId,accept?'accepted':'spam').first<{id:string}>();},
+  async changeDirectBlock(hash: string, threadId: string, block: boolean) {
+   session(hash);
+   const participants = `WITH authorized AS (
+     SELECT actor_id, CASE WHEN actor_id = initiator_id THEN recipient_id ELSE initiator_id END AS peer
+     FROM d1_chat_access WHERE token_hash = ?1 AND id = ?2 AND kind = 'direct'
+   )`;
+   const sql = block
+     ? `INSERT INTO chat_blocks (blocker_id, blocked_id)
+        SELECT actor_id, peer FROM authorized WHERE peer IS NOT NULL ON CONFLICT DO NOTHING`
+     : `DELETE FROM chat_blocks WHERE (blocker_id, blocked_id) IN (SELECT actor_id, peer FROM authorized)`;
+   const result = await db.prepare(participants + " " + sql).bind(hash, threadId).run();
+   if (!result.success) throw Error('Unable to change chat block');
+   return Boolean(await db.prepare(`SELECT id FROM d1_chat_access WHERE token_hash = ? AND id = ? AND kind = 'direct'`)
+     .bind(hash, threadId).first());
+  },
   async createGroup(hash:string,threadId:string,name:string,members:string[]){session(hash);id(threadId);
    if(typeof name!=='string'||!name.trim()||name.trim().length>60||!Array.isArray(members)||members.length<1||members.length>14||new Set(members).size!==members.length)throw new Error('Invalid group');
    members.forEach(id);const r=await db.prepare('INSERT INTO d1_chat_group_commands(id,token_hash,name,members) VALUES(?,?,?,?)').bind(threadId,hash,name.trim(),JSON.stringify(members)).run();
    if(!r.success)throw new Error('Unable to create group');return{id:threadId};},
+  async inviteUsernames(hash:string,threadId:string,names:string[]) {
+   session(hash);
+   const result = await db.prepare(`WITH candidates AS (
+     SELECT p.id FROM profiles p JOIN auth_accounts a ON a.id=p.user_id
+     WHERE p.username IN(SELECT value FROM json_each(?3)) AND p.moderation_hidden_at IS NULL AND a.account_status='active'
+   ), everyone AS (
+     SELECT profile_id AS id FROM chat_group_members WHERE thread_id=?2 UNION SELECT id FROM candidates
+   )
+   INSERT INTO chat_group_members(thread_id,profile_id,status)
+   SELECT t.id,c.id,'pending' FROM d1_chat_access t CROSS JOIN candidates c
+   WHERE t.token_hash=?1 AND t.id=?2 AND t.kind='group' AND t.initiator_id=t.actor_id AND t.member_status='accepted'
+   AND (SELECT count(*) FROM candidates)=json_array_length(?3) AND (SELECT count(*) FROM everyone)<=15
+   AND NOT EXISTS(SELECT 1 FROM chat_blocks b JOIN candidates member
+     ON member.id IN(b.blocker_id,b.blocked_id)
+     JOIN everyone e ON e.id=CASE WHEN b.blocker_id=member.id THEN b.blocked_id ELSE b.blocker_id END)
+   ON CONFLICT(thread_id,profile_id) DO UPDATE SET status=chat_group_members.status RETURNING profile_id`)
+     .bind(hash,threadId,JSON.stringify(names)).all<{profile_id:string}>();
+   if (!result.success) throw Error('Unable to invite group members');
+   return result.results.length===names.length;
+  },
   async invite(hash:string,threadId:string,target:string){session(hash);
    return db.prepare(`INSERT INTO chat_group_members(thread_id,profile_id,status) SELECT t.id,p.id,'pending' FROM chat_threads t
     JOIN d1_social_actors a ON a.profile_id=t.initiator_id JOIN profiles p ON p.id=?3 JOIN auth_accounts u ON u.id=p.user_id
@@ -90,6 +125,15 @@ export function d1Chat(db:NooklieD1,version:1|2=2) {
     .bind(hash,threadId,tokenHash).first<{thread_id:string}>();},
   async revokeLink(hash:string,threadId:string){session(hash);return db.prepare(`DELETE FROM chat_group_invite_links WHERE thread_id=?2
     AND EXISTS(SELECT 1 FROM d1_chat_access t WHERE t.token_hash=?1 AND t.id=?2 AND t.initiator_id=t.actor_id AND t.member_status='accepted') RETURNING thread_id`).bind(hash,threadId).first<{thread_id:string}>();},
+  async linkInfo(tokenHash:string) {
+   session(tokenHash);
+   return db.prepare(`SELECT t.name,l.expires_at FROM chat_group_invite_links l
+     JOIN chat_threads t ON t.id=l.thread_id AND t.kind='group' AND t.initiator_id=l.created_by
+     JOIN chat_group_members m ON m.thread_id=t.id AND m.profile_id=l.created_by AND m.status='accepted'
+     JOIN profiles p ON p.id=l.created_by AND p.moderation_hidden_at IS NULL
+     JOIN auth_accounts a ON a.id=p.user_id AND a.account_status='active'
+     WHERE l.token_hash=? AND julianday(l.expires_at)>julianday('now')`).bind(tokenHash).first();
+  },
   async joinLink(hash:string,tokenHash:string){session(hash);session(tokenHash);
    return db.prepare(`INSERT INTO chat_group_members(thread_id,profile_id,status)
     SELECT t.id,a.profile_id,'accepted' FROM chat_group_invite_links l JOIN chat_threads t ON t.id=l.thread_id

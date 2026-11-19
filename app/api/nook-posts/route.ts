@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Feed } from '@/lib/database/d1-feed';
+import { normalizeHashtag } from '@/lib/social/feed-links';
 import { isNewsArticle } from '@/lib/news/articles';
 import { sameOrigin } from '@/lib/chat/server';
 import { NextResponse } from 'next/server';
@@ -320,7 +325,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if(!sameOrigin(request)) return new NextResponse(null,{status:403});
-    const userId = await currentViewerProfileId(supabase);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const actor = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash=?')
+      .bind(hash).first<{profile_id:string}>() : null;
+    const userId = db ? actor?.profile_id : await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -388,6 +397,15 @@ export async function POST(request: Request) {
           status: 400,
         }
       );
+    }
+
+    if (db && hash) {
+      const feed = d1Feed(db);
+      const tags = [...new Set((String(text).match(/#[\p{L}\p{N}_-]+/gu) ?? []).map(normalizeHashtag).filter(Boolean))];
+      const post = await feed.createPublication(hash, randomUUID(), { body: text, origin, image: imageUrl, story: storyId, news: newsSlug, tags });
+      if (!post) return NextResponse.json({ error: 'Publicação indisponível ou história sem permissão.' }, { status: 403 });
+      return NextResponse.json({ post: { ...post, pinned: Boolean(post.pinned), author: await feed.author(userId),
+        media: [], reaction_counts: {}, user_reactions: [], comments_count: 0 } }, { status: 201 });
     }
 
     /*

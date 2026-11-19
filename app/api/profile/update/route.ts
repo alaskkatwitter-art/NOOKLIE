@@ -1,3 +1,5 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
 import { spotifyUpdate } from '@/lib/spotify/resolve';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -14,54 +16,63 @@ const supabase = createClient(
 
 export async function PATCH(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    let userId: string | null = null;
+    if (db) {
+      if (!actor) return NextResponse.json({ error: 'Você precisa estar logado.' }, { status: 401 });
+    } else {
+      const cookieHeader = request.headers.get('cookie') || '';
 
-    const sessionCookie = cookieHeader
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .find((cookie) =>
-        cookie.startsWith('toriland_session=')
+      const sessionCookie = cookieHeader
+        .split(';')
+        .map((cookie) => cookie.trim())
+        .find((cookie) =>
+          cookie.startsWith('toriland_session=')
+        );
+
+      if (!sessionCookie) {
+        return NextResponse.json(
+          { error: 'Você precisa estar logado.' },
+          { status: 401 }
+        );
+      }
+
+      const sessionToken = decodeURIComponent(
+        sessionCookie.substring('toriland_session='.length)
       );
 
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Você precisa estar logado.' },
-        { status: 401 }
-      );
-    }
+      if (!sessionToken) {
+        return NextResponse.json(
+          { error: 'Sessão inválida.' },
+          { status: 401 }
+        );
+      }
 
-    const sessionToken = decodeURIComponent(
-      sessionCookie.substring('toriland_session='.length)
-    );
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(sessionToken)
+        .digest('hex');
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Sessão inválida.' },
-        { status: 401 }
-      );
-    }
+      const { data: session, error: sessionError } =
+        await supabase
+          .from('auth_sessions')
+          .select('user_id, expires_at')
+          .eq('token_hash', tokenHash)
+          .maybeSingle();
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(sessionToken)
-      .digest('hex');
+      if (
+        sessionError ||
+        !session ||
+        new Date(session.expires_at).getTime() <= Date.now()
+      ) {
+        return NextResponse.json(
+          { error: 'Sua sessão expirou. Entre novamente.' },
+          { status: 401 }
+        );
+      }
 
-    const { data: session, error: sessionError } =
-      await supabase
-        .from('auth_sessions')
-        .select('user_id, expires_at')
-        .eq('token_hash', tokenHash)
-        .maybeSingle();
-
-    if (
-      sessionError ||
-      !session ||
-      new Date(session.expires_at).getTime() <= Date.now()
-    ) {
-      return NextResponse.json(
-        { error: 'Sua sessão expirou. Entre novamente.' },
-        { status: 401 }
-      );
+      userId = session.user_id;
     }
 
     const body = await request.json();
@@ -169,22 +180,47 @@ export async function PATCH(request: Request) {
     }
 
     if (Object.hasOwn(body, 'spotify_url')) {
-      const existing = typeof body.spotify_url === 'string' && body.spotify_url.trim()
-        ? await supabase.from('profiles').select('spotify_link').eq('user_id', session.user_id).maybeSingle()
-        : null;
-      if (existing?.error) throw existing.error;
-      const music = await spotifyUpdate(body.spotify_url, existing?.data?.spotify_link, false, {
+      let existing;
+      if (typeof body.spotify_url === 'string' && body.spotify_url.trim()) {
+        if (db && actor) {
+          const row = await db.prepare('SELECT spotify_link FROM profiles WHERE id=?').bind(actor.id)
+            .first<{ spotify_link: string | null }>();
+          existing = row?.spotify_link ? JSON.parse(row.spotify_link) : null;
+        } else {
+          const result = await supabase.from('profiles').select('spotify_link').eq('user_id', userId).maybeSingle();
+          if (result.error) throw result.error;
+          existing = result.data?.spotify_link;
+        }
+      }
+      const music = await spotifyUpdate(body.spotify_url, existing, false, {
         title: body.spotify_title, artists: body.spotify_artists,
       });
       if (music instanceof NextResponse) return music;
       Object.assign(updates, music);
     }
 
+    if (db && actor) {
+      const entries = Object.entries(updates);
+      const values = entries.map(([column, value]) =>
+        column === 'spotify_link' && value !== null ? JSON.stringify(value) : value);
+      const profile = await db.prepare(`UPDATE profiles SET ${entries.map(([column]) => column + '=?').join(',')}
+        WHERE id=(SELECT profile_id FROM d1_social_actors WHERE token_hash=?)
+        RETURNING id,username,display_name,bio,avatar_url,cover_url,theme_color,verified,is_official,
+          header_layout,avatar_position,spotify_link`).bind(...values, actor.hash).first<{
+            verified: number; is_official: number; spotify_link: string | null;
+          }>();
+      if (!profile) return NextResponse.json({ error: 'Não foi possível atualizar seu perfil.' }, { status: 500 });
+      return NextResponse.json({ message: 'Perfil atualizado com sucesso.', user: {
+        ...profile, verified: Boolean(profile.verified), is_official: Boolean(profile.is_official),
+        spotify_link: profile.spotify_link ? JSON.parse(profile.spotify_link) : null,
+      } });
+    }
+
     const { data: profile, error: profileError } =
       await supabase
         .from('profiles')
         .update(updates)
-        .eq('user_id', session.user_id)
+        .eq('user_id', userId)
         .select(
           'id, username, display_name, bio, avatar_url, cover_url, theme_color, verified, is_official, header_layout, avatar_position, spotify_link'
         )

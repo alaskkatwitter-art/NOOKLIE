@@ -1,10 +1,14 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Moderation } from '@/lib/database/d1-moderation';
+import { getAuthenticatedUserContext } from '@/lib/auth/session';
 import { NextResponse } from "next/server";
 import { getStaffContext } from "@/lib/admin/authorization";
 import { chatDb, privateHeaders, sameOrigin, uuid } from "@/lib/chat/server";
 export async function POST(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const staff = await getStaffContext();
+    const db = getD1PreviewDatabase('auth');
+    const staff = db ? await getAuthenticatedUserContext() : await getStaffContext();
     if (!staff) return new NextResponse(null, { status: 401 });
     const raw = await request.text();
     if (raw.length > 3000) return new NextResponse(null, { status: 400 });
@@ -20,6 +24,18 @@ export async function POST(request: Request) {
         { error: "Explique a advertência em 10 a 2.000 caracteres." },
         { status: 400 },
       );
+    if (db) {
+      try {
+        await d1Moderation(db).warn(staff.sessionTokenHash, crypto.randomUUID(), b.source_type, b.source_id.toLowerCase(), b.reason);
+      } catch (error) {
+        const duplicate = error instanceof Error && error.message.includes('UNIQUE constraint failed');
+        return NextResponse.json({
+          error: duplicate ? 'Já existe uma advertência para este relato.'
+            : 'Não foi possível advertir. Verifique a permissão e se o relato identifica uma conta elegível.',
+        }, { status: 409, headers: privateHeaders });
+      }
+      return NextResponse.json({ warned: true }, { status: 201, headers: privateHeaders });
+    }
     const r = await chatDb.rpc("moderation_warn", {
       p_session: staff.sessionTokenHash,
       p_source_type: b.source_type,

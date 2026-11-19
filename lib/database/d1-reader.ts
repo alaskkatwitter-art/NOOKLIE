@@ -34,13 +34,21 @@ export function d1Reader(db: NooklieD1, validPreferences: (value: unknown) => bo
     async comments(hash: string | null, chapterId: string, limit=100, after: {createdAt:string;id:string} | null=null) {
       session(hash);if(!Number.isInteger(limit)||limit<1||limit>200)throw new Error('Invalid page size');
       if(after!==null&&(typeof after.createdAt!=='string'||!Number.isFinite(Date.parse(after.createdAt))||typeof after.id!=='string'))throw new Error('Invalid cursor');
-      const result=await db.prepare(reader+` SELECT c.id,c.chapter_id,c.body,c.selected_text,c.start_offset,c.end_offset,
+      const result=await db.prepare(reader+` SELECT c.id,c.chapter_id,c.user_id,c.body,c.selected_text,c.start_offset,c.end_offset,
         c.parent_comment_id,c.created_at,c.sticker_id,p.username,p.display_name,p.avatar_url,p.verified,p.is_official,
         st.image_url AS sticker_url FROM visible_comments c JOIN profiles p ON p.id=c.user_id
         LEFT JOIN user_stickers st ON st.id=c.sticker_id
         WHERE c.chapter_id=?2 AND (?4 IS NULL OR c.created_at>?4 OR (c.created_at=?4 AND c.id>?5))
         ORDER BY c.created_at,c.id LIMIT ?3`).bind(hash,chapterId,limit,after?.createdAt??null,after?.id??null).all<Record<string,unknown>>();
       if(!result.success)throw new Error('Comments unavailable');return result.results;
+    },
+    async commentById(hash: string, id: string) {
+      session(hash);
+      return db.prepare(reader + ` SELECT c.id,c.chapter_id,c.user_id,c.body,c.selected_text,c.start_offset,
+        c.parent_comment_id,c.created_at,c.sticker_id,
+        p.username,p.display_name,p.avatar_url,p.verified,p.is_official,st.image_url AS sticker_url
+        FROM visible_comments c JOIN profiles p ON p.id=c.user_id LEFT JOIN user_stickers st ON st.id=c.sticker_id
+        WHERE c.id=?2`).bind(hash,id).first<Record<string,unknown>>();
     },
     async postComment(hash: string, input: D1CommentInput) {
       session(hash);

@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Books } from '@/lib/database/d1-books';
+import { getSessionTokenHash } from '@/lib/auth/session';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { isPublicProfileVisible } from '@/lib/moderation/content-visibility';
@@ -12,6 +15,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!uuid.test(id)) return unavailable();
 
   try {
+    const preview = getD1PreviewDatabase('auth');
+    if (preview) {
+      const book = await d1Books(preview, safeChapterHtml).download(await getSessionTokenHash(), id.toLowerCase());
+      return book ? NextResponse.json(book, { headers: privateHeaders }) : unavailable();
+    }
     const { data: released, error: releaseError } = await db.from('released_stories')
       .select('id, title, author_id').eq('id', id).is('moderation_hidden_at', null).maybeSingle();
     if (releaseError) throw releaseError;

@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { d1PublicProfile } from '@/lib/database/d1-public-profile';
 import { readingListImageUrl } from '@/lib/reading-lists/image';
 import { NextRequest, NextResponse } from "next/server";
 import { parseProfileTheme } from '@/lib/profile/themes';
@@ -5,17 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getPublicStaffBadges } from "@/lib/admin/public-badges";
 import { getPublicProfileIds, currentViewerProfileId, isLoadedProfileVisible, canViewerAccessLoadedProfile } from '@/lib/moderation/content-visibility';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Variáveis do Supabase não configuradas.");
-}
-
-const supabase = createClient(
-  supabaseUrl,
-  supabaseServiceKey
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SECRET_KEY!);
 
 export async function GET(
   request: NextRequest,
@@ -40,6 +33,14 @@ export async function GET(
         { error: "Username inválido." },
         { status: 400 }
       );
+    }
+
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const profile = await d1PublicProfile(db,await getSessionTokenHash(),decodedUsername);
+      const headers = {'Cache-Control':'no-store, private',Vary:'Cookie'};
+      return profile ? NextResponse.json(profile,{headers})
+        : NextResponse.json({error:'Perfil não encontrado.'},{status:404,headers});
     }
 
     // =========================================================

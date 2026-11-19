@@ -20,6 +20,25 @@ export function d1Auth(db: NooklieD1) {
       return db.prepare(`SELECT id, username, password_hash, recovery_key_hash, account_status
         FROM auth_accounts WHERE username = ?`).bind(username).first<D1Account>();
     },
+    async register(id: string, username: string, passwordHash: string, recoveryHash: string, officialHash: string | null) {
+      if (officialHash !== null) requireHash(officialHash);
+      const account = db.prepare(`INSERT INTO auth_accounts (id, username, password_hash, recovery_key_hash)
+        SELECT ?1, ?2, ?3, ?4
+        WHERE (?2 <> 'nooklie' AND ?5 IS NULL) OR (?2 = 'nooklie' AND EXISTS (
+          SELECT 1 FROM official_signup_tokens WHERE singleton = 1 AND used_at IS NULL AND token_hash = ?5
+        ))
+        ON CONFLICT(username) DO NOTHING`).bind(id, username, passwordHash, recoveryHash, officialHash);
+      const profile = db.prepare(`INSERT INTO profiles (id, user_id, username, is_official)
+        SELECT id, id, username, username = 'nooklie' FROM auth_accounts WHERE id = ?`).bind(id);
+      const claim = db.prepare(`UPDATE official_signup_tokens
+        SET used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE singleton = 1 AND used_at IS NULL AND token_hash = ?1
+          AND EXISTS (SELECT 1 FROM auth_accounts WHERE id = ?2 AND username = 'nooklie')`)
+        .bind(officialHash, id);
+      const results = await db.batch([account, profile, claim]);
+      if (results.some(result => !result.success)) throw Error('Unable to register account');
+      return results[0].meta.changes === 1;
+    },
     async session(tokenHash: string) {
       requireHash(tokenHash);
       return db.prepare(`SELECT s.user_id, s.expires_at FROM auth_sessions s

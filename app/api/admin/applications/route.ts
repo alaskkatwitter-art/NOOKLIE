@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { getAuthenticatedUserContext } from '@/lib/auth/session';
+import { d1Permissions } from '@/lib/database/d1-permissions';
+import { d1ApplicationCards, d1ReviewApplication } from '@/lib/database/d1-applications';
+import { uuid } from '@/lib/chat/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -22,6 +27,21 @@ function dbError(error: { code?: string; message?: string }, label: string) {
 
 export async function GET(request: NextRequest) {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const actor = await getAuthenticatedUserContext();
+      if (!actor) return staffPermissionErrorResponse(401);
+      const hash = actor.sessionTokenHash;
+      const permissions = d1Permissions(db);
+      if (!await permissions.hasPermission(hash,'applications.view') &&
+        !await permissions.hasPermission(hash,'applications.review')) return staffPermissionErrorResponse(403);
+      const opportunityId = new URL(request.url).searchParams.get('opportunity_id');
+      if (opportunityId && !uuid.test(opportunityId)) {
+        return NextResponse.json({error:'Vaga inválida.'},{status:400,headers:noStore});
+      }
+      return NextResponse.json({applications:await d1ApplicationCards(db,hash,opportunityId?.toLowerCase() || null)},
+        {headers:noStore});
+    }
     const staff = await getStaffContext();
     if (!staff) return staffPermissionErrorResponse(401);
     const hasView = await hasStaffPermission(staff, 'applications.view');
@@ -78,8 +98,10 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const staff = await getStaffContext();
-    if (!staff) return staffPermissionErrorResponse(401);
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await getAuthenticatedUserContext() : null;
+    const staff = db ? null : await getStaffContext();
+    if (!actor && !staff) return staffPermissionErrorResponse(401);
     const body = await request.json();
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
         typeof body.id !== 'string' ||
@@ -89,6 +111,29 @@ export async function PATCH(request: NextRequest) {
     if ((body.status === 'approved' || body.status === 'rejected') && body.confirm !== true) {
       return NextResponse.json({ error: 'Confirme a decisão final.' }, { status: 400, headers: noStore });
     }
+    if (db && actor) {
+      const id = body.id.toLowerCase();
+      const application = uuid.test(id) ? await db.prepare(`SELECT x.user_id,o.department_id
+        FROM applications x JOIN opportunities o ON o.id=x.opportunity_id WHERE x.id=?`).bind(id)
+        .first<{user_id:string;department_id:string}>() : null;
+      if (!application) return dbError({code:'P0002'},'PATCH /api/admin/applications');
+      const hash = actor.sessionTokenHash;
+      const permissions = d1Permissions(db);
+      const department = application.department_id;
+      const approving = body.status === 'approved';
+      if (!await permissions.hasPermission(hash,'applications.review',department) || (approving &&
+        (actor.userId===application.user_id || !await permissions.hasPermission(hash,'members.manage',department)))) {
+        return staffPermissionErrorResponse(403);
+      }
+      const notes = typeof body.internal_notes === 'string' ? body.internal_notes.trim() : '';
+      if (notes.length>8000 || (approving ? typeof body.role_id!=='string' || !uuid.test(body.role_id) : body.role_id!=null)) {
+        return dbError({code:'22023'},'PATCH /api/admin/applications');
+      }
+      const updated = await d1ReviewApplication(db,hash,id,body.status,notes,approving ? body.role_id.toLowerCase() : null);
+      return updated ? NextResponse.json({updated:true},{headers:noStore})
+        : dbError({code:'22023'},'PATCH /api/admin/applications');
+    }
+    if (!staff) return staffPermissionErrorResponse(401);
     const { data: application, error: applicationError } = await supabase.from('applications')
       .select('id, opportunity_id')
       .eq('id', body.id)

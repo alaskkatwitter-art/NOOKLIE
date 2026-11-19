@@ -1,7 +1,10 @@
-import { mediaStorage } from '@/lib/media/storage';
+import { randomUUID } from 'node:crypto';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Feed } from '@/lib/database/d1-feed';
 import { chatActor, chatDb, privateHeaders, uuid } from '@/lib/chat/server';
 import { getPublicProfileIds, isPublicPostVisible } from '@/lib/moderation/content-visibility';
-import { AttachmentError, uploadFeedAttachments } from '@/lib/social/upload-attachments';
+import { AttachmentError, removeFeedAttachments, uploadFeedAttachments } from '@/lib/social/upload-attachments';
 
 const fields = 'id,post_id,author_id,content,parent_id,image_url,created_at,updated_at';
 const authorFields = 'id,username,display_name,avatar_url,verified,is_official';
@@ -13,6 +16,18 @@ export async function GET(request: Request) {
     const postId = params.get('post_id') ?? '';
     const replyId = params.get('reply_id');
     if (replyId && !uuid.test(replyId)) return respond({ error: 'Resposta indisponível.' }, 404);
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const hash = await getSessionTokenHash();
+      const feed = d1Feed(db);
+      if (params.get('saved') === '1') {
+        const actor = hash && await db.prepare('SELECT 1 FROM d1_social_actors WHERE token_hash=?').bind(hash).first();
+        if (!actor) return respond({ error: 'Entre para ver suas respostas salvas.' }, 401);
+        return respond({ comments: await feed.replyCards(hash,null,null,true) });
+      }
+      if (!uuid.test(postId) || !await feed.post(hash,postId)) return respond({ error: 'Publicação indisponível.' }, 404);
+      return respond({ comments: await feed.replyCards(hash,postId,replyId,false) });
+    }
     const actor = await chatActor();
     if (params.get('saved') === '1') {
       if (!actor) return respond({ error: 'Entre para ver suas respostas salvas.' }, 401);
@@ -66,8 +81,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   let uploaded: string[] = [];
+  let isolated = false;
   try {
-    const actor = await chatActor();
+    const db = getD1PreviewDatabase('auth');
+    isolated = Boolean(db);
+    const hash = db ? await getSessionTokenHash() : null;
+    const row = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash=?')
+      .bind(hash).first<{profile_id:string}>() : null;
+    const actor = db ? row && { profileId: row.profile_id } : await chatActor();
     if (!actor) return respond({ error: 'Entre para responder à publicação.' }, 401);
     const form = request.headers.get('content-type')?.includes('multipart/form-data') ? await request.formData() : null;
     const body = form ? Object.fromEntries(form.entries()) : await request.json().catch(() => null);
@@ -78,6 +99,29 @@ export async function POST(request: Request) {
     const parentId = body.parent_id || null;
     if ((!content && !(image instanceof File)) || content.length > 2000 || (parentId && (typeof parentId !== 'string' || !uuid.test(parentId)))) {
       return respond({ error: 'Escreva uma resposta de até 2.000 caracteres ou anexe uma imagem.' }, 400);
+    }
+    if (db && hash) {
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return respond({ error: 'Origem não permitida.' }, 403);
+      const feed = d1Feed(db);
+      if (!await feed.post(hash,postId)) return respond({ error: 'Publicação indisponível.' }, 404);
+      if (parentId && !(await feed.replyCards(hash,postId,parentId,false)).length) {
+        return respond({ error: 'Resposta indisponível.' }, 404);
+      }
+      let imageUrl: string | null = null;
+      if (image instanceof File) {
+        const upload = await uploadFeedAttachments([image], actor.profileId, true, true);
+        uploaded = upload.paths;
+        imageUrl = upload.media[0].media_url;
+      }
+      const comment = await feed.comment(hash,randomUUID(),postId,content,parentId,imageUrl);
+      if (!comment) {
+        if (uploaded.length) await removeFeedAttachments(uploaded,isolated).catch(() => undefined);
+        return respond({ error: 'Resposta indisponível.' }, 404);
+      }
+      uploaded = [];
+      const [created] = await feed.replyCards(hash,postId,comment.id,false);
+      return respond({ comment: { ...created, parent_id: parentId } }, 201);
     }
     if (!(await isPublicPostVisible(chatDb, postId))) return respond({ error: 'Publicação indisponível.' }, 404);
     if (parentId) {
@@ -101,7 +145,7 @@ export async function POST(request: Request) {
     const author = await chatDb.from('profiles').select(authorFields).eq('id', actor.profileId).maybeSingle();
     return respond({ comment: { ...result.data, author: author.data ?? null, likes: 0, liked: false, saved: false } }, 201);
   } catch (error) {
-    if (uploaded.length) await mediaStorage(chatDb, 'nook-media').remove(uploaded);
+    if (uploaded.length) await removeFeedAttachments(uploaded,isolated).catch(() => undefined);
     if (error instanceof AttachmentError) return respond({ error: error.message }, 400);
     console.error('feed replies POST', error);
     return respond({ error: 'Não foi possível enviar a resposta.' }, 500);

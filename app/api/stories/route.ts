@@ -1,3 +1,8 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1FollowActor } from '@/lib/database/d1-follow-http';
+import { d1SocialStoryList } from '@/lib/database/d1-social-stories';
+import { getMediaBucket } from '@/lib/media/r2-binding';
+import { uuid } from '@/lib/chat/server';
 import { mediaStorage } from '@/lib/media/storage';
 import { imageMatchesType } from '@/lib/security/uploads';
 import { contentMediaUrl } from '@/lib/security/content-media';
@@ -60,6 +65,13 @@ function getStoragePathFromPublicUrl(
 
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const actor = await d1FollowActor(db);
+      const rows = actor ? await d1SocialStoryList(db,actor.hash) : [];
+      return NextResponse.json({stories:rows.map(story=>({...story,media_url:contentMediaUrl(story.media_url)}))},
+        {headers:privateHeaders});
+    }
     const userId = await currentViewerProfileId(supabaseAdmin);
 
     if (!userId) {
@@ -214,7 +226,9 @@ export async function POST(
     null;
 
   try {
-    const userId = await currentViewerProfileId(supabaseAdmin);
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    const userId = db ? actor?.id : await currentViewerProfileId(supabaseAdmin);
 
     if (!userId) {
       return NextResponse.json(
@@ -231,20 +245,12 @@ export async function POST(
     /*
      * Confirma que o perfil existe.
      */
-    const {
-      data: profile,
-      error: profileError,
-    } =
-      await supabaseAdmin
-        .from('profiles')
-        .select(
-          'id, username, avatar_url, verified, is_official'
-        )
-        .eq(
-          'id',
-          userId
-        )
-        .maybeSingle();
+    const {data:profile,error:profileError} = db ? {
+      data:await db.prepare('SELECT id,username,avatar_url,verified,is_official FROM profiles WHERE id=?')
+        .bind(userId).first<{id:string;username:string;avatar_url:string|null;verified:number;is_official:number}>(),
+      error:null,
+    } : await supabaseAdmin.from('profiles').select('id, username, avatar_url, verified, is_official')
+      .eq('id',userId).maybeSingle();
 
     if (profileError) {
       console.error(
@@ -368,8 +374,7 @@ export async function POST(
     const storagePath =
       `${userId}/${crypto.randomUUID()}.${extension}`;
 
-    uploadedPath =
-      storagePath;
+    if (!db) uploadedPath = storagePath;
 
     const arrayBuffer =
       await file.arrayBuffer();
@@ -382,6 +387,33 @@ export async function POST(
       return NextResponse.json({ error: 'O conteúdo do arquivo não corresponde ao formato da imagem.' }, { status: 415 });
     }
 
+
+    if (db && actor) {
+      const bucket = getMediaBucket();
+      const path = 'd1-social-stories/' + storagePath;
+      const key = BUCKET + '/' + path;
+      const mediaUrl = '/api/content-media?' + new URLSearchParams({bucket:BUCKET,path});
+      if (!await bucket?.put(key,buffer,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:file.type}})) {
+        throw Error('Story media upload failed');
+      }
+      const id = crypto.randomUUID();
+      let saved = false;
+      try {
+        const story = await db.prepare(`INSERT INTO social_stories(id,user_id,media_url,media_type,thought)
+          SELECT ?2,profile_id,?3,?4,?5 FROM d1_social_actors WHERE token_hash=?1
+          RETURNING id,user_id,media_url,media_type,thought,created_at,expires_at`)
+          .bind(actor.hash,id,mediaUrl,file.type==='image/gif'?'gif':'image',thought || null).first<object>();
+        if (!story) throw Error('Story could not be saved');
+        saved = true;
+        return NextResponse.json({story:{...story,user:{...profile,verified:Boolean(profile.verified),
+          is_official:Boolean(profile.is_official)}}},{status:201,headers:privateHeaders});
+      } finally {
+        if (!saved) {
+          const existing = await db.prepare('SELECT id FROM social_stories WHERE id=?').bind(id).first().catch(()=>undefined);
+          if (existing===null) await bucket?.delete([key]).catch(()=>undefined);
+        }
+      }
+    }
 
     /*
      * Upload.
@@ -592,7 +624,9 @@ export async function DELETE(
   request: Request
 ) {
   try {
-    const userId = await currentViewerProfileId(supabaseAdmin);
+    const db = getD1PreviewDatabase('auth');
+    const actor = db ? await d1FollowActor(db) : null;
+    const userId = db ? actor?.id : await currentViewerProfileId(supabaseAdmin);
 
     if (!userId) {
       return NextResponse.json(
@@ -622,6 +656,20 @@ export async function DELETE(
           status: 400,
         }
       );
+    }
+
+    if (db && actor) {
+      const story = typeof storyId==='string' && uuid.test(storyId) ? await db.prepare(`DELETE FROM social_stories
+        WHERE id=?2 AND user_id=(SELECT profile_id FROM d1_social_actors WHERE token_hash=?1)
+        RETURNING media_url`).bind(actor.hash,storyId.toLowerCase()).first<{media_url:string}>() : null;
+      if (!story) return NextResponse.json({error:'Story não encontrado.'},{status:404});
+      if (story.media_url.startsWith('/api/content-media?')) {
+        const path = new URL(story.media_url,request.url).searchParams.get('path');
+        if (path?.startsWith('d1-social-stories/' + actor.id + '/')) {
+          await getMediaBucket()?.delete([BUCKET+'/'+path]).catch(()=>undefined);
+        }
+      }
+      return NextResponse.json({success:true});
     }
 
     const {

@@ -1,3 +1,4 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
 import Link from 'next/link';
 import { discoveryDb } from '@/lib/discovery/server';
 import { getPublicProfileIds } from '@/lib/moderation/content-visibility';
@@ -6,7 +7,7 @@ import AccountBadge from '@/components/AccountBadge';
 export const metadata = { title: 'Equipe do Nooklie' };
 export const dynamic = 'force-dynamic';
 
-export default async function TeamPage() {
+async function loadLegacyTeam() {
   const [members, departments, roles, admins] = await Promise.all([
     discoveryDb.from('team_memberships').select('user_id,department_id,role_id').eq('status', 'active'),
     discoveryDb.from('departments').select('id,name').eq('status', 'active').order('sort_order'),
@@ -15,7 +16,7 @@ export default async function TeamPage() {
   ]);
   if (members.error || departments.error || roles.error || admins.error) {
     console.error('public team', members.error || departments.error || roles.error || admins.error);
-    return <main className="mx-auto max-w-5xl p-6"><h1 className="text-2xl font-bold">Equipe do Nooklie</h1><p role="alert">Não foi possível carregar a equipe agora.</p></main>;
+    return null;
   }
 
   const ids = [...new Set([...members.data, ...admins.data].map(member => member.user_id))];
@@ -36,6 +37,43 @@ export default async function TeamPage() {
   ].map(group => ({ ...group, members: group.members.filter(member => profileById.has(member.userId)) }))
     .filter(group => group.members.length > 0);
 
+  return { groups, profileById };
+}
+
+async function loadTeam() {
+  const db = getD1PreviewDatabase('auth');
+  if (!db) return loadLegacyTeam();
+  type Profile = { user_id: string; username: string; display_name: string | null; avatar_url: string | null;
+    verified: number; is_official: number };
+  const result = await db.prepare(`WITH memberships AS (
+    SELECT 'admins' id, 'Administração' name, 0 kind, 0 ordering, 'Administração' role, pa.user_id FROM platform_admins pa
+    UNION ALL
+    SELECT d.id,d.name,1,d.sort_order,r.name,m.user_id FROM team_memberships m
+    JOIN departments d ON d.id=m.department_id AND d.status='active'
+    JOIN team_roles r ON r.id=m.role_id AND r.department_id=d.id AND r.status='active'
+    WHERE m.status='active'
+  ) SELECT m.id,m.name,m.role,p.user_id,p.username,p.display_name,p.avatar_url,p.verified,p.is_official
+    FROM memberships m JOIN profiles p ON p.user_id=m.user_id JOIN auth_accounts a ON a.id=p.user_id
+    WHERE p.is_private=0 AND p.moderation_hidden_at IS NULL AND a.account_status='active'
+    ORDER BY m.kind,m.ordering,m.id,p.username,m.role`)
+    .all<Profile & { id: string; name: string; role: string }>();
+  if (!result.success) return null;
+  const profileById = new Map(result.results.map(row => [row.user_id, {
+    ...row, verified: Boolean(row.verified), is_official: Boolean(row.is_official),
+  }]));
+  const groupsById = new Map<string, { id: string; name: string; members: { userId: string; role: string }[] }>();
+  for (const row of result.results) {
+    const group = groupsById.get(row.id) ?? { id: row.id, name: row.name, members: [] };
+    group.members.push({ userId: row.user_id, role: row.role });
+    groupsById.set(row.id, group);
+  }
+  return { groups: [...groupsById.values()], profileById };
+}
+
+export default async function TeamPage() {
+  const team = await loadTeam();
+  if (!team) return <main className="mx-auto max-w-5xl p-6"><h1 className="text-2xl font-bold">Equipe do Nooklie</h1><p role="alert">Não foi possível carregar a equipe agora.</p></main>;
+  const { groups, profileById } = team;
   return <main className="mx-auto min-h-screen max-w-5xl space-y-8 p-5 text-white sm:p-8">
     <header className="rounded-3xl border border-pink-300/20 bg-gradient-to-br from-pink-300/15 to-purple-400/5 p-6">
       <Link href="/sobre" className="text-sm text-pink-200">Sobre o Nooklie</Link>

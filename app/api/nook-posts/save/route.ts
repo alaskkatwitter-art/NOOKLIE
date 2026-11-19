@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { getSessionTokenHash } from '@/lib/auth/session';
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Feed } from '@/lib/database/d1-feed';
 import { NextResponse } from 'next/server';
 import { currentViewerProfileId } from '@/lib/moderation/content-visibility';
 import { createClient } from '@supabase/supabase-js';
@@ -21,7 +25,11 @@ const supabase = createClient(
  */
 export async function GET(request: Request) {
   try {
-    const userId = await currentViewerProfileId(supabase);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const session = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash = ?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const userId = db ? session?.profile_id : await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -44,6 +52,11 @@ export async function GET(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    if (db && hash) {
+      const saved = await d1Feed(db).savedEntry(hash, postId);
+      return NextResponse.json({ saved: Boolean(saved) }, { headers: { 'Cache-Control': 'no-store, private' } });
     }
 
     const { data, error } = await supabase
@@ -97,7 +110,11 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const userId = await currentViewerProfileId(supabase);
+    const db = getD1PreviewDatabase('auth');
+    const hash = db ? await getSessionTokenHash() : null;
+    const session = db && hash ? await db.prepare('SELECT profile_id FROM d1_social_actors WHERE token_hash = ?')
+      .bind(hash).first<{ profile_id: string }>() : null;
+    const userId = db ? session?.profile_id : await currentViewerProfileId(supabase);
 
     if (!userId) {
       return NextResponse.json(
@@ -122,6 +139,14 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    if (db && hash) {
+      const origin = request.headers.get('origin');
+      if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403 });
+      const result = await d1Feed(db).toggleSaved(hash, postId, randomUUID());
+      if (!result) return NextResponse.json({ error: 'Post não encontrado.' }, { status: 404 });
+      return NextResponse.json(result, { status: result.saved ? 201 : 200 });
     }
 
     /*

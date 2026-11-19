@@ -19,6 +19,33 @@ export function d1Moderation(db:NooklieD1){
     AND(SELECT count(*) FROM moderation_reports r WHERE r.reporter_id=a.user_id AND r.status IN('pending','in_review'))<10
     ON CONFLICT DO NOTHING RETURNING id`).bind(hash,reportId,kind,contentId,reason,details.trim()).first<{id:string}>();},
   async reports(hash:string){session(hash);const r=await db.prepare(`SELECT r.* FROM moderation_reports r WHERE ${scoped('r.department_id')} ORDER BY r.created_at DESC,r.id LIMIT 100`).bind(hash).all<Record<string,unknown>>();if(!r.success)throw new Error('Reports unavailable');return r.results;},
+  async reportCards(hash: string) {
+    session(hash);
+    const profile = (alias: string) => `CASE WHEN ${alias}.id IS NOT NULL THEN json_object(
+      'user_id',${alias}.user_id,'username',${alias}.username,'display_name',${alias}.display_name,
+      'avatar_url',${alias}.avatar_url,'moderation_hidden_at',${alias}.moderation_hidden_at) END`;
+    const result = await db.prepare(`SELECT r.id,r.reporter_id,r.target_user_id,r.department_id,r.content_type,
+      r.content_id,r.reason,r.details,r.status,r.internal_notes,r.reviewer_id,r.reviewed_at,r.created_at,
+      ${profile('reporter')} AS reporter_json,${profile('target')} AS target_json,
+      CASE WHEN s.id IS NOT NULL THEN json_object('id',s.id,'title',s.title,'moderation_hidden_at',s.moderation_hidden_at)
+        WHEN p.id IS NOT NULL THEN json_object('id',p.id,'body',p.body,'moderation_hidden_at',p.moderation_hidden_at)
+      END AS content_json,
+      coalesce(CASE r.content_type WHEN 'profile' THEN target.moderation_hidden_at
+        WHEN 'story' THEN s.moderation_hidden_at ELSE p.moderation_hidden_at END,'')<>'' AS content_hidden
+      FROM moderation_reports r LEFT JOIN profiles reporter ON reporter.user_id=r.reporter_id
+      LEFT JOIN profiles target ON target.user_id=r.target_user_id
+      LEFT JOIN stories s ON r.content_type='story' AND s.id=r.content_id
+      LEFT JOIN nook_posts p ON r.content_type='post' AND p.id=r.content_id
+      WHERE ${scoped('r.department_id')} ORDER BY r.created_at DESC,r.id LIMIT 300`)
+      .bind(hash).all<Record<string,unknown> & {
+        reporter_json: string | null; target_json: string | null; content_json: string | null; content_hidden: number;
+      }>();
+    if (!result.success) throw Error('Reports unavailable');
+    return result.results.map(({reporter_json,target_json,content_json,content_hidden,...report}) => ({
+      ...report, reporter:reporter_json && JSON.parse(reporter_json), target:target_json && JSON.parse(target_json),
+      content:content_json && JSON.parse(content_json),content_hidden:Boolean(content_hidden),
+    }));
+  },
   async reviewReport(hash:string,eventId:string,reportId:string,status:string,notes='',action='none'){text(notes,0,8000);
    if(!['in_review','resolved','dismissed'].includes(status)||!['none','hide','restore'].includes(action)||(status==='in_review'&&action!=='none'))throw new Error('Invalid moderation decision');
    return command(hash,eventId,'review_report',reportId,{status,notes:notes.trim(),action});},
@@ -32,7 +59,12 @@ export function d1Moderation(db:NooklieD1){
     AND(SELECT count(*) FROM support_tickets t WHERE t.reporter_id=a.user_id AND julianday(t.created_at)>julianday('now','-1 hour'))<10 RETURNING id`)
     .bind(hash,ticketId,category,subject.trim(),details.trim(),targetUsername).first<{id:string}>();},
   async myTickets(hash:string){session(hash);const r=await db.prepare(`SELECT id,category,subject,details,status,response,created_at,updated_at FROM support_tickets WHERE reporter_id=(${actor}) ORDER BY created_at DESC,id LIMIT 50`).bind(hash).all<Record<string,unknown>>();if(!r.success)throw new Error('Support unavailable');return r.results;},
-  async tickets(hash:string){session(hash);const r=await db.prepare(`SELECT t.* FROM support_tickets t WHERE ${scoped('t.department_id')} ORDER BY t.created_at DESC,t.id LIMIT 100`).bind(hash).all<Record<string,unknown>>();if(!r.success)throw new Error('Support unavailable');return r.results;},
+  async tickets(hash:string){session(hash);const r=await db.prepare(`SELECT t.*, reporter.username AS reporter, target.username AS target
+   FROM support_tickets t LEFT JOIN profiles reporter ON reporter.user_id=t.reporter_id
+   LEFT JOIN profiles target ON target.user_id=t.target_user_id
+   WHERE (EXISTS(SELECT 1 FROM d1_mod_actor WHERE token_hash=?1 AND is_root=1)
+     OR (t.department_id IN(SELECT id FROM departments WHERE slug='moderacao' AND status='active')
+       AND ${scoped('t.department_id')})) ORDER BY t.created_at DESC,t.id LIMIT 200`).bind(hash).all<Record<string,unknown>>();if(!r.success)throw new Error('Support unavailable');return r.results.map(({reporter,target,...row})=>({...row,reporter:reporter??undefined,target:target??undefined}));},
   async reviewTicket(hash:string,eventId:string,ticketId:string,status:string,notes='',response=''){text(notes,0,8000);text(response,0,3000);if(!['in_review','resolved','dismissed'].includes(status))throw new Error('Invalid decision');return command(hash,eventId,'support_review',ticketId,{status,notes,response});},
   async assignRole(hash:string,eventId:string,userId:string,roleId:string){id(userId);return command(hash,eventId,'assign_role',roleId,{user:userId});},
   async removeRole(hash:string,eventId:string,membershipId:string,reason=''){text(reason,0,1000);return command(hash,eventId,'remove_role',membershipId,{reason:reason.trim()});},

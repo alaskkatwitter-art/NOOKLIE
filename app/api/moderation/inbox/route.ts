@@ -1,8 +1,32 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1Moderation } from '@/lib/database/d1-moderation';
+import { getAuthenticatedUserContext } from '@/lib/auth/session';
+import { d1Permissions } from '@/lib/database/d1-permissions';
+import type { NooklieD1 } from '@/lib/database/d1';
+
+async function d1InboxStaff(db: NooklieD1, manage = false) {
+  const staff = await getAuthenticatedUserContext();
+  if (!staff) return null;
+  const department = await db.prepare("SELECT id FROM departments WHERE slug='moderacao' AND status='active'")
+    .first<{ id: string }>();
+  if (!department) return null;
+  const permissions = d1Permissions(db);
+  const allowed = await permissions.hasPermission(staff.sessionTokenHash, 'moderation.manage', department.id)
+    || (!manage && await permissions.hasPermission(staff.sessionTokenHash, 'moderation.view', department.id));
+  return allowed ? staff : null;
+}
 import { NextResponse } from "next/server";
 import { moderationStaff } from "@/lib/moderation/staff";
 import { chatDb, privateHeaders, sameOrigin, uuid } from "@/lib/chat/server";
 export async function GET() {
   try {
+    const db = getD1PreviewDatabase('auth');
+    if (db) {
+      const staff = await d1InboxStaff(db);
+      if (!staff) return new NextResponse(null, { status: 403 });
+      const tickets = await d1Moderation(db).tickets(staff.sessionTokenHash);
+      return NextResponse.json({ tickets }, { headers: privateHeaders });
+    }
     const staff = await moderationStaff();
     if (!staff) return new NextResponse(null, { status: 403 });
     let q = chatDb
@@ -44,7 +68,8 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     if (!sameOrigin(request)) return new NextResponse(null, { status: 403 });
-    const staff = await moderationStaff("moderation.manage");
+    const db = getD1PreviewDatabase('auth');
+    const staff = db ? await d1InboxStaff(db, true) : await moderationStaff("moderation.manage");
     if (!staff) return new NextResponse(null, { status: 403 });
     const raw = await request.text();
     if (raw.length > 14000) return new NextResponse(null, { status: 400 });
@@ -58,6 +83,15 @@ export async function PATCH(request: Request) {
       b.response.length > 3000
     )
       return new NextResponse(null, { status: 400 });
+    if (db) {
+      try {
+        await d1Moderation(db).reviewTicket(staff.sessionTokenHash, crypto.randomUUID(), b.id.toLowerCase(),
+          b.status, b.notes, b.response);
+      } catch {
+        return new NextResponse(null, { status: 403 });
+      }
+      return NextResponse.json({ updated: true }, { headers: privateHeaders });
+    }
     const r = await chatDb.rpc("support_review", {
       p_session: staff.sessionTokenHash,
       p_id: b.id,
