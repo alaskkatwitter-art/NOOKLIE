@@ -31,7 +31,13 @@ export async function publishScheduledChapters(db, scheduledTime) {
   const releases = db.prepare(`UPDATE stories SET release_at=NULL
     WHERE julianday(release_at)<=julianday(?1) AND moderation_hidden_at IS NULL
       AND EXISTS (SELECT 1 FROM chapters c WHERE c.story_id=stories.id AND c.published=1)`).bind(now);
-  const result = await db.batch([updates, notifications, releases]);
+  const opportunities = db.prepare(`INSERT INTO opportunity_announcements(opportunity_id,announced_at)
+    SELECT o.id,?1 FROM opportunities o
+    WHERE o.status='open' AND julianday(o.opens_at)<=julianday(?1) AND julianday(o.closes_at)>julianday(?1)
+      AND NOT EXISTS(SELECT 1 FROM opportunity_announcements a WHERE a.opportunity_id=o.id)
+      AND coalesce((SELECT value FROM d1_runtime_flags WHERE key='suppress_notifications'),'0')='0'
+    ON CONFLICT(opportunity_id) DO NOTHING`).bind(now);
+  const result = await db.batch([updates, notifications, releases, opportunities]);
   if (result.some(statement => !statement.success)) throw Error('Scheduled chapter publication failed');
   return result[0].meta.changes;
 }
