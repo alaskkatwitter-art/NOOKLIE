@@ -1,3 +1,6 @@
+import { getD1PreviewDatabase } from '@/lib/database/preview';
+import { d1StaffContext } from '@/lib/database/d1-staff';
+import { d1Permissions } from '@/lib/database/d1-permissions';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -29,6 +32,9 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     .createHash('sha256')
     .update(sessionToken)
     .digest('hex');
+
+  const db = getD1PreviewDatabase('auth');
+  if (db) return d1StaffContext(db, tokenHash);
 
   const { data: session, error: sessionError } = await supabase
     .from('auth_sessions')
@@ -83,6 +89,8 @@ export async function hasStaffPermission(
   permissionCode: string,
   departmentId?: string
 ): Promise<boolean> {
+  const db = getD1PreviewDatabase('auth');
+  if (db) return d1Permissions(db).hasPermission(context.sessionTokenHash, permissionCode, departmentId ?? null);
   if (context.isPlatformAdmin) return true;
   if (context.memberships.length === 0) return false;
 
