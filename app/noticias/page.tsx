@@ -81,6 +81,12 @@ export default function NoticiasPage() {
 
         <section className="mt-12" aria-label="Edições do Jornal Nooklie">
           <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
+            <p className="text-sm font-bold uppercase tracking-widest text-pink-300">Comunidade · <time dateTime="2026-11-20">20 de novembro de 2026</time></p>
+            <h2 className="mt-4 text-3xl font-black">{newsArticles['convites-e-vagas-moderacao'].title}</h2>
+            <p className="mt-4 max-w-xl leading-7 text-white/75">{newsArticles['convites-e-vagas-moderacao'].description}</p>
+            <Link href="/noticias/convites-e-vagas-moderacao" className="mt-6 inline-flex min-h-11 items-center font-bold text-pink-200 hover:underline">Conhecer os convites e a seleção</Link>
+          </article>
+          <article className="mb-5 rounded-3xl border border-pink-300/30 bg-gradient-to-br from-[#421c35] via-[#291522] to-[#171018] p-7 sm:p-10">
             <p className="text-xs font-bold uppercase tracking-widest text-pink-300">Novidades · <time dateTime="2026-11-14">14 de novembro de 2026</time></p>
             <h2 className="mt-4 text-3xl font-black">{latestEdition.title}</h2>
             <p className="mt-4 max-w-xl leading-7 text-white/75">{latestEdition.description}</p>

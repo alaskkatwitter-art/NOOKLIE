@@ -1,9 +1,10 @@
-export const newsArticleSlugs = ['boas-vindas', 'originais', 'atualizacao-6-novembro-2026', 'doacoes-e-novidades', 'nooklie-de-volta'] as const;
+export const newsArticleSlugs = ['convites-e-vagas-moderacao', 'boas-vindas', 'originais', 'atualizacao-6-novembro-2026', 'doacoes-e-novidades', 'nooklie-de-volta'] as const;
 export function isNewsArticle(value: unknown): value is typeof newsArticleSlugs[number] {
   return typeof value === 'string' && (newsArticleSlugs as readonly string[]).includes(value);
 }
 
 export const newsArticles = {
+  'convites-e-vagas-moderacao': { title: 'Autores e leitores mais perto: convites e vagas para moderação', description: 'Saiba como convidar leitores, acompanhar os novos cadastros e participar da seleção de 10 moderadores, com inscrições abertas de 20 de novembro a 12 de dezembro.' },
   'boas-vindas': { title: 'Boas-vindas ao Nooklie', description: 'Conheça os recursos e encontre seu próximo cantinho de leitura.' },
   'originais': { title: 'Um espaço para suas histórias originais', description: 'Conheça as opções para publicar e descobrir obras originais.' },
   'atualizacao-6-novembro-2026': { title: 'Novidades e correções do Nooklie', description: 'Personalização, capítulos, comentários e melhorias sugeridas pela comunidade.' },
