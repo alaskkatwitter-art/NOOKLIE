@@ -1,8 +1,31 @@
 # Estado da virada do Nooklie para D1
 
-**Sem data de virada confirmada.** O site de produção ainda grava no Supabase.
-O banco D1 de migração tem uma cópia preliminar. Os testes HTTP publicados usam
-um terceiro banco, isolado, com dados fictícios.
+**Virada concluída em 19 de novembro de 2026, com reabertura às 21:09 de Brasília.**
+O Worker de produção usa o D1 `nooklie-migration`. O Supabase permanece preservado
+e bloqueado para gravações, com seu cron desativado, como origem de recuperação.
+As seções históricas abaixo registram a preparação e não descrevem o estado atual.
+
+## Resultado operacional da virada
+
+- Worker ativo: `ca61b46e-3509-4346-b233-9382a08e2d5c`, implantação `e9e6767a-a4f4-4839-8fd6-b248fe80ffd9`, com 100% do tráfego. D1: `fcea4d88-3c18-4c21-a6c1-af13c72caa00`; R2 de produção e chave de chat V2 preservados.
+- A versão anterior `43d63ea3-fd4d-403c-b525-946320a228a3` foi consultada e permanece disponível. O marcador D1 anterior aos testes foi `0000001a-00000002-00005128-01f511e2a36726f22785a042c2c78620`.
+- As 72 tabelas do Supabase receberam bloqueio de escrita por gatilhos de instrução. Uma tentativa de UPDATE sem linhas confirmou o bloqueio. O cron `nooklie-release-chapters` foi desativado; o scheduler D1 antigo também ficou sem cron.
+- Sob a pausa, foram comparados 14.316 registros por chave primária e todos os 471 campos, com normalização de tipos e SHA-256. As 72 tabelas coincidiram: nenhuma diferença a aplicar. O marcador D1 permaneceu igual durante a comparação; não houve violações de chave estrangeira.
+- O candidato foi enviado pelo build autenticado do Cloudflare usando `wrangler versions upload`; a falta de login no Wrangler local não impediu a publicação. A troca de tráfego foi feita pela API de deployments.
+- Testes em produção verificaram cadastro, login, sessão, edição de perfil, CSRF, obra e capítulo em rascunho, publicação e leitura pública, biblioteca, listas, feed e detalhe de post, exclusão com autorização, avatar/capa e nova leitura no R2, administração com conta sintética, chat cifrado, edição e cancelamento de mensagem, reordenação e exclusão de capítulo e logout.
+- A publicação agendada foi exercitada no D1 de produção com um capítulo sintético: HTTP 404 antes, HTTP 200 depois; uma notificação e nenhuma nova alteração na segunda execução da rotina. A rotina executada corresponde ao módulo de agendamento do Worker. O Worker temporário de teste foi removido.
+- Foi identificado e corrigido o GET de posts próprios que ainda consultava Supabase. O teste cobre exclusão de outros autores e republicações. Os 80 testes D1 e o TypeScript passaram.
+- Durante a manutenção, as únicas contas e gravações de teste eram sintéticas. Ao terminar, o D1 foi restaurado ao ponto anterior aos testes, os dois objetos R2 sintéticos foram removidos e as 72 tabelas foram comparadas novamente com a origem congelada: 14.316 registros, zero divergências e zero violações. O marcador após a restauração foi `0000001b-00000000-00005129-eba3d208b92bd01747dbba55c0f27f66`.
+- O cron do Worker principal foi configurado para cada minuto. Seu handler respeita a pausa. A liberação de gravações e do agendamento ocorreu às `2026-11-20T00:09:13.422Z`; os tokens temporários de teste foram removidos.
+
+### Publicações e recuperação após a virada
+
+O comando de build de produção prepara uma versão D1 sem trocar automaticamente o tráfego:
+`node cloudflare/deploy-preview.mjs --prepare-d1-production`. A ativação usa um deployment explícito.
+Não publicar novamente o ramo antigo com um comando que selecione Supabase.
+O arquivo `d1/target.json` agora sinaliza produção e impede reutilizar o importador inicial no banco ativo.
+
+Após a reabertura, o D1 é a origem das novas gravações. **Não voltar simplesmente à versão Supabase nem restaurar um marcador antigo:** isso perderia alterações posteriores. Uma reversão exige nova pausa, reconciliação de volta ao Supabase, conferência e só então a troca de versão e liberação dos bloqueios da origem. Nada foi apagado do Supabase.
 
 ## Inventário inicial das 44 rotas
 

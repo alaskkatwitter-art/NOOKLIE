@@ -2,7 +2,7 @@
   "database_name": "nooklie-migration",
   "database_id": "fcea4d88-3c18-4c21-a6c1-af13c72caa00",
   "binding": "NOOKLIE_DB",
-  "stage": "isolated-all-72-source-table-schemas",
+  "stage": "production-d1",
   "applied_migrations": [
     "0001_auth_foundation.sql",
     "0002_profiles_social_permissions.sql",
@@ -16,6 +16,9 @@
     "0010_news_comments.sql",
     "0011_remaining_tables.sql"
   ],
-  "production_cutover": false,
-  "user_data_imported": false
+  "production_cutover": true,
+  "user_data_imported": true,
+  "production_worker": "nooklie",
+  "production_version": "ca61b46e-3509-4346-b233-9382a08e2d5c",
+  "cutover_reopened_at": "2026-11-20T00:09:13.422Z"
 }
