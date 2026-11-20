@@ -246,7 +246,7 @@ export default function HistoriaPage() {
 
             {story.author && (
               <Link
-                href={`/perfil/${story.author.id}`}
+                href={`/perfil/${encodeURIComponent(story.author.username)}`}
                 className="col-start-2 row-start-2 flex min-w-0 items-center gap-2 rounded-xl text-pink-50 hover:text-pink-200 lg:gap-3 lg:border lg:border-white/10 lg:bg-black/20 lg:p-3"
               >
                 {story.author.avatar_url ? (
@@ -303,6 +303,7 @@ export default function HistoriaPage() {
 
               <SpotifyCard value={story.spotify_link} label="Trilha da história" />
 
+              <Link href={`/nookview?story=${encodeURIComponent(story.id)}`} className="mt-4 inline-flex min-h-11 items-center border border-pink-300/30 px-4 text-sm font-bold text-pink-200">Avaliar e resenhar no Nookview</Link>
               {story.allows_download && story.chapters?.some(chapter => chapter.published) && <BookDownloads id={story.id} />}
 
               {!!story.tags?.length && (

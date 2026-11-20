@@ -1,0 +1,11 @@
+# Nookview and community services
+
+The story summary now links to `/perfil/<encoded username>`, matching the public profile route, rather than passing a profile UUID. Public reading lists appear in a responsive two-to-four-column grid with square covers; a disclosure opens each list's visible works in their saved order.
+
+`/nookview` provides one editable reading diary entry per member/story, half-star ratings, reading state, optional reading date, favorites, spoiler-protected reviews, private entries, community/following feeds and review likes. The story summary links to its Nookview entries. The diary has explicit delete confirmation. Only released, accessible stories and visible accounts appear. Private diaries are owner-only; profile privacy, suspension, moderation and bilateral blocks are checked for reads and writes.
+
+`/designers-e-servicos` replaces the sidebar's beta reading link. Members publish service profiles with multiple categories, availability, HTTPS external contact, and up to eight portfolio works. Category shelves scroll horizontally. Free requests have private participant inboxes and server-validated pending/accepted/declined/completed/cancelled transitions. Creation and transitions emit transactional notifications. Paid services are external-contact only; closed services cannot receive new requests. Existing private beta invitations/drafts/notes remain under “Meus trabalhos beta”; the old URL redirects there.
+
+Migration `0016_nookview_services.sql` is additive. It adds four tables, indexes and notification triggers. No existing story, list or beta record is rewritten. Deployment can be reverted to the prior Worker without removing these tables.
+
+Validation: TypeScript, Vinext production build, and 48 HTTP integration scenarios passed, including community privacy, block behavior, release gating, rating/date validation, CSRF, duplicate likes/requests, ownership, portfolio validation and notifications. Browser and production checks are recorded after deployment.

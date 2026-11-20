@@ -1229,118 +1229,23 @@ export default function PublicProfilePage() {
                   description={`${getDisplayName(user)} ainda não deixou nenhuma lista de leitura pública.`}
                 />
               ) : (
-                <div className="mx-auto w-full max-w-2xl space-y-5">
-                  {readingLists.map(
-                    (list) => (
-                      <article
-                        key={
-                          list.id
-                        }
-                        className="profile-themed-surface overflow-hidden rounded-lg border border-white/10 bg-[#151015]"
-                      >
-                        <div className="border-b border-white/10 p-5">
-                          <div className="flex items-start gap-4">
-                            <ReadingListImage src={list.image_url} className="w-24 sm:w-28" />
-                            <div className="min-w-0 flex-1">
-                              <h2 className="break-words text-lg font-black">
-                                {
-                                  list.name
-                                }
-                              </h2>
-
-                              {list.description && (
-                                <p className="profile-themed-text mt-2 text-sm leading-6 text-white/45">
-                                  {
-                                    list.description
-                                  }
-                                </p>
-                              )}
-                            </div>
-
-                            {isSelf && <Link href={'/listas-de-leitura/' + list.id}
-                              className="shrink-0 py-2 text-xs font-semibold text-pink-200">Editar</Link>}
-                          </div>
-                        </div>
-
-                        <div className="divide-y divide-white/[0.06]">
-                          {list.items.length ===
-                          0 ? (
-                            <p className="profile-themed-text p-5 text-sm text-white/30">
-                              Esta lista ainda está vazia.
-                            </p>
-                          ) : (
-                            list.items.map(
-                              (
-                                item
-                              ) => {
-                                const story =
-                                  item.story;
-
-                                if (
-                                  !story
-                                ) {
-                                  return null;
-                                }
-
-                                return (
-                                  <button
-                                    type="button"
-                                    key={
-                                      item.id
-                                    }
-                                    onClick={() =>
-                                      router.push(
-                                        `/historia/${story.id}`
-                                      )
-                                    }
-                                    className="flex w-full gap-4 p-4 text-left transition hover:bg-white/[0.03]"
-                                  >
-                                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-[#211a21]">
-                                      {story.cover_url ? (
-                                        <img
-                                          src={
-                                            contentMediaUrl(story.cover_url)
-                                          }
-                                          alt=""
-                                          className="h-full w-full object-cover"
-                                        />
-                                      ) : (
-                                        <div className="flex h-full items-center justify-center text-xl text-white/20">
-                                          Livro
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="min-w-0">
-                                      <h3 className="profile-themed-text truncate text-sm font-black text-white">
-                                        {
-                                          story.title
-                                        }
-                                      </h3>
-
-                                      {story.description && (
-                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/40">
-                                          {
-                                            story.description
-                                          }
-                                        </p>
-                                      )}
-
-                                      <p className="mt-2 text-[10px] text-white/25">
-                                        {formatDate(
-                                          item.added_at
-                                        )}
-                                      </p>
-                                    </div>
-                                  </button>
-                                );
-                              }
-                            )
-                          )}
-                        </div>
-                      </article>
-                    )
-                  )}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {readingLists.map(list => <details key={list.id} className="group profile-themed-surface relative min-w-0 self-start border border-white/10 bg-[#151015]">
+                    <summary className="cursor-pointer list-none p-3 [&::-webkit-details-marker]:hidden">
+                      <ReadingListImage src={list.image_url} className="mb-3 w-full !rounded-none" />
+                      <h2 className="break-words font-bold">{list.name}</h2>
+                      <p className="mt-1 text-sm text-pink-200">{list.items.filter(item => item.story).length} obras · <span className="group-open:hidden">Abrir lista</span><span className="hidden group-open:inline">Fechar lista</span></p>
+                    </summary>
+                    <div className="border-t border-white/10 p-3">
+                      {list.description && <p className="mb-3 text-sm text-white/65">{list.description}</p>}
+                      {isSelf && <Link href={'/listas-de-leitura/' + list.id} className="mb-3 inline-flex min-h-11 items-center text-sm text-pink-200">Editar lista</Link>}
+                      {!list.items.some(item => item.story) && <p className="text-sm text-white/60">Esta lista ainda está vazia.</p>}
+                      {list.items.map(item => item.story && <Link key={item.id} href={'/historia/' + item.story.id} className="flex min-w-0 gap-2 border-t border-white/10 py-3">
+                        {item.story.cover_url && <img src={contentMediaUrl(item.story.cover_url)} alt="" loading="lazy" className="h-16 w-11 shrink-0 object-contain" />}
+                        <span className="break-words text-sm font-semibold">{item.story.title}</span>
+                      </Link>)}
+                    </div>
+                  </details>)}
                 </div>
               )}
             </section>)}

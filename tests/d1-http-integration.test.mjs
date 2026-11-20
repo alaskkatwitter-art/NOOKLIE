@@ -1425,3 +1425,92 @@ test('Author invitation HTTP signup records the author and dashboard rejects ano
     assert.equal((await invites.POST(f.request('/api/author-invites','POST',{}))).status,401);
   }finally{f.sqlite.close();}
 });
+
+test('Nookview validates reviews, isolates private diaries, and enforces ownership, release, blocks and following',async()=>{
+ const f=fixture();try{
+  const route=f.load(root+'/app/api/nookview/route.ts');
+  const book='22000000-0000-4000-8000-000000000001',chapter='22000000-0000-4000-8000-000000000002';
+  const peer='22000000-0000-4000-8000-000000000003',peerUser='22000000-0000-4000-8000-000000000004',peerHash='b'.repeat(64);
+  f.sqlite.prepare('INSERT INTO auth_accounts(id,username,password_hash,recovery_key_hash) VALUES(?,?,?,?)').run(peerUser,'community_peer','p','peer-recovery');
+  f.sqlite.prepare('INSERT INTO profiles(id,user_id,username) VALUES(?,?,?)').run(peer,peerUser,'community_peer');
+  f.sqlite.prepare('INSERT INTO auth_sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,?)').run('peer-session',peerUser,peerHash,'2099-01-01T00:00:00Z');
+  f.sqlite.prepare('INSERT INTO stories(id,author_id,title,story_kind) VALUES(?,?,?,?)').run(book,f.profile,'Nookview story','original');
+  f.sqlite.prepare('INSERT INTO chapters(id,story_id,title,body,chapter_number,published) VALUES(?,?,?,?,1,1)').run(chapter,book,'One','Body');
+  const body={story:book,body:'A review with <script>literal text</script>',stars:4.5,status:'read',favorite:true,spoiler:true,readOn:'2026-01-01',public:false};
+  assert.equal((await route.POST(f.request('/api/nookview','POST',body,'https://foreign.invalid'))).status,403);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{...body,stars:6}))).status,400);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{...body,readOn:'2026-02-30'}))).status,400);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',body))).status,200);
+  let data=await(await route.GET(f.request('/api/nookview?scope=mine'))).json();
+  assert.equal(data.entries.length,1);assert.equal(data.stats.finished,1);assert.equal(data.stats.favorites,1);assert.equal(data.entries[0].stars,4.5);
+  const id=data.entries[0].id;
+  f.setToken(peerHash);
+  assert.equal((await(await route.GET(f.request('/api/nookview'))).json()).entries.length,0);
+  assert.equal((await route.DELETE(f.request('/api/nookview','DELETE',{id}))).status,404);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{action:'like',id,like:true}))).status,404);
+  f.setToken(f.hash);assert.equal((await route.POST(f.request('/api/nookview','POST',{...body,public:true}))).status,200);
+  f.setToken(peerHash);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{action:'like',id,like:true}))).status,200);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{action:'like',id,like:true}))).status,200);
+  assert.equal((await(await route.GET(f.request('/api/nookview'))).json()).entries[0].likes,1);
+  assert.equal((await(await route.GET(f.request('/api/nookview?scope=following'))).json()).entries.length,0);
+  f.sqlite.prepare('INSERT INTO follows(follower_id,following_id) VALUES(?,?)').run(peer,f.profile);
+  assert.equal((await(await route.GET(f.request('/api/nookview?scope=following'))).json()).entries.length,1);
+  f.sqlite.prepare('INSERT INTO chat_blocks(blocker_id,blocked_id) VALUES(?,?)').run(peer,f.profile);
+  assert.equal((await(await route.GET(f.request('/api/nookview'))).json()).entries.length,0);
+  assert.equal((await route.POST(f.request('/api/nookview','POST',{...body,public:true}))).status,404);
+  f.sqlite.exec('DELETE FROM chat_blocks; DELETE FROM follows;');
+  f.sqlite.prepare('UPDATE profiles SET is_private=1 WHERE id=?').run(f.profile);
+  assert.equal((await(await route.GET(f.request('/api/nookview'))).json()).entries.length,0);
+  f.sqlite.prepare('UPDATE profiles SET is_private=0 WHERE id=?').run(f.profile);
+  f.sqlite.prepare('UPDATE chapters SET published=0 WHERE id=?').run(chapter);
+  assert.equal((await(await route.GET(f.request('/api/nookview'))).json()).entries.length,0);
+  f.setToken(null);assert.equal((await route.POST(f.request('/api/nookview','POST',body))).status,401);
+  assert.equal((await route.GET(f.request('/api/nookview?scope=mine'))).status,401);
+  f.setToken(f.hash);assert.equal((await route.DELETE(f.request('/api/nookview','DELETE',{id}))).status,200);
+  assert.equal(f.sqlite.prepare('SELECT count(*) n FROM nookview_likes').get().n,0);
+  assert.deepEqual(f.sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
+ }finally{f.sqlite.close();}
+});
+
+test('Services enforces free-only requests, private inboxes, valid portfolios and participant state transitions with notifications',async()=>{
+ const f=fixture();try{
+  const route=f.load(root+'/app/api/services/route.ts');
+  const peer='33000000-0000-4000-8000-000000000001',peerUser='33000000-0000-4000-8000-000000000002',peerHash='c'.repeat(64);
+  f.sqlite.prepare('INSERT INTO auth_accounts(id,username,password_hash,recovery_key_hash) VALUES(?,?,?,?)').run(peerUser,'service_peer','p','service-peer');
+  f.sqlite.prepare('INSERT INTO profiles(id,user_id,username) VALUES(?,?,?)').run(peer,peerUser,'service_peer');
+  f.sqlite.prepare('INSERT INTO auth_sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,?)').run('services-session',peerUser,peerHash,'2099-01-01T00:00:00Z');
+  const body={action:'profile',headline:'Covers and beta',bio:'Creative studio',categories:['cover','beta'],availability:'free',contact:'',portfolio:[{title:'Example cover',url:'https://example.com/work',image:'https://example.com/cover.png'}]};
+  assert.equal((await route.POST(f.request('/api/services','POST',body,'https://foreign.invalid'))).status,403);
+  assert.equal((await route.POST(f.request('/api/services','POST',{...body,contact:'javascript:alert(1)'}))).status,400);
+  assert.equal((await route.POST(f.request('/api/services','POST',{...body,availability:'external'}))).status,400);
+  assert.equal((await route.POST(f.request('/api/services','POST',body))).status,200);
+  const ask={action:'request',provider:f.profile,category:'cover',title:'A cover request',brief:'Please create a cover for my story.'};
+  assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,409); // No self-request.
+  f.setToken(peerHash);assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,200);
+  assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,409); // Pending duplicate.
+  let data=await(await route.GET(f.request('/api/services'))).json();assert.equal(data.requests.length,1);assert.equal(data.requests[0].incoming,0);
+  const id=data.requests[0].id;
+  assert.equal((await route.POST(f.request('/api/services','POST',{action:'status',id,status:'accepted'}))).status,409);
+  f.setToken(null);data=await(await route.GET(f.request('/api/services'))).json();assert.equal(data.requests.length,0);assert.equal(data.mine,null);assert.equal(data.providers.length,1);
+  f.setToken(f.hash);data=await(await route.GET(f.request('/api/services'))).json();assert.equal(data.requests[0].incoming,1);
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM user_notifications WHERE notification_type='service_request'").get().n,1);
+  assert.equal((await route.POST(f.request('/api/services','POST',{action:'status',id,status:'completed'}))).status,409);
+  assert.equal((await route.POST(f.request('/api/services','POST',{action:'status',id,status:'accepted'}))).status,200);
+  assert.equal((await route.POST(f.request('/api/services','POST',{action:'status',id,status:'completed'}))).status,200);
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM user_notifications WHERE notification_type='service_request'").get().n,3);
+  assert.equal((await route.POST(f.request('/api/services','POST',{...body,availability:'external',contact:'https://example.com/contact'}))).status,200);
+  f.setToken(peerHash);assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,409);
+  f.setToken(f.hash);assert.equal((await route.POST(f.request('/api/services','POST',body))).status,200);
+  f.setToken(peerHash);assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,200);
+  f.sqlite.prepare('UPDATE profiles SET is_private=1 WHERE id=?').run(peer);
+  f.setToken(f.hash);const privateInbox=await(await route.GET(f.request('/api/services'))).json();assert.equal(privateInbox.requests.length,2);
+  f.setToken(peerHash);
+  data=await(await route.GET(f.request('/api/services'))).json();const pending=data.requests.find(r=>r.status==='pending');
+  assert.equal((await route.POST(f.request('/api/services','POST',{action:'status',id:pending.id,status:'cancelled'}))).status,200);
+  f.sqlite.prepare('INSERT INTO chat_blocks(blocker_id,blocked_id) VALUES(?,?)').run(peer,f.profile);
+  data=await(await route.GET(f.request('/api/services'))).json();assert.equal(data.providers.length,0);assert.equal(data.requests.length,0);
+  assert.equal((await route.POST(f.request('/api/services','POST',ask))).status,409);
+  assert.deepEqual(f.sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
+ }finally{f.sqlite.close();}
+});
