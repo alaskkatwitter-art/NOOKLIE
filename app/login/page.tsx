@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AuthorInvitation from "@/components/AuthorInvitation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [invitedBy, setInvitedBy] = useState("");
+  useEffect(() => {
+    const author = new URLSearchParams(window.location.search).get("convite") || "";
+    if (/^[a-z0-9_]{3,30}$/.test(author)) setInvitedBy(author);
+  }, []);
 
   const [mode, setMode] = useState<"login" | "signup" | "recover">(
     "signup"
@@ -88,7 +94,7 @@ export default function LoginPage() {
 
       // Login realizado com sucesso:
       // envia o usuário para a área personalizada de leitura.
-      router.replace("/inicio");
+      router.replace(invitedBy ? `/convite/${invitedBy}?boasvindas=1` : "/inicio");
       router.refresh();
     } catch {
       setError("Não foi possível conectar ao Nooklie.");
@@ -188,12 +194,13 @@ export default function LoginPage() {
                   setRecoveryKeyWasRotated(false);
                   setMode("login");
                 } else {
-                  router.push("/");
+                  if (invitedBy) { setRecoveryKey(""); setMode("login"); }
+                  else router.push("/");
                 }
               }}
               className="mt-7 w-full rounded-full bg-[#ff78b9] px-6 py-3.5 font-bold text-[#180d15] transition hover:brightness-110"
             >
-              {recoveryKeyWasRotated ? "Ir para o login" : "Continuar para o Nooklie"}
+              {recoveryKeyWasRotated || invitedBy ? "Ir para o login" : "Continuar para o Nooklie"}
             </button>
           </section>
         </div>
@@ -216,6 +223,8 @@ export default function LoginPage() {
                 NOOKLIE
               </span>
             </button>
+
+            {invitedBy && <AuthorInvitation username={invitedBy} compact />}
 
             <h1 className="mt-8 text-2xl font-black">
               {mode === "signup"
