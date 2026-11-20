@@ -13,7 +13,7 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { username, password, officialSignupCode } = await request.json();
+    const { username, password, officialSignupCode, invitedBy } = await request.json();
 
     const cleanUsername = typeof username === 'string' ? username.trim().toLowerCase() : '';
 
@@ -142,7 +142,8 @@ export async function POST(request: Request) {
     const userId = crypto.randomUUID();
 
     if (auth) {
-      const created = await auth.register(userId, cleanUsername, passwordHash, recoveryKeyHash, officialHash);
+      const created = await auth.register(userId, cleanUsername, passwordHash, recoveryKeyHash, officialHash,
+        typeof invitedBy === 'string' ? invitedBy.trim().toLowerCase() : null);
       if (!created) {
         const error = isOfficialAccount
           ? 'O código oficial já foi usado. Solicite um novo código.'

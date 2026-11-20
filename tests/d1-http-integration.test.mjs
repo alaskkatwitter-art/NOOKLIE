@@ -1406,3 +1406,22 @@ test('D1 own-post listing stays in D1 and excludes other authors and reposts',as
   f.setToken(null);assert.equal((await route.GET()).status,401);
  }finally{f.sqlite.close();}
 });
+
+test('Author invitation HTTP signup records the author and dashboard rejects anonymous or cross-site access',async()=>{
+  const f=fixture();try{
+    const invites=f.load(root+'/app/api/author-invites/route.ts');
+    const signup=f.load(root+'/app/api/auth/signup/route.ts');
+    assert.equal((await invites.POST(f.request('/api/author-invites','POST',{},'https://foreign.invalid'))).status,403);
+    assert.equal((await invites.POST(f.request('/api/author-invites','POST',{}))).status,200);
+    const result=await signup.POST(f.request('/api/auth/signup','POST',{username:'invited_http_reader',password:'synthetic-passphrase',invitedBy:'http_reader'}));
+    assert.equal(result.status,201);
+    const dashboard=await(await invites.GET(f.request('/api/author-invites'))).json();
+    assert.equal(dashboard.participating,true);assert.equal(dashboard.registrations,1);
+    assert.equal(dashboard.readers[0].username,'invited_http_reader');
+    const notification=f.sqlite.prepare("SELECT user_id,href FROM user_notifications WHERE notification_type='author_invite_signup'").get();
+    assert.equal(notification.user_id,f.user);assert.equal(notification.href,'/convites');
+    f.setToken(null);
+    assert.equal((await invites.GET(f.request('/api/author-invites'))).status,401);
+    assert.equal((await invites.POST(f.request('/api/author-invites','POST',{}))).status,401);
+  }finally{f.sqlite.close();}
+});

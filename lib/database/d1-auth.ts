@@ -20,7 +20,7 @@ export function d1Auth(db: NooklieD1) {
       return db.prepare(`SELECT id, username, password_hash, recovery_key_hash, account_status
         FROM auth_accounts WHERE username = ?`).bind(username).first<D1Account>();
     },
-    async register(id: string, username: string, passwordHash: string, recoveryHash: string, officialHash: string | null) {
+    async register(id: string, username: string, passwordHash: string, recoveryHash: string, officialHash: string | null, invitedBy: string | null = null) {
       if (officialHash !== null) requireHash(officialHash);
       const account = db.prepare(`INSERT INTO auth_accounts (id, username, password_hash, recovery_key_hash)
         SELECT ?1, ?2, ?3, ?4
@@ -35,7 +35,19 @@ export function d1Auth(db: NooklieD1) {
         WHERE singleton = 1 AND used_at IS NULL AND token_hash = ?1
           AND EXISTS (SELECT 1 FROM auth_accounts WHERE id = ?2 AND username = 'nooklie')`)
         .bind(officialHash, id);
-      const results = await db.batch([account, profile, claim]);
+      const statements = [account, profile, claim];
+      if (invitedBy && /^[a-z0-9_]{3,30}$/.test(invitedBy)) {
+        // Same transaction as account creation: no notification for a failed signup.
+        // Existing invitation URLs remain valid without requiring re-enrolment.
+        statements.push(db.prepare(`INSERT INTO author_invite_registrations(reader_user_id,author_id)
+          SELECT reader.id,author.id FROM auth_accounts reader
+          JOIN profiles author ON author.username=?2
+          JOIN auth_accounts owner ON owner.id=author.user_id
+          WHERE reader.id=?1 AND owner.id<>reader.id AND owner.account_status='active'
+            AND author.moderation_hidden_at IS NULL AND author.is_private=0
+          ON CONFLICT(reader_user_id) DO NOTHING`).bind(id,invitedBy));
+      }
+      const results = await db.batch(statements);
       if (results.some(result => !result.success)) throw Error('Unable to register account');
       return results[0].meta.changes === 1;
     },

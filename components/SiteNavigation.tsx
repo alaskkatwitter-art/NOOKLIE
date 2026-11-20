@@ -61,6 +61,7 @@ const drawerLinks = [
   ["/calendario", "Calendário de atualizações", CalendarDays],
   ["/chat", "Mensagens", MessageCircle],
   ["/minhas-historias", "Minhas histórias", NotebookPen],
+  ["/convites", "Convites", Users],
   ["/leitura-beta", "Leitura beta", NotebookPen],
   ["/noticias", "Jornal Nooklie", Newspaper],
   ["/eventos", "Eventos literários", CalendarDays],

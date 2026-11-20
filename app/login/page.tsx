@@ -49,6 +49,7 @@ export default function LoginPage() {
           username,
           password,
           officialSignupCode,
+          invitedBy: invitedBy || undefined,
         }),
       });
 
