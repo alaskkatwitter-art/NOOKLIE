@@ -1514,3 +1514,55 @@ test('Services enforces free-only requests, private inboxes, valid portfolios an
   assert.deepEqual(f.sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{f.sqlite.close();}
 });
+
+test('Service portfolios upload gallery photos without links and retain profile privacy on image reads',async()=>{
+ const f=fixture();try{
+  const route=f.load(root+'/app/api/services/route.ts');
+  const media=f.load(root+'/app/api/services/media/[profile]/[file]/route.ts');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXnUAAAAASUVORK5CYII=','base64');
+  const data={action:'profile',headline:'Gallery portfolio',bio:'My own work',categories:['cover'],availability:'free',contact:'',portfolio:[{title:'My cover',url:'',image:''}]};
+  const form=new FormData();form.set('data',JSON.stringify(data));form.set('image_0',new File([png],'my-cover.png',{type:'image/png'}));
+  const request=new Request('https://preview.invalid/api/services',{method:'POST',headers:{origin:'https://preview.invalid'},body:form});
+  const response=await route.POST(request);assert.equal(response.status,200);
+  const saved=await response.json();const url=saved.portfolio[0].image;
+  assert.equal(saved.portfolio[0].url,'');assert.match(url,new RegExp('^/api/services/media/'+f.profile+'/[a-f0-9-]+\\.png$'));
+  const context={params:Promise.resolve({profile:f.profile,file:url.split('/').pop()})};
+  const loaded=await media.GET(f.request(url),context);assert.equal(loaded.status,200);assert.equal(loaded.headers.get('content-type'),'image/png');
+  assert.deepEqual(Buffer.from(await loaded.arrayBuffer()),png);assert.match(loaded.headers.get('cache-control'),/private/);
+  f.setToken(null);assert.equal((await media.GET(f.request(url),context)).status,200);
+  f.sqlite.prepare('UPDATE profiles SET is_private=1 WHERE id=?').run(f.profile);
+  assert.equal((await media.GET(f.request(url),context)).status,404);
+  f.setToken(f.hash);assert.equal((await media.GET(f.request(url),context)).status,200);
+  assert.equal((await route.POST(f.request('/api/services','POST',{...data,portfolio:saved.portfolio}))).status,200);
+  const mine=await(await route.GET(f.request('/api/services'))).json();assert.equal(mine.mine.portfolio[0].image,url);
+  assert.equal((await route.POST(f.request('/api/services','POST',{...data,portfolio:[]}))).status,200);
+  assert.equal((await media.GET(f.request(url),context)).status,404); // Removed works cannot be downloaded by an old URL.
+  assert.equal((await media.GET(f.request(url),{params:Promise.resolve({profile:f.profile,file:'../../secret.svg'})})).status,404);
+ }finally{f.sqlite.close();}
+});
+
+test('Gallery upload rejects anonymous, cross-origin, invalid and oversized files and rolls storage back on failed saves',async()=>{
+ const f=fixture();try{
+  const route=f.load(root+'/app/api/services/route.ts');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXnUAAAAASUVORK5CYII=','base64');
+  const data={action:'profile',headline:'Gallery portfolio',bio:'My work',categories:['cover'],availability:'free',contact:'',portfolio:[{title:'My cover',url:'',image:''}]};
+  function upload(file,origin='https://preview.invalid',extraHeaders={}){const form=new FormData();form.set('data',JSON.stringify(data));form.set('image_0',file);return new Request('https://preview.invalid/api/services',{method:'POST',headers:{origin,...extraHeaders},body:form});}
+  const file=()=>new File([png],'cover.png',{type:'image/png'});
+  assert.equal((await route.POST(upload(file(),'https://foreign.invalid'))).status,403);
+  f.setToken(null);assert.equal((await route.POST(upload(file()))).status,401);f.setToken(f.hash);
+  assert.equal((await route.POST(upload(new File(['<svg/>'],'cover.svg',{type:'image/svg+xml'})))).status,400);
+  assert.equal((await route.POST(upload(new File(['pretend PNG'],'cover.png',{type:'image/png'})))).status,415);
+  assert.equal((await route.POST(upload(new File([new Uint8Array(3*1024*1024+1)],'large.png',{type:'image/png'})))).status,413);
+  assert.equal((await route.POST(upload(file(),'https://preview.invalid',{'content-length':String(13*1024*1024)}))).status,413);
+  assert.equal((await route.POST(f.request('/api/services','POST',data))).status,400); // Neither a file nor a link.
+  const foreign='/api/services/media/99999999-9999-4999-8999-999999999999/99999999-9999-4999-8999-999999999999.png';
+  assert.equal((await route.POST(f.request('/api/services','POST',{...data,portfolio:[{title:'Foreign photo',url:'',image:foreign}]}))).status,400);
+  assert.equal(f.objects.size,0);
+  assert.equal((await route.POST(upload(file()))).status,200);const count=f.objects.size;
+  f.sqlite.exec("CREATE TRIGGER reject_portfolio BEFORE UPDATE ON service_profiles BEGIN SELECT RAISE(ABORT,'simulated save failure'); END;");
+  assert.equal((await route.POST(upload(file()))).status,503);assert.equal(f.objects.size,count);
+  const {serviceBody}=f.load(root+'/lib/community/portfolio-upload.ts');
+  let sent=false;const stream=new ReadableStream({pull(controller){if(sent){controller.close();return;}sent=true;controller.enqueue(new Uint8Array(13*1024*1024));}});
+  await assert.rejects(()=>serviceBody(new Request('https://preview.invalid/api/services',{method:'POST',duplex:'half',headers:{'content-type':'multipart/form-data; boundary=test'},body:stream})),/12 MB/);
+ }finally{f.sqlite.close();}
+});
