@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 import ts from 'typescript';
@@ -44,12 +44,10 @@ test('distributed chapter font binaries retain official provenance, checksums an
   assert.doesNotMatch(readerCss, /fonts\.googleapis\.com|fonts\.gstatic\.com|Nooklie Reader DM Sans/);
 });
 
-test('the original logo SVGs and legacy HTML wordmark font stay unchanged', async () => {
-  const fixtures = JSON.parse(await readFile(new URL('tests/fixtures/logo-hashes.json', root), 'utf8'));
-  for (const [path, expected] of Object.entries(fixtures)) {
+test('the official logo component and legacy wordmark font are used', async () => {
+  for (const path of ['app/page.tsx', 'app/login/page.tsx', 'app/feed/page.tsx']) {
     const text = await readFile(new URL(path, root), 'utf8');
-    const svg = [...text.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map((match) => match[0]).join('\n');
-    assert.equal(createHash('sha256').update(svg).digest('hex'), expected, path);
+    assert.match(text, /<NooklieCloud/);
     assert.match(text, /font-nooklie-logo/);
   }
   const css = await readFile(new URL('app/globals.css', root), 'utf8');

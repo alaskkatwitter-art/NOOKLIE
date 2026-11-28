@@ -1,5 +1,7 @@
 'use client';
 
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import type { AccountBadgeFlags } from '@/components/AccountBadge';
 import { isReadingStatus, readingStatuses, type ReadingStatus } from '@/lib/library/reading-status';
 import {contentMediaUrl} from '@/lib/security/content-media';
@@ -72,21 +74,7 @@ function matchesFilter(item: LibraryItem, filter: LibraryFilter, readingDetailsA
 
 function CloudIcon() {
   return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M7.5 18.5H17a4.5 4.5 0 0 0 .72-8.942A6.5 6.5 0 0 0 5.02 10.5H4.5a4 4 0 0 0 0 8h3Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <NooklieCloud width="22" height="22" aria-hidden="true" />
   );
 }
 

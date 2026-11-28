@@ -1,7 +1,9 @@
 "use client";
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import AccountBadge from '@/components/AccountBadge';
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Cloud, MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send } from "lucide-react";
 type Comment = {
   id: string;
   content: string;
@@ -83,7 +85,7 @@ export default function MuralActions({ postId }: { postId: string }) {
             }
           }}
         >
-          <Cloud size={20} fill={liked ? "currentColor" : "none"} />
+          <NooklieCloud size={20} fill={liked ? "currentColor" : "none"} />
           {likes}
         </button>
         <button

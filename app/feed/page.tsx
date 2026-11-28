@@ -1,4 +1,6 @@
 'use client';
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import LiteraryEventHighlight from '@/components/LiteraryEventHighlight';
 import QuotedReply from '@/components/QuotedReply';
 import FeedVideo from '@/components/FeedVideo';
@@ -135,26 +137,12 @@ const SPOTIFY_URL_REGEX =
 
 function CloudIcon({
   className = 'h-5 w-5',
-  filled = false,
 }: {
   className?: string;
   filled?: boolean;
 }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.5 19h9a4.5 4.5 0 0 0 .8-8.93A6 6 0 0 0 5.6 8.5 4.25 4.25 0 0 0 7.5 19Z"
-      />
-    </svg>
+    <NooklieCloud className={className} aria-hidden="true" />
   );
 }
 

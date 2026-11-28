@@ -1,4 +1,5 @@
 "use client";
+import { NooklieCloud } from "@/components/NooklieCloud";
 
 import BookDownloads from '@/components/BookDownloads';
 import { SpotifyCard } from '@/components/SpotifyLink';
@@ -192,7 +193,7 @@ export default function HistoriaPage() {
         <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6">
           <div className="text-center">
             <div className="mb-4 text-5xl">
-              ☁️
+              <NooklieCloud size={28} />
             </div>
 
             <h1 className="mb-2 text-2xl font-semibold">

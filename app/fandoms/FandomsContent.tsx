@@ -1,5 +1,7 @@
 'use client';
 
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import AccountBadge from '@/components/AccountBadge';
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
@@ -521,25 +523,7 @@ function MobileNavLink({
 
 function CloudLogo() {
   return (
-    <svg
-      width="48"
-      height="32"
-      viewBox="0 0 180 105"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Logo Nooklie"
-    >
-      <path
-        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        fill="#FF78B9"
-      />
-
-      <path
-        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        stroke="#FF9BCB"
-        strokeWidth="3"
-      />
-    </svg>
+    <NooklieCloud width="48" height="32" aria-label="Logo Nooklie" style={{ color: "#ff78b9" }} />
   );
 }
 

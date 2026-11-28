@@ -1,12 +1,14 @@
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import Link from "next/link";
-import { Cloud, HeartHandshake, BookOpen, Sparkles } from "lucide-react";
+import { HeartHandshake, BookOpen, Sparkles } from "lucide-react";
 export const metadata = { title: "Sobre o Nooklie | Nooklie" };
 export default function Page() {
   return (
     <main className="info-page min-h-screen px-5 py-12 text-white">
       <article className="mx-auto max-w-3xl">
         <header className="info-hero">
-          <Cloud size={48} className="text-[#ff9bca]" />
+          <NooklieCloud size={48} className="text-[#ff9bca]" />
           <p className="mt-5 text-xs font-bold uppercase tracking-[.22em] text-[#ff9bca]">
             De fã para fã
           </p>

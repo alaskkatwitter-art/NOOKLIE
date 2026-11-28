@@ -1,5 +1,7 @@
 'use client';
 
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import {contentMediaUrl} from '@/lib/security/content-media';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -16,21 +18,7 @@ type SavedItem = {
 
 function CloudIcon() {
   return (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M7.5 18.5H17C19.4853 18.5 21.5 16.4853 21.5 14C21.5 11.6304 19.6685 9.68907 17.3445 9.51352C16.6917 6.90473 14.3338 5 11.5 5C8.35051 5 5.7974 7.35271 5.48042 10.4199C3.20692 10.918 1.5 12.9488 1.5 15.25C1.5 17.0459 2.95406 18.5 4.75 18.5H7.5Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <NooklieCloud width="28" height="28" />
   );
 }
 

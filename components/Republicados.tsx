@@ -1,10 +1,12 @@
 "use client";
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import RepostAttribution, {type RepostAuthor} from './RepostAttribution';
 import {isNewsArticle,newsArticles} from '@/lib/news/articles';
 import AccountBadge from '@/components/AccountBadge';
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CloudUpload, LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { contentMediaUrl } from "@/lib/security/content-media";
 import RepostActions from "./RepostActions";
 type Post = {
@@ -88,7 +90,7 @@ export default function Republicados({
     <section className="mx-auto max-w-2xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-xl font-bold">
-          <CloudUpload className="text-[#ff9bca]" />
+          <NooklieCloud className="text-[#ff9bca]" />
           Republicados
         </h2>
         {own && (
@@ -121,7 +123,7 @@ export default function Republicados({
             className="rounded-3xl border border-white/10 bg-white/[.025] p-5"
           >
             <p className="mb-4 flex items-center gap-2 text-xs text-[#ffb9da]">
-              <CloudUpload size={16} />
+              <NooklieCloud size={16} />
               Nooklado em{" "}
               {new Date(p.repost.created_at).toLocaleDateString("pt-BR")}
             </p>

@@ -1,4 +1,6 @@
 'use client';
+
+import { NooklieCloud } from "@/components/NooklieCloud";
 import { PostMentions } from '@/components/PostMention';
 import FeedVideo from '@/components/FeedVideo';
 import AccountBadge from '@/components/AccountBadge';
@@ -11,7 +13,7 @@ import { parseProfileThemeCollection, profileThemeVariables, type ProfileThemeCo
 import type { ProfileAvatarPosition, ProfileHeaderLayout } from '@/lib/profile/appearance';
 import Republicados from '@/components/Republicados';
 
-import { Cloud, MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from 'lucide-react';
+import { MessageCircle, BookOpen, Image as ImageIcon, Pin, Music2 } from "lucide-react";
 import {contentMediaUrl} from '@/lib/security/content-media';
 import LinkedNewsCard from '@/components/LinkedNewsCard';
 import LinkedStoryCard from '@/components/LinkedStoryCard';
@@ -3298,7 +3300,7 @@ export default function PerfilPage() {
                                         )}
 
                                         <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
-                                          <button type="button" aria-label="Curtir publicação" aria-pressed={social.user_reactions.includes('❤️')} onClick={()=>handleReaction(post.id,'❤️')} className="social-action"><Cloud size={20} fill={social.user_reactions.includes('❤️')?'currentColor':'none'}/><span>{social.counts['❤️']||0}</span></button>
+                                          <button type="button" aria-label="Curtir publicação" aria-pressed={social.user_reactions.includes('❤️')} onClick={()=>handleReaction(post.id,'❤️')} className="social-action"><NooklieCloud size={20} fill={social.user_reactions.includes('❤️')?'currentColor':'none'}/><span>{social.counts['❤️']||0}</span></button>
                                           <button type="button" aria-label="Comentários" onClick={()=>toggleComments(post.id)} className="social-action"><MessageCircle size={19}/><span>{social.comments_count}</span></button>
                                         </div>
 
@@ -3839,25 +3841,6 @@ function CloudLogo({
   color?: string;
 }) {
   return (
-    <svg
-      width="48"
-      height="30"
-      viewBox="0 0 180 105"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Logo Nooklie"
-    >
-      <path
-        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        fill={color}
-      />
-
-      <path
-        d="M45 79C26 79 14 67 14 51C14 36 25 24 40 23C45 9 58 2 73 2C89 2 102 12 106 27C111 24 117 22 124 22C143 22 158 36 158 54C158 57 158 60 157 63C168 66 174 74 174 84C174 96 164 103 151 103H45C28 103 17 94 17 83C17 81 17 80 18 78C26 79 35 79 45 79Z"
-        stroke={color}
-        strokeOpacity="0.75"
-        strokeWidth="3"
-      />
-    </svg>
+    <NooklieCloud width="48" height="30" aria-label="Logo Nooklie" style={{ color: color }} />
   );
 }
